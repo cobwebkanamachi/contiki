@@ -1,0 +1,64 @@
+= Toolchain installation =
+
+  Some care has to be taken in order to use Jennics toolchain together with
+the build system of Contiki. Libraries and header files provided by Jennic
+have to either be copied to a compiler-known path or by setting JENSDK_PATH
+prior to running make, i.e. the make call to build an application will become:
+
+ $ make JENSDK_PATH=/path/to/jennic/sdk/installation
+
+If you do not like to specify this on every make call, you can add that path to
+your project specific Makefile.target, i.e. is enough:
+
+ $ echo JENSDK_PATH=/path/to/jennic/sdk/installation >> Makefile.target
+
+For example to build examples/ethbridge and program it into a jennic module
+connected to your serial line using jenprog, you need to do the following:
+
+ $ cd examples/ethbridge
+ $ make TARGET=jnusb ethbridge.jnusb.hex
+ $ jenprog ethbridge.jnusb.hex
+
+= Platforms =
+
+  Two example platforms are included in the Jennic port: jndevkit and jnusb.
+The first one supports the demo board from Jennics evaluation kit. The latter is
+a homegrown board with a Maxim USB controller attached, this boards enables the
+use as a ethernet emulation usb stick (cdc_subset), similar to the AVR raven
+board. Schematics and Board Layout are available on request.
+
+= Wireless support =
+
+  All Jennic chips include a ieee802.15.4 wireless controller. Support for
+sicslowpan and ipv6 on top of these controllers is implemented and tested.
+
+= Programming & Debugging =
+
+  Reprogramming and debugging jennic chips is done via the serial line. For
+reprogramming purposes you can either use jennic provided tool or if you are
+working under linux you can use jenprog
+(http://www.teco.edu/~scholl/jenprog-1.0.tar.gz).
+
+  Debugging support is enabled by compiling with the DEBUG flag set:
+
+ $ make DEBUG=true
+
+this will start gdb stubs on the jennic chip whenever you power it up, to open
+the debug shell use the following commands:
+
+ $ ba-elf-gdb <your-program>
+GNU gdb 6.6
+Copyright (C) 2006 Free Software Foundation, Inc.
+GDB is free software, covered by the GNU General Public License, and you are
+welcome to change it and/or distribute copies of it under certain conditions.
+Type "show copying" to see the conditions.
+There is absolutely no warranty for GDB.  Type "show warranty" for details.
+This GDB was configured as "--host=i686-pc-linux-gnu --target=ba-elf".
+(gdb) set ignore_MMU 1
+(gdb) set remotebaud 38400
+(gdb) target remote /dev/ttyUSB0
+
+Assuming that you connected you jennic through with the provided ftdi-cable
+attached to /dev/ttyUSB0 and the first serial port on the jennic. Keep in mind
+that debugger itself is pretty buggy.
+

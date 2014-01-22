@@ -1,0 +1,836 @@
+CONTIKI_CPU_DIRS = . 
+#dev net sys
+#CONTIKI_SOURCEFILES += clock.c timer-arch.c uart1.c uart0.c jts.c assert.c i2c.c irq.c sprintf.c watchdog.c init.c slip.c
+
+###############################################################################
+# Compiler Paths
+
+CC	= gcc
+AS	= as
+LD	= ld
+AR	= ar
+NM	= nm
+STRIP	= strip
+SIZE	= size
+OBJCOPY = objcopy
+OBJDUMP = objdump
+RANLIB	= ranlib
+
+# Set toolchain path to use ba2 version of compiler
+TOOLCHAIN_PATH = ba-elf-ba2
+CROSS_COMPILE  = ba-elf
+
+SDK_BASE_DIR ?= /cygdrive/C/Jennic
+#$(abspath $(CONTIKI)/platform/jn5168/Jennic)
+TOOL_BASE_DIR ?= $(SDK_BASE_DIR)/Tools
+SUBWCREV ?= $(TOOL_BASE_DIR)/TortoiseSVN/bin/subwcrev.exe
+
+ifdef CROSS_COMPILE
+CC:=$(TOOL_BASE_DIR)/$(TOOLCHAIN_PATH)/bin/$(CROSS_COMPILE)-$(CC)
+AS:=$(TOOL_BASE_DIR)/$(TOOLCHAIN_PATH)/bin/$(CROSS_COMPILE)-$(AS)
+LD:=$(TOOL_BASE_DIR)/$(TOOLCHAIN_PATH)/bin/$(CROSS_COMPILE)-$(LD)
+AR:=$(TOOL_BASE_DIR)/$(TOOLCHAIN_PATH)/bin/$(CROSS_COMPILE)-$(AR)
+NM:=$(TOOL_BASE_DIR)/$(TOOLCHAIN_PATH)/bin/$(CROSS_COMPILE)-$(NM)
+STRIP:=$(TOOL_BASE_DIR)/$(TOOLCHAIN_PATH)/bin/$(CROSS_COMPILE)-$(STRIP)
+SIZE:=$(TOOL_BASE_DIR)/$(TOOLCHAIN_PATH)/bin/$(CROSS_COMPILE)-$(SIZE)
+OBJCOPY:=$(TOOL_BASE_DIR)/$(TOOLCHAIN_PATH)/bin/$(CROSS_COMPILE)-$(OBJCOPY)
+OBJDUMP:=$(TOOL_BASE_DIR)/$(TOOLCHAIN_PATH)/bin/$(CROSS_COMPILE)-$(OBJDUMP)
+endif
+
+##############################################################################
+# User definable make parameters that may be overwritten from the command line
+
+# Default target device is the JN5148, (JN5148J01, JN5142J01, JN5168, JN5164 also valid)
+JENNIC_CHIP ?= JN5168
+# Factory reset PDM magic number (0 for default)
+FACTORY_RESET_MAGIC ?= 0
+
+# Default DK4 development kit target hardware
+JENNIC_PCB ?= DEVKIT4
+
+JENNIC_STACK=None
+# Figure out chip family and short chip name
+ifeq ($(JENNIC_CHIP), JN5168)
+JENNIC_CHIP_FAMILY = JN516x
+JENNIC_CHIP_SHORT = 68
+endif
+
+ifeq ($(JENNIC_CHIP), JN5164)
+JENNIC_CHIP_FAMILY = JN516x
+JENNIC_CHIP_SHORT = 64
+endif
+
+ifeq ($(JENNIC_CHIP), JN5148)
+JENNIC_CHIP_FAMILY = JN514x
+JENNIC_CHIP_SHORT = 48
+endif
+
+ifeq ($(JENNIC_CHIP), JN5148J01)
+JENNIC_CHIP_FAMILY = JN514x
+JENNIC_CHIP_SHORT = 8J
+endif
+
+ifeq ($(JENNIC_CHIP), JN5142J01)
+JENNIC_CHIP_FAMILY = JN514x
+JENNIC_CHIP_SHORT = 2J
+endif
+
+# Default driver device is DR1174, (but really has no effect on this template router) 
+DEVICE_NAME ?= DR1174
+
+# Figure out node type ?
+ifeq ($(JENNIC_CHIP_FAMILY), JN516x) 
+# JN516x defaults to Router (can be EndDevice)
+NODE_TYPE ?= Router
+endif
+
+ifeq ($(JENNIC_CHIP_FAMILY), JN514x) 
+# JN514x must be Router
+NODE_TYPE = Router
+endif
+
+# Calculate character for node type
+ifeq ($(NODE_TYPE), Coordinator) 
+NODE_TYPE_CHAR = c
+endif
+ifeq ($(NODE_TYPE), Router) 
+NODE_TYPE_CHAR = r
+endif
+ifeq ($(NODE_TYPE), EndDevice) 
+NODE_TYPE_CHAR = e
+endif
+# Build JIP Node Name (prefix of Node MIB Name variable
+JIP_NODE_NAME ?= $(JIP_DEVICE_TYPE_CHAR)$(JIP_PRODUCT_ID)$(NODE_TYPE_CHAR)$(JENNIC_CHIP_SHORT)
+
+# Flags to build stack MIB persistance support
+BLD_MIB_NODE         = 0
+BLD_MIB_GROUP        = 0
+
+# Flags to build and register common MIBs
+BLD_MIB_NODE_STATUS  = 0
+REG_MIB_NODE_STATUS  = 0
+
+BLD_MIB_NODE_CONTROL = 0
+REG_MIB_NODE_CONTROL = 0
+
+BLD_MIB_ADC_STATUS   = 0
+REG_MIB_ADC_STATUS   = 0
+
+BLD_MIB_NWK_CONFIG   = 0
+REG_MIB_NWK_CONFIG   = 0
+
+BLD_MIB_NWK_PROFILE  = 0
+REG_MIB_NWK_PROFILE  = 0
+
+BLD_MIB_NWK_STATUS   = 0
+REG_MIB_NWK_STATUS   = 0
+
+BLD_MIB_NWK_SECURITY = 0
+REG_MIB_NWK_SECURITY = 0
+
+BLD_MIB_NWK_TEST     = 0
+REG_MIB_NWK_TEST     = 0
+
+# Zero version if not passed in on the command line 
+VERSION ?= 0
+# Need to create a time based version number ? 
+ifeq ($(VERSION), 0)
+# Get touched time
+TEMP := $(shell touch touch.txt)
+TOUCHED := $(word 6, $(shell ls -l --time-style=+%w%H%M touch.txt))
+VERSION := $(TOUCHED)
+else ifeq ($(VERSION), 1)
+# Get touched time
+TEMP := $(shell touch touch.txt)
+TOUCHED := $(word 6, $(shell ls -l --time-style=+%y%m%d touch.txt))
+VERSION := $(TOUCHED)
+else
+TOUCHED := 0
+endif
+
+# Set makefile defines 
+CFLAGS += -DMK_TARGET=\"$(TARGET)\"
+CFLAGS += -DMK_DEVICE_NAME=\"$(DEVICE_NAME)\"
+CFLAGS += -DMK_JIP_NODE_NAME=\"$(JIP_NODE_NAME)\"
+ifeq ($(NODE_TYPE), Router)
+CFLAGS += -DMK_NODE_TYPE=E_JIP_DEVICE_ROUTER
+endif
+ifeq ($(NODE_TYPE), EndDevice)
+CFLAGS += -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE
+CFLAGS += -DMK_BLD_NODE_TYPE_END_DEVICE
+endif
+CFLAGS += -DMK_VERSION=\"$(VERSION)\"
+CFLAGS += -DMK_JIP_DEVICE_ID=$(JIP_DEVICE_ID)
+CFLAGS += -DMK_JIP_DEVICE_TYPE=$(JIP_DEVICE_TYPE)
+CFLAGS += -DMK_NETWORK_ID=$(NETWORK_ID)
+CFLAGS += -DMK_CHANNEL=$(CHANNEL)
+CFLAGS += -DMK_SECURITY=$(SECURITY)
+CFLAGS += -DMK_PRODUCTION=$(PRODUCTION)
+ifneq ($(FACTORY_RESET_MAGIC), 0)
+CFLAGS += -DMK_FACTORY_RESET_MAGIC=$(FACTORY_RESET_MAGIC)
+endif
+CFLAGS += -DMK_SRC_BUS_VOLTS_INT=$(SRC_BUS_VOLTS_INT)
+CFLAGS += -DMK_BLD_MIB_NODE=$(BLD_MIB_NODE)
+CFLAGS += -DMK_BLD_MIB_GROUP=$(BLD_MIB_GROUP)
+CFLAGS += -DMK_BLD_MIB_NODE_STATUS=$(BLD_MIB_NODE_STATUS)
+CFLAGS += -DMK_REG_MIB_NODE_STATUS=$(REG_MIB_NODE_STATUS)
+CFLAGS += -DMK_BLD_MIB_NODE_CONTROL=$(BLD_MIB_NODE_CONTROL)
+CFLAGS += -DMK_REG_MIB_NODE_CONTROL=$(REG_MIB_NODE_CONTROL)
+CFLAGS += -DMK_BLD_MIB_ADC_STATUS=$(BLD_MIB_ADC_STATUS)
+CFLAGS += -DMK_REG_MIB_ADC_STATUS=$(REG_MIB_ADC_STATUS)
+CFLAGS += -DMK_BLD_MIB_NWK_CONFIG=$(BLD_MIB_NWK_CONFIG)
+CFLAGS += -DMK_REG_MIB_NWK_CONFIG=$(REG_MIB_NWK_CONFIG)
+CFLAGS += -DMK_BLD_MIB_NWK_PROFILE=$(BLD_MIB_NWK_PROFILE)
+CFLAGS += -DMK_REG_MIB_NWK_PROFILE=$(REG_MIB_NWK_PROFILE)
+CFLAGS += -DMK_BLD_MIB_NWK_STATUS=$(BLD_MIB_NWK_STATUS)
+CFLAGS += -DMK_REG_MIB_NWK_STATUS=$(REG_MIB_NWK_STATUS)
+CFLAGS += -DMK_BLD_MIB_NWK_SECURITY=$(BLD_MIB_NWK_SECURITY)
+CFLAGS += -DMK_REG_MIB_NWK_SECURITY=$(REG_MIB_NWK_SECURITY)
+CFLAGS += -DMK_BLD_MIB_NWK_TEST=$(BLD_MIB_NWK_TEST)
+CFLAGS += -DMK_REG_MIB_NWK_TEST=$(REG_MIB_NWK_TEST)
+CFLAGS += -DEMBEDDED
+CFLAGS += -DUSER_VSR_HANDLER
+CFLAGS += -fno-common
+ifeq ($(TRACE), 1)
+CFLAGS += -DDBG_ENABLE
+BUILD  = _DEBUG
+endif
+
+# Production build disabled ? */
+ifeq ($(PRODUCTION), 0)
+	# Security disabled ? */
+	ifeq ($(SECURITY), 0)
+	SECURITY_CHAR = u
+	else
+	SECURITY_CHAR = s
+	endif
+else
+	SECURITY_CHAR = p
+endif
+
+# Build name with non single channel specified 
+ifeq ($(CHANNEL), 0)
+NAME_PREFIX = $(NETWORK_ID)$(SECURITY_CHAR)
+else
+NAME_PREFIX = $(NETWORK_ID)$(SECURITY_CHAR)_CH$(CHANNEL)
+endif
+
+# Build name with version 
+ifeq ($(TOUCHED), 0)
+NAME_POSTFIX = $(DEVICE_NAME)_$(NODE_TYPE)_$(JENNIC_CHIP)$(BUILD)_v$(VERSION)
+else
+NAME_POSTFIX = $(DEVICE_NAME)_$(NODE_TYPE)_$(JENNIC_CHIP)$(BUILD)
+endif
+
+##############################################################################
+# Application Source files
+
+# Note: Path to source file is found using vpath below, so only .c filename is required
+# Router files 
+
+#APPSRC += DeviceTemplate.c
+#APPSRC += Node.c
+#APPSRC += Exception.c
+#APPSRC += Security.c
+#ifeq ($(JENNIC_CHIP_FAMILY), JN516x)
+#APPSRC += AHI_EEPROM.c
+#endif
+
+# Mib Common files
+ifneq ($(BLD_MIB_GROUP), 0)
+APPSRC += MibGroupDec.c
+endif
+ifneq ($(BLD_MIB_NODE), 0)
+APPSRC += MibNodeDec.c
+endif
+ifneq ($(BLD_MIB_ADC_STATUS), 0)
+APPSRC += MibAdcStatusDec.c
+APPSRC += MibAdcStatusPatch.c
+endif
+ifneq ($(BLD_MIB_NODE_STATUS), 0)
+APPSRC += MibNodeStatusDec.c
+endif
+ifneq ($(BLD_MIB_NODE_CONTROL), 0)
+APPSRC += MibNodeControlDec.c
+endif
+ifneq ($(BLD_MIB_NWK_STATUS), 0)
+APPSRC += MibNwkStatusDec.c
+endif
+ifneq ($(BLD_MIB_NWK_CONFIG), 0)
+APPSRC += MibNwkConfigDec.c
+APPSRC += MibNwkConfigPatch.c
+endif
+ifneq ($(BLD_MIB_NWK_PROFILE), 0)
+APPSRC += MibNwkProfileDec.c
+APPSRC += MibNwkProfile.c
+endif
+ifneq ($(BLD_MIB_NWK_SECURITY), 0)
+APPSRC += MibNwkSecurityDec.c
+APPSRC += MibNwkSecurityPatch.c
+endif
+ifneq ($(BLD_MIB_NWK_TEST), 0)
+APPSRC += MibNwkTestDec.c
+APPSRC += MibNwkTest.c
+endif
+
+# Other files
+#APPSRC += Uart.c
+
+##############################################################################
+# Additional Application Source directories
+# Define any additional application directories outside the application directory
+# e.g. for AppQueueApi
+
+#ADDITIONAL_SRC_DIR += $(APP_BASE)/$(TARGET)/Source
+ADDITIONAL_SRC_DIR += $(COMPONENTS_BASE_DIR)/Utilities/Source
+##############################################################################
+# Standard Application header search paths
+#INCFLAGS += -I$(APP_SRC_DIR)
+#INCFLAGS += -I$(APP_SRC_DIR)/..
+#INCFLAGS += -I$(APP_COMMON_SRC_DIR)
+INCFLAGS += -I$(ADDITIONAL_SRC_DIR) 
+#INCFLAGS += -I$(APP_BASE)/MibCommon/Include
+
+# Application specific include files
+INCFLAGS += -I$(COMPONENTS_BASE_DIR)/JenNet/Include
+INCFLAGS += -I$(COMPONENTS_BASE_DIR)/6LP/Include
+INCFLAGS += -I$(COMPONENTS_BASE_DIR)/OS/Include
+INCFLAGS += -I$(COMPONENTS_BASE_DIR)/JIP/Include
+INCFLAGS += -I$(COMPONENTS_BASE_DIR)/Utilities/Include
+INCFLAGS += -I$(COMPONENTS_BASE_DIR)/Aes/Include
+
+##############################################################################
+#  Application libraries (non-JN5142J01)
+#ifneq ($(JENNIC_CHIP), JN5142J01)
+## Application libraries
+##MYLIBS += MibCommon
+#endif
+
+# Chip family libraries 
+ifeq ($(JENNIC_CHIP), JN5142J01)
+APPLIBS += DBG
+APPLIBS += Recal
+else ifeq ($(JENNIC_CHIP), JN5148J01)
+APPLIBS += DBG
+APPLIBS += Recal
+APPLIBS += PDM
+APPLIBS += JIP
+else ifeq ($(JENNIC_CHIP), JN5148)
+APPLIBS += DBG
+APPLIBS += Recal
+APPLIBS += PDM
+APPLIBS += JIP
+else 
+APPLIBS += DBG
+APPLIBS += Recal
+APPLIBS += PDM_EEPROM
+APPLIBS += JIP
+APPLIBS += JenNet
+APPLIBS += 6LP
+endif
+
+# Chip specific libraries
+ifeq ($(JENNIC_CHIP), JN5148J01)
+STACKLIBS += JenNet
+STACKLIBS += 6LP
+else ifeq ($(JENNIC_CHIP), JN5148)
+STACKLIBS += JenNet_CR_NOSLEEP
+STACKLIBS += 6LP_CR_NOSLEEP
+endif
+##############################################################################
+# Configure for the selected PLatform and stack
+#include $(SDK_BASE_DIR)/Chip/Common/Build/config.mk
+###############################################################################
+# Include the chip or chip family definitions.
+# Chip takes precendence over chip family
+
+# Ensure chip and family are set
+override JENNIC_CHIP_FAMILY = JN516x
+
+# Define numeric value for chip type
+CFLAGS += -DJN516x=5160
+CFLAGS += -DJN5168=5168
+CFLAGS += -DJENNIC_CHIP_NAME=_JN5168
+
+# Base dir for selected chip
+CHIP_BASE_DIR = $(SDK_BASE_DIR)/Chip/$(JENNIC_CHIP)
+
+# include definitions for the BA2 architecture
+#include $(SDK_BASE_DIR)/Chip/Common/Build/config_ba2.mk
+
+# BA2 archtecture compiler flags
+CFLAGS += -msibcall -mno-multi -mno-setcc
+CFLAGS += -mno-carry -mno-subb -mno-sext
+CFLAGS += -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul
+CFLAGS += -march=ba2 -mredzone-size=4
+CFLAGS +=  -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19
+CFLAGS +=  -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23
+CFLAGS +=  -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27
+CFLAGS +=  -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31
+
+# omit frame pointer by default
+CFLAGS += -fomit-frame-pointer
+
+# default to optimise for size
+CFLAGS += -Os
+
+# Output each function and static data in their own sections
+CFLAGS += -fdata-sections -ffunction-sections
+
+# Debug Support
+
+# Define seperate debug for SW and HW debug
+ifeq ($(DEBUG), SW)
+CFLAGS  := $(subst -Os,,$(CFLAGS))
+CFLAGS  += -g -O0 -DGDB
+CFLAGS  += -DSWDEBUG
+
+BIN_SUFFIX ?= _swdbg
+$(info Building SW debug version ...)
+endif
+
+
+ifeq ($(DEBUG), HW)
+CFLAGS  := $(subst -Os,,$(CFLAGS))
+CFLAGS  += -g -O0 -DGDB
+HARDWARE_DEBUG_ENABLED=1
+endif
+
+ifeq ($(DEBUG), HW_SIZEOPT)
+CFLAGS  += -g  -DGDB
+$(info Size optimisation enabled with HW debug ...)
+HARDWARE_DEBUG_ENABLED=1
+endif
+
+ifeq ($(HARDWARE_DEBUG_ENABLED), 1)
+# Set DEBUG_PORT to UART0 or UART1 dependant on connection to serial port on board
+CFLAGS += -D$(DEBUG_PORT)_DEBUG
+CFLAGS  += -DHWDEBUG
+BIN_SUFFIX ?= _hwdbg
+$(info Building HW debug version ...)
+endif
+
+# Chip specific C flags
+# watchdog is enabled by default on chip so allow disable if reqd
+CFLAGS += -DWATCHDOG_ENABLED
+
+# Feature set:
+#   JENNIC_HW_xx is silicon feature and so fixed
+#   JENNIC_SW_xx is build option and can be changed
+#
+#   JENNIC_HW_BBC_RXINCCA:    BBC RX during CCA capability
+#   JENNIC_HW_BBC_DMA:        BBC frame buffer DMA mechanism
+#   JENNIC_HW_BBC_ISA:        BBC inline security engine 
+#   JENNIC_SW_EXTERNAL_FLASH: whether external flash is supported
+#   JN516X_DMA_UART_BACKWARDS_COMPATIBLE_API: API behaves like the older versions with no visible UART DMA 
+#   JN516X_BACKWARDS_COMPATIBLE_API: API behaves like the older versions (supercedes above)
+#   PDM_DESCRIPTOR_BASED_API: Use standard API interface 
+#
+CFLAGS += -DJENNIC_HW_BBC_RXINCCA=1
+CFLAGS += -DJENNIC_HW_BBC_DMA=1
+CFLAGS += -DJENNIC_HW_BBC_ISA=0
+CFLAGS += -DJENNIC_SW_EXTERNAL_FLASH=0
+CFLAGS += -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1
+CFLAGS += -DJN516X_BACKWARDS_COMPATIBLE_API=1
+CFLAGS += -DPDM_DESCRIPTOR_BASED_API=1
+
+## Linker flags
+LDFLAGS += -nostartfiles
+LDFLAGS += -mba2_elf
+LDFLAGS += -march=ba2
+
+# Standard libraries: Peripheral API, MAC, etc.
+ifneq ($(JENNIC_STACK), None)
+LDLIBS  += AppApi_$(REDUCED_MAC_LIB_SUFFIX)$(JENNIC_CHIP_FAMILY)
+LDLIBS  += Mac_$(REDUCED_MAC_LIB_SUFFIX)$(JENNIC_CHIP_FAMILY)
+LDLIBS  += Tof_$(JENNIC_CHIP_FAMILY)
+LDLIBS  += Xcv_$(JENNIC_CHIP_FAMILY)
+endif
+LDLIBS  += AES_CCM_SW_PATCH_$(JENNIC_CHIP_FAMILY)
+LDLIBS  += Aes_$(JENNIC_CHIP_FAMILY)
+LDLIBS  += TimerServer_$(JENNIC_CHIP_FAMILY)
+LDLIBS  += HardwareApi_$(JENNIC_CHIP_FAMILY)
+LDLIBS  += MicroSpecific_$(JENNIC_CHIP_FAMILY)
+LDLIBS  += Boot_$(JENNIC_CHIP_FAMILY)
+LDLIBS  += Maths_$(JENNIC_CHIP_FAMILY)
+
+# Stack-specific libraries: JIP uses the PDM EEPROM variant
+ifeq ($(JENNIC_STACK), JIP)
+LDLIBS  += PDM_EEPROM_$(JENNIC_CHIP_FAMILY)
+endif
+
+# Export linker command file if building patch library
+ifeq ($(JENNIC_STACK), None)
+LINKER_FILE = AppBuildNone
+else
+ifeq ($(JENNIC_STACK), JIP)
+LINKER_FILE = AppBuildJip
+else
+LINKER_FILE = AppBuildMac
+endif
+endif
+LINKCMD ?= $(LINKER_FILE)_$(JENNIC_CHIP).ld
+
+# Hardware debug support (NOTE: JN516x doesn't need separate library as JTag initialised in bootloader)
+ifeq ($(HARDWARE_DEBUG_ENABLED), 1)
+LDFLAGS += -Wl,--defsym,g_bSWConf_Debug=1
+ifeq ($(DEBUG_PORT), UART1)
+LDFLAGS += -Wl,-defsym,g_bSWConf_AltDebugPort=1
+else
+ifneq ($(DEBUG_PORT), UART0)
+$(error if DEBUG=HW: Must define DEBUG_PORT=UART0 or DEBUG_PORT=UART1)
+endif
+endif
+$(info  Building HW debug version ...)
+
+endif
+
+###############################################################################
+
+ifndef JENNIC_STACK
+JENNIC_STACK = MAC
+endif
+
+###############################################################################
+# Define the selected Jennic chip
+
+CFLAGS += -DJENNIC_CHIP=$(JENNIC_CHIP)
+CFLAGS += -DJENNIC_CHIP_$(JENNIC_CHIP)
+CFLAGS += -DJENNIC_CHIP_FAMILY=$(JENNIC_CHIP_FAMILY)
+CFLAGS += -DJENNIC_CHIP_FAMILY_$(JENNIC_CHIP_FAMILY)
+
+CFLAGS += -DJENNIC_STACK_$(JENNIC_STACK)
+
+###############################################################################
+# Chip independent compiler options
+
+CFLAGS += -Wall
+CFLAGS += -Wunreachable-code
+
+include $(SDK_BASE_DIR)/Platform/Common/Build/Config.mk
+include $(SDK_BASE_DIR)/Stack/Common/Build/config.mk
+
+###############################################################################
+# App library folders
+#LDFLAGS += -L$(APP_BASE)/MibCommon/Build
+
+###############################################################################
+# OND / 2 stage bootloader setup 
+#ifneq ($(OND_CHIPSET), 0)
+#LDFLAGS += -Wl,--defsym,OND_DEV_TYPE=$(OND_DEVICE_TYPE)
+#LDFLAGS += -Wl,--defsym,OND_CHIPSET=$(OND_CHIPSET)
+#LDFLAGS += -Wl,--defsym,OND_REVISION=$(VERSION)
+#endif
+##############################################################################
+
+APPOBJS = $(APPSRC:.c=.o)
+
+##############################################################################
+# Application dynamic dependencies
+
+APPDEPS = $(APPOBJS:.o=.d)
+
+#########################################################################
+# Linker
+
+# Add application libraries before chip specific libraries to linker so
+# symbols are resolved correctly (i.e. ordering is significant for GCC)
+
+LDMYLIBS := $(addsuffix _$(JENNIC_CHIP_FAMILY)$(BUILD),$(MYLIBS)) $(LDMYLIBS)
+LDLIBS := $(addsuffix _$(JENNIC_CHIP_FAMILY),$(APPLIBS)) $(LDLIBS)
+LDSTACKLIBS := $(addsuffix _$(JENNIC_CHIP),$(STACKLIBS)) $(LDSTACKLIBS)
+
+### Remap names
+# APPLIBS ?? , STACKLIBS ?? LDFLAGS ?? LDLIBS ?? LINKCMD ??
+CONTIKI_CPU_DIRS += $(ADDITIONAL_SRC_DIR)
+#CONTIKI_SOURCEFILES += $(APPSRC)
+CFLAGS += $(INCFLAGS) 
+#CONTIKI_OBJECTFILES += $(APPOBJS)
+
+# Library search paths
+LDFLAGS += -L$(CHIP_BASE_DIR)/Build
+LDFLAGS += -L$(CHIP_BASE_DIR)/Library
+#TARGET_LIBFILES += -llibJPT_JN5168
+#TARGET_STARTFILES += $(APPOBJS)
+#TARGET_LIBFILES += $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS))
+
+# Linker flags
+#LDFLAGS += -Wl,--gc-sections 
+#LDFLAGS += -Wl,-u_AppColdStart -Wl,-u_AppWarmStart
+#LDFLAGS += -T$(LINKCMD) 
+#LDFLAGS += -Wl,-Map=contiki-$(TARGET).map
+#LDFLAGS += -Wl,--relax -T$(LINKCMD) -nostartfiles -mba2_elf -march=ba2 -Wl,-Map=contiki-$(TARGET).map
+
+#LDFLAGS += -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart $(LDFLAGS) -T$(LINKCMD) -o $@ -Wl,--start-group $(APPOBJS) $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS)) -Wl,--end-group -Wl,-Map=contiki-$(TARGET).map 
+
+#LDFLAGS += -T$(LINKCMD) -o $@ -Wl,--start-group $(APPOBJS) $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS))
+#CFLAGS += -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart
+#LDFLAGS += -T$(LINKCMD) -o $@ -Wl,--start-group $(APPOBJS) $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS))
+
+#### make targets
+
+########################################################################
+# Dependency rules
+
+.PHONY: all clean
+# Path to directories containing application source 
+#vpath % $(ADDITIONAL_SRC_DIR) #:$(APP_SRC_DIR):$(APP_COMMON_SRC_DIR):
+#:$(APP_BASE)/MibCommon/Source
+
+.PRECIOUS: %.elf
+
+# OND Disabled ? 
+#ifeq ($(OND_CHIPSET), 0)
+#all: $(APP_BIN_DIR)/$(NAME_PREFIX)_$(TARGET)_$(NAME_POSTFIX)$(BIN_SUFFIX).bin
+## OND Enabled ?
+#else
+#ifeq ($(JENNIC_CHIP_FAMILY), JN516x)
+#all: $(APP_BIN_DIR)/$(NAME_PREFIX)_$(TARGET)_$(NAME_POSTFIX)$(BIN_SUFFIX).bin
+#else
+#all: $(APP_BIN_DIR)/$(NAME_PREFIX)_$(TARGET)_$(NAME_POSTFIX)$(BIN_SUFFIX).bin $(APP_BIN_DIR)/$(NAME_PREFIX)_$(TARGET)_$(NAME_POSTFIX)$(BIN_SUFFIX).ond
+#endif
+#endif
+
+%.bin:
+-include $(APPDEPS)
+%.d:
+	rm -f $*.o
+
+#CUSTOM_RULE_S_TO_OBJECTDIR_O=1
+#%.o: %.S
+#	$(info Assembling $< ...)
+#	$(CC) -c -o $(subst Source,Build,$@) $(CFLAGS) $(INCFLAGS) $< -MD -MF $*.d -MP
+#	@echo
+
+#CUSTOM_RULE_C_TO_O=1
+#%.o: %.c
+#	$(info Compiling $< ...)
+#	$(CC) -c -o $(subst Source,Build,$@) $(CFLAGS) $(INCFLAGS) $< -MD -MF $*.d -MP
+#	@echo
+
+#CUSTOM_RULE_C_TO_CO=1
+#%.co: %.c
+#	$(TRACE_CC)
+#	$(Q)$(CC) $(CFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
+
+%.elf: $(APPOBJS) $(addsuffix _$(JENNIC_CHIP_FAMILY).a,$(addprefix $(COMPONENTS_BASE_DIR)/Library/lib,$(APPLIBS)))
+	$(info Linking $@ ...)
+	$(CC) -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart $(LDFLAGS) -T$(LINKCMD) -o $@ -Wl,--start-group $(APPOBJS) $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS)) -Wl,--end-group -Wl,-Map,contiki-$(TARGET).map  
+	@echo
+	
+%.nm: %.elf
+	$(NM) -nS $< > $@
+
+%.dmp: %.elf
+	$(OBJDUMP) -d $< > $@
+
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart -TApp_Stack_Size.ld -nostartfiles -mba2_elf -march=ba2 -L/cygdrive/C/Jennic/Chip/JN5168/Build -L/cygdrive/C/Jennic/Chip/JN5168/Library -L/cygdrive/C/Jennic/Platform/DK4/Library -L/cygdrive/C/Jennic/Components/Library -L/cygdrive/C/Jennic/Stack/JIP/Build -L/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Build -Wl,--defsym,OND_DEV_TYPE=0x88011174 -Wl,--defsym,OND_CHIPSET=5168 -Wl,--defsym,OND_REVISION=31009 -TAppBuildJip_JN5168.ld -o /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.elf -Wl,--start-group DeviceTemplate.o Node.o Exception.o Security.o AHI_EEPROM.o MibGroupDec.o MibNodeDec.o MibAdcStatusDec.o MibAdcStatusPatch.o MibNodeStatusDec.o MibNodeControlDec.o MibNwkStatusDec.o MibNwkConfigDec.o MibNwkConfigPatch.o MibNwkSecurityDec.o MibNwkSecurityPatch.o Uart.o -lDBG_JN516x -lRecal_JN516x -lPDM_EEPROM_JN516x -lJIP_JN516x -lJenNet_JN516x -l6LP_JN516x -lAppApi_JN516x -lMac_JN516x -lTof_JN516x -lXcv_JN516x -lAES_CCM_SW_PATCH_JN516x -lAes_JN516x -lTimerServer_JN516x -lHardwareApi_JN516x -lMicroSpecific_JN516x -lBoot_JN516x -lMaths_JN516x -lPDM_EEPROM_JN516x -lBoardLib_JN516x  -lMibCommon_JN516x -Wl,--end-group -Wl,-Map,0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.map 
+
+# OND Disabled ? 
+#ifeq ($(OND_CHIPSET), 0)
+MYLIBS = $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS))
+#libJPT_JN5168.a
+#MYLIBS = -lAppApi_JN516x -lMac_JN516x -lHardwareApi_JN516x -lMicroSpecific_JN516x -lBoot_JN516x -lMaths_JN516x
+#contiki-$(TARGET).a 
+CUSTOM_RULE_LINK=1
+%.$(TARGET): %.co $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) contiki-$(TARGET).a 
+	$(TRACE_LD)
+	$(CC) -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart -T$(LINKCMD) $(LDFLAGS) -o $@ -Wl,--start-group $(TARGET_STARTFILES) ${filter-out %.a,$^} ${filter %.a,$^} $(MYLIBS) -Wl,--end-group -Wl,-Map,contiki-$(TARGET).map
+	$(info Generating binary ...)
+	$(OBJCOPY) $@ $$( $(OBJDUMP) -h $< | sed -n 's/^ *[0-9]* \(.rom[._[:alnum:]]*\).*/-R \1/p' )
+	$(OBJCOPY) -S -O binary $@ $@.bin
+	$(info JENNIC_CHIP     = $(JENNIC_CHIP))
+	$(info OND_CHIPSET     = $(OND_CHIPSET))
+	$(info DEVICE_NAME     = $(DEVICE_NAME))
+	$(info JIP_DEVICE_TYPE = $(JIP_DEVICE_TYPE))
+	$(info JIP_DEVICE_ID   = $(JIP_DEVICE_ID))
+	$(info OND_DEVICE_TYPE = $(OND_DEVICE_TYPE))
+	$(info VERSION         = $(VERSION))
+	${SIZE} --totals $*.co contiki-$(TARGET).a
+	${SIZE} $@
+	
+%.bin: %.$(TARGET) 
+	$(info Generating binary ...)
+	$(OBJCOPY) $< $$( $(OBJDUMP) -h $< | sed -n 's/^ *[0-9]* \(.rom[._[:alnum:]]*\).*/-R \1/p' )
+	$(OBJCOPY) -S -O binary $< $@
+	$(info JENNIC_CHIP     = $(JENNIC_CHIP))
+	$(info OND_CHIPSET     = $(OND_CHIPSET))
+	$(info DEVICE_NAME     = $(DEVICE_NAME))
+	$(info JIP_DEVICE_TYPE = $(JIP_DEVICE_TYPE))
+	$(info JIP_DEVICE_ID   = $(JIP_DEVICE_ID))
+	$(info OND_DEVICE_TYPE = $(OND_DEVICE_TYPE))
+	$(info VERSION         = $(VERSION))
+	${SIZE} --totals $(PROJECT_OBJECTFILES)
+	${SIZE} $<
+
+## OND Enabled  
+#endif
+
+######## OLD ####
+#
+#ifeq ($(DEBUG),true)
+#CONTIKI_SOURCEFILES += gdb2.c
+#CFLAGS += -DGDB
+#endif
+#
+#CFLAGS += -I$(CONTIKI_CPU)/jn5148
+#LDFLAGS += -L$(CONTIKI_CPU)/jn5148
+#TARGET_LIBFILES += -lHwPatch -lMacPatch
+#
+#CFLAGS += -Wall -Os -fomit-frame-pointer -fpack-struct -Wcast-align
+#CFLAGS += -fdata-sections -ffunction-sections
+#CFLAGS += -march=ba2
+#CFLAGS += -msibcall -mno-entri -mno-multi -mno-setcc -mno-cmov
+#CFLAGS += -mno-carry -mno-subb -mno-sext -mno-ror
+#CFLAGS += -mno-hard-div -mhard-mul -mbranch-cost=3 #-mno-unal
+#CFLAGS += -msimple-mul -mredzone-size=4
+#CFLAGS += -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19
+#CFLAGS += -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23
+#CFLAGS += -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27
+#CFLAGS += -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31
+#
+#LDFLAGS += -Wl,--relax -TAppBuild_JN5148.ld -nostartfiles -mba2_elf -march=ba2 -Wl,-Map=contiki-$(TARGET).map
+
+### Compilation rules
+
+# .PHONY: symbols.c symbols.h
+
+symbols.c symbols.h:
+	@${CONTIKI}/tools/make-empty-symbols
+
+%.hex: %.$(TARGET)
+	$(OBJCOPY) $^ -O binary $@
+
+%.u: %.hex
+	sudo jenprog -c serial -t /dev/ttyACM0 $<
+	#jenprog $<
+	
+
+#**** Build of configuration DeviceTemplate_DR1174_EndDevice_JN5168 for project JN-AN-1190-JenNet-IP-Application-Template ****
+#
+#make clean SDK_BASE_DIR=/cygdrive/C/Jennic DEVICE_NAME=DR1174 NODE_TYPE=EndDevice JENNIC_CHIP=JN5168 -j4 all 
+#rm -f Uart.o
+#rm -f MibNwkSecurityPatch.o
+#rm -f MibNwkSecurityDec.o
+#rm -f MibNwkConfigPatch.o
+#rm -f MibNwkConfigDec.o
+#rm -f MibNwkStatusDec.o
+#rm -f MibNodeControlDec.o
+#rm -f MibNodeStatusDec.o
+#rm -f MibAdcStatusPatch.o
+#rm -f MibAdcStatusDec.o
+#rm -f MibNodeDec.o
+#rm -f MibGroupDec.o
+#rm -f AHI_EEPROM.o
+#rm -f Security.o
+#rm -f Exception.o
+#rm -f Node.o
+#rm -f DeviceTemplate.o
+#rm -f DeviceTemplate.o Node.o Exception.o Security.o AHI_EEPROM.o MibGroupDec.o MibNodeDec.o MibAdcStatusDec.o MibAdcStatusPatch.o MibNodeStatusDec.o MibNodeControlDec.o MibNwkStatusDec.o MibNwkConfigDec.o MibNwkConfigPatch.o MibNwkSecurityDec.o MibNwkSecurityPatch.o Uart.o DeviceTemplate.d Node.d Exception.d Security.d AHI_EEPROM.d MibGroupDec.d MibNodeDec.d MibAdcStatusDec.d MibAdcStatusPatch.d MibNodeStatusDec.d MibNodeControlDec.d MibNwkStatusDec.d MibNwkConfigDec.d MibNwkConfigPatch.d MibNwkSecurityDec.d MibNwkSecurityPatch.d Uart.d /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.bin /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.elf 0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.map /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.ond 0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.dmp
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/DeviceTemplate.c ...
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o DeviceTemplate.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/DeviceTemplate.c -MD -MF DeviceTemplate.d -MP
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source/Node.c ...
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o Node.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source/Node.c -MD -MF Node.d -MP
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source/Exception.c ...
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o Exception.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source/Exception.c -MD -MF Exception.d -MP
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source/Security.c ...
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o Security.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source/Security.c -MD -MF Security.d -MP
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source/AHI_EEPROM.c ...
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#
+#
+#
+#
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o AHI_EEPROM.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source/AHI_EEPROM.c -MD -MF AHI_EEPROM.d -MP
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibGroupDec.c ...
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o MibGroupDec.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibGroupDec.c -MD -MF MibGroupDec.d -MP
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNodeDec.c ...
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o MibNodeDec.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNodeDec.c -MD -MF MibNodeDec.d -MP
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibAdcStatusDec.c ...
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o MibAdcStatusDec.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibAdcStatusDec.c -MD -MF MibAdcStatusDec.d -MP
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibAdcStatusPatch.c ...
+#
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o MibAdcStatusPatch.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibAdcStatusPatch.c -MD -MF MibAdcStatusPatch.d -MP
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNodeStatusDec.c ...
+#
+#
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o MibNodeStatusDec.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNodeStatusDec.c -MD -MF MibNodeStatusDec.d -MP
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNodeControlDec.c ...
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o MibNodeControlDec.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNodeControlDec.c -MD -MF MibNodeControlDec.d -MP
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNwkStatusDec.c ...
+#
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o MibNwkStatusDec.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNwkStatusDec.c -MD -MF MibNwkStatusDec.d -MP
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNwkConfigDec.c ...
+#
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o MibNwkConfigDec.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNwkConfigDec.c -MD -MF MibNwkConfigDec.d -MP
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNwkConfigPatch.c ...
+#
+#
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o MibNwkConfigPatch.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNwkConfigPatch.c -MD -MF MibNwkConfigPatch.d -MP
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNwkSecurityDec.c ...
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o MibNwkSecurityDec.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNwkSecurityDec.c -MD -MF MibNwkSecurityDec.d -MP
+#
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNwkSecurityPatch.c ...
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o MibNwkSecurityPatch.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Source/MibNwkSecurityPatch.c -MD -MF MibNwkSecurityPatch.d -MP
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#Compiling /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source/Uart.c ...
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#
+#
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -c -o Uart.o -DLIBRARY_BUILD -DMK_TARGET=\"DeviceTemplate\" -DMK_DEVICE_NAME=\"DR1174\" -DMK_JIP_NODE_NAME=\"T1174e68\" -DMK_NODE_TYPE=E_JIP_DEVICE_END_DEVICE -DMK_BLD_NODE_TYPE_END_DEVICE -DMK_VERSION=\"31009\" -DMK_JIP_DEVICE_ID=0x88011174 -DMK_JIP_DEVICE_TYPE=0x0002 -DMK_NETWORK_ID=0x11111111 -DMK_CHANNEL=0 -DMK_SECURITY=1 -DMK_PRODUCTION=0 -DMK_SRC_BUS_VOLTS_INT= -DMK_BLD_MIB_NODE=1 -DMK_BLD_MIB_GROUP=1 -DMK_BLD_MIB_NODE_STATUS=1 -DMK_REG_MIB_NODE_STATUS=1 -DMK_BLD_MIB_NODE_CONTROL=1 -DMK_REG_MIB_NODE_CONTROL=1 -DMK_BLD_MIB_ADC_STATUS=1 -DMK_REG_MIB_ADC_STATUS=0 -DMK_BLD_MIB_NWK_CONFIG=1 -DMK_REG_MIB_NWK_CONFIG=0 -DMK_BLD_MIB_NWK_PROFILE=0 -DMK_REG_MIB_NWK_PROFILE=0 -DMK_BLD_MIB_NWK_STATUS=1 -DMK_REG_MIB_NWK_STATUS=1 -DMK_BLD_MIB_NWK_SECURITY=1 -DMK_REG_MIB_NWK_SECURITY=1 -DMK_BLD_MIB_NWK_TEST=0 -DMK_REG_MIB_NWK_TEST=0 -DEMBEDDED -DUSER_VSR_HANDLER -fno-common -DJN516x=5160 -DJN5168=5168 -DJENNIC_CHIP_NAME=_JN5168 -msibcall -mno-multi -mno-setcc -mno-carry -mno-subb -mno-sext -mno-hard-div -mhard-mul -mbranch-cost=3 -msimple-mul -march=ba2 -mredzone-size=4 -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 -fomit-frame-pointer -Os -fdata-sections -ffunction-sections -DWATCHDOG_ENABLED -DJENNIC_HW_BBC_RXINCCA=1 -DJENNIC_HW_BBC_DMA=1 -DJENNIC_HW_BBC_ISA=0 -DJENNIC_SW_EXTERNAL_FLASH=0 -DJN516X_DMA_UART_BACKWARDS_COMPATIBLE_API=1 -DJN516X_BACKWARDS_COMPATIBLE_API=1 -DPDM_DESCRIPTOR_BASED_API=1 -DJENNIC_CHIP=JN5168 -DJENNIC_CHIP_JN5168 -DJENNIC_CHIP_FAMILY=JN516x -DJENNIC_CHIP_FAMILY_JN516x -DJENNIC_STACK_JIP -Wall -Wunreachable-code -I/cygdrive/C/Jennic/Platform/Common/Include -DJENNIC_PCB=DEVKIT4 -DJENNIC_PCB_DEVKIT4 -I/cygdrive/C/Jennic/Platform/DK4/Include -I/cygdrive/C/Jennic/Components/Common/Include -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source/.. -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/DeviceTemplate/Source /cygdrive/C/Jennic/Components/Utilities/Source  -I/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/OS/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/Utilities/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/AppApi/Include -I/cygdrive/C/Jennic/Components/HardwareApi/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/MAC/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/TimerServer/Include -I/cygdrive/C/Jennic/Components/Os/Include -I/cygdrive/C/Jennic/Components/PDM/Include -I/cygdrive/C/Jennic/Components/Aes/Include -I/cygdrive/C/Jennic/Components/DBG/Include -I/cygdrive/C/Jennic/Components/Recal/Include -I/cygdrive/C/Jennic/Components/PDM_EEPROM/Include -I/cygdrive/C/Jennic/Components/JIP/Include -I/cygdrive/C/Jennic/Components/JenNet/Include -I/cygdrive/C/Jennic/Components/6LP/Include /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Common/Source/Uart.c -MD -MF Uart.d -MP
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#
+#
+#ba-elf-gcc: /cygdrive/C/Jennic/Components/Utilities/Source: linker input file unused because linking not done
+#
+#Linking /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.elf ...
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart -TApp_Stack_Size.ld -nostartfiles -mba2_elf -march=ba2 -L/cygdrive/C/Jennic/Chip/JN5168/Build -L/cygdrive/C/Jennic/Chip/JN5168/Library -L/cygdrive/C/Jennic/Platform/DK4/Library -L/cygdrive/C/Jennic/Components/Library -L/cygdrive/C/Jennic/Stack/JIP/Build -L/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Build -Wl,--defsym,OND_DEV_TYPE=0x88011174 -Wl,--defsym,OND_CHIPSET=5168 -Wl,--defsym,OND_REVISION=31009 -TAppBuildJip_JN5168.ld -o /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.elf -Wl,--start-group DeviceTemplate.o Node.o Exception.o Security.o AHI_EEPROM.o MibGroupDec.o MibNodeDec.o MibAdcStatusDec.o MibAdcStatusPatch.o MibNodeStatusDec.o MibNodeControlDec.o MibNwkStatusDec.o MibNwkConfigDec.o MibNwkConfigPatch.o MibNwkSecurityDec.o MibNwkSecurityPatch.o Uart.o -lDBG_JN516x -lRecal_JN516x -lPDM_EEPROM_JN516x -lJIP_JN516x -lJenNet_JN516x -l6LP_JN516x -lAppApi_JN516x -lMac_JN516x -lTof_JN516x -lXcv_JN516x -lAES_CCM_SW_PATCH_JN516x -lAes_JN516x -lTimerServer_JN516x -lHardwareApi_JN516x -lMicroSpecific_JN516x -lBoot_JN516x -lMaths_JN516x -lPDM_EEPROM_JN516x -lBoardLib_JN516x  -lMibCommon_JN516x -Wl,--end-group -Wl,-Map,0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.map 
+#
+#Generating binary ...
+#JENNIC_CHIP     = JN5168
+#OND_CHIPSET     = 5168
+#DEVICE_NAME     = DR1174
+#JIP_DEVICE_TYPE = 0x0002
+#JIP_DEVICE_ID   = 0x88011174
+#OND_DEVICE_TYPE = 0x88011174
+#VERSION         = 31009
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-objcopy /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.elf $( /cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-objdump -h /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.elf | sed -n 's/^ *[0-9]* \(.rom[._[:alnum:]]*\).*/-R \1/p' )
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-objcopy -S -O binary /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.elf 0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.img
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-size --totals DeviceTemplate.o Node.o Exception.o Security.o AHI_EEPROM.o MibGroupDec.o MibNodeDec.o MibAdcStatusDec.o MibAdcStatusPatch.o MibNodeStatusDec.o MibNodeControlDec.o MibNwkStatusDec.o MibNwkConfigDec.o MibNwkConfigPatch.o MibNwkSecurityDec.o MibNwkSecurityPatch.o Uart.o
+#   text	   data	    bss	    dec	    hex	filename
+#    564	      0	     12	    576	    240	DeviceTemplate.o
+#   2245	      2	     96	   2343	    927	Node.o
+#    523	      0	     16	    539	    21b	Exception.o
+#     33	      0	      0	     33	     21	Security.o
+#    170	      0	      0	    170	     aa	AHI_EEPROM.o
+#      0	      0	    304	    304	    130	MibGroupDec.o
+#      0	      0	     48	     48	     30	MibNodeDec.o
+#      4	      0	     44	     48	     30	MibAdcStatusDec.o
+#    422	      0	      7	    429	    1ad	MibAdcStatusPatch.o
+#    195	    141	     48	    384	    180	MibNodeStatusDec.o
+#     63	     45	     12	    120	     78	MibNodeControlDec.o
+#     94	     77	     64	    235	     eb	MibNwkStatusDec.o
+#      4	     56	      0	     60	     3c	MibNwkConfigDec.o
+#    307	      2	      9	    318	    13e	MibNwkConfigPatch.o
+#    141	    109	    164	    414	    19e	MibNwkSecurityDec.o
+#    327	      0	      6	    333	    14d	MibNwkSecurityPatch.o
+#    343	      0	      1	    344	    158	Uart.o
+#   5435	    432	    831	   6698	   1a2a	(TOTALS)
+#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-size /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.elf
+#   text	   data	    bss	    dec	    hex	filename
+# 119577	   1220	  18840	 139637	  22175	/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.elf
+#Generating OndFull 31009 ...
+#/cygdrive/C/Jennic/Tools/OND/OND_Checksum.exe -6 -m -t 62500 -v 0x88011174 5168 31009 0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.img /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.bin
+#

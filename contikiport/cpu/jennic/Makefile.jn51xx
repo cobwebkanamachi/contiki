@@ -1,0 +1,93 @@
+CONTIKI_CPU_DIRS     = . dev net sys
+CONTIKI_SOURCEFILES += clock.c timer-arch.c uart1.c uart0.c jts.c assert.c i2c.c irq.c sprintf.c watchdog.c init.c slip.c
+
+### Compiler definitions
+CCPREFIX = ba-elf
+CC       = $(CCPREFIX)-gcc
+LD       = $(CCPREFIX)-gcc
+AS       = $(CCPREFIX)-as
+AR       = $(CCPREFIX)-ar
+OBJCOPY  = $(CCPREFIX)-objcopy
+STRIP    = $(CCPREFIX)-strip
+
+### This chooses the Jennic processor we're building for.
+#    GCC 4.1.2 always builds for JN5148 (jn5139 support is not working)
+#    GCC 4.2.1 always builds for JN5139 (jn5148 support is not working)
+#   So put the proper compiler in your PATH to build for JN5148 or JN5139,
+#   the compiler will fail on mixed incomplete builds!
+#
+#   Building for the JN5148 is the default!
+ifeq ($(shell ${CC} -dumpversion),4.2.1)
+	ifeq ($(DEBUG),true)
+	CONTIKI_SOURCEFILES += gdb2.c
+	CFLAGS += -DGDB -g
+	endif
+
+	ifdef JENSDK_PATH
+	LDFLAGS += -L$(JENSDK_PATH)/Chip/JN513xR1/Build/
+	LDFLAGS += -Lcpu/jennic/jn5139
+	TARGET_LIBFILES += $(JENSDK_PATH)/Chip/JN513xR1/Library/ChipLib.a
+	TARGET_LIBFILES += $(JENSDK_PATH)/Common/Library/libc.a
+	CFLAGS += -I$(JENSDK_PATH)/Common/Include/
+	CFLAGS += -I$(JENSDK_PATH)/Chip/JN513xR1/Include/
+	CFLAGS += -Icpu/jennic/jn5139
+	else
+	TARGET_LIBFILES += -lChipLib -lc
+	CFLAGS += -I$(CONTIKI_CPU)/jn5139
+	LDFLAGS += -L$(CONTIKI_CPU)/jn5139
+	endif
+	
+	TARGET_LIBFILES += $(CONTIKI_CPU)/jn5139/BeaconTxNotification_JN5139R1.a
+	
+	CFLAGS  += -Wall -Os -Wcast-align #-fpack-struct
+	CFLAGS  += -march=ba1 -mabi=1
+	CFLAGS  += -DCHIP_RELEASE_5131
+	CFLAGS  += -DOR1K -Wall -fpack-struct
+	CFLAGS  += -mno-entri -mno-multi -mno-setcc -mno-cmov
+	CFLAGS  += -mno-carry -mno-subb -mno-sext -mno-ror
+	CFLAGS  += -mno-ff1 -mno-hard-div -mhard-mul -mbranch-cost=3
+	CFLAGS  += -msimple-mul -mredzone-size=4
+	LDFLAGS += -TAppBuild_JN5139R1.ld -nostdlib -Wl,-Map=contiki-$(TARGET).map
+else
+	ifeq ($(DEBUG),true)
+	CONTIKI_SOURCEFILES += gdb2.c
+	CFLAGS += -DGDB
+	endif
+	
+	CFLAGS += -I$(CONTIKI_CPU)/jn5148
+	LDFLAGS += -L$(CONTIKI_CPU)/jn5148
+	TARGET_LIBFILES += -lHwPatch -lMacPatch
+	
+	CFLAGS += -Wall -Os -fomit-frame-pointer -fpack-struct -Wcast-align
+	CFLAGS += -fdata-sections -ffunction-sections
+	CFLAGS += -march=ba2
+	CFLAGS += -msibcall -mno-entri -mno-multi -mno-setcc -mno-cmov
+	CFLAGS += -mno-carry -mno-subb -mno-sext -mno-ror
+	CFLAGS += -mno-hard-div -mhard-mul -mbranch-cost=3 #-mno-unal
+	CFLAGS += -msimple-mul -mredzone-size=4
+	CFLAGS += -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19
+	CFLAGS += -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23
+	CFLAGS += -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27
+	CFLAGS += -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31
+	
+	LDFLAGS += -Wl,--relax -TAppBuild_JN5148.ld -nostartfiles -mba2_elf -march=ba2 -Wl,-Map=contiki-$(TARGET).map
+endif
+
+### Compilation rules
+
+# .PHONY: symbols.c symbols.h
+ifdef CORE
+symbols.c symbols.h:
+	$(NM) $(CORE) | awk -f ../../tools/mknmlist > symbols.c
+#	@${CONTIKI}/tools/make-symbols $(CORE)
+else
+symbols.c symbols.h:
+	@${CONTIKI}/tools/make-empty-symbols
+endif
+
+%.$(TARGET).hex: %.$(TARGET)
+	$(OBJCOPY) $^ -O binary $@
+
+%.u: %.$(TARGET).hex
+	sudo jenprog -c serial -t /dev/ttyACM0 $<
+	#jenprog $<

@@ -1,0 +1,13 @@
+#
+#
+# Initialisation file for Software GDB
+# 
+
+# List all directories containing source code
+# non-existant directories will be ignored
+dir ../Source
+dir ../../Common/Source
+set remotebaud 38400
+# Set /dev/com5 to COM port # of serial connection 
+target remote /dev/com5
+set $pc+=2

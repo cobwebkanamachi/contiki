@@ -1,0 +1,16 @@
+#
+#
+# Initialisation file for Hardware GDB
+# 
+# List all directories containing source code
+# non-existant directories will be ignored
+dir ../Source
+dir ../../Source
+dir ../../Common/Source
+
+# replace port no. if not using default of 9991 when starting jp3 jtag server
+
+target jtag jtag://localhost:9991
+load
+hbreak AppColdStart
+
