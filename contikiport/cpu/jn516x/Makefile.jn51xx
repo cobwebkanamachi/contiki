@@ -42,13 +42,19 @@ endif
 
 # Default target device is the JN5148, (JN5148J01, JN5142J01, JN5168, JN5164 also valid)
 JENNIC_CHIP ?= JN5168
-# Factory reset PDM magic number (0 for default)
-FACTORY_RESET_MAGIC ?= 0
 
 # Default DK4 development kit target hardware
 JENNIC_PCB ?= DEVKIT4
 
-JENNIC_STACK=None
+# Stack: JIP, MAC, None
+JENNIC_STACK ?= None
+
+# Default driver device is DR1174, (but really has no effect on this template router) 
+DEVICE_NAME ?= DR1174
+
+# Factory reset PDM magic number (0 for default)
+FACTORY_RESET_MAGIC ?= 0
+
 # Figure out chip family and short chip name
 ifeq ($(JENNIC_CHIP), JN5168)
 JENNIC_CHIP_FAMILY = JN516x
@@ -74,9 +80,6 @@ ifeq ($(JENNIC_CHIP), JN5142J01)
 JENNIC_CHIP_FAMILY = JN514x
 JENNIC_CHIP_SHORT = 2J
 endif
-
-# Default driver device is DR1174, (but really has no effect on this template router) 
-DEVICE_NAME ?= DR1174
 
 # Figure out node type ?
 ifeq ($(JENNIC_CHIP_FAMILY), JN516x) 
@@ -303,7 +306,7 @@ INCFLAGS += -I$(COMPONENTS_BASE_DIR)/Aes/Include
 #  Application libraries (non-JN5142J01)
 #ifneq ($(JENNIC_CHIP), JN5142J01)
 ## Application libraries
-##MYLIBS += MibCommon
+#MYLIBS += MibCommon
 #endif
 
 # Chip family libraries 
@@ -388,7 +391,6 @@ CFLAGS  += -DSWDEBUG
 BIN_SUFFIX ?= _swdbg
 $(info Building SW debug version ...)
 endif
-
 
 ifeq ($(DEBUG), HW)
 CFLAGS  := $(subst -Os,,$(CFLAGS))
@@ -550,23 +552,6 @@ CFLAGS += $(INCFLAGS)
 # Library search paths
 LDFLAGS += -L$(CHIP_BASE_DIR)/Build
 LDFLAGS += -L$(CHIP_BASE_DIR)/Library
-#TARGET_LIBFILES += -llibJPT_JN5168
-#TARGET_STARTFILES += $(APPOBJS)
-#TARGET_LIBFILES += $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS))
-
-# Linker flags
-#LDFLAGS += -Wl,--gc-sections 
-#LDFLAGS += -Wl,-u_AppColdStart -Wl,-u_AppWarmStart
-#LDFLAGS += -T$(LINKCMD) 
-#LDFLAGS += -Wl,-Map=contiki-$(TARGET).map
-#LDFLAGS += -Wl,--relax -T$(LINKCMD) -nostartfiles -mba2_elf -march=ba2 -Wl,-Map=contiki-$(TARGET).map
-
-#LDFLAGS += -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart $(LDFLAGS) -T$(LINKCMD) -o $@ -Wl,--start-group $(APPOBJS) $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS)) -Wl,--end-group -Wl,-Map=contiki-$(TARGET).map 
-
-#LDFLAGS += -T$(LINKCMD) -o $@ -Wl,--start-group $(APPOBJS) $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS))
-#CFLAGS += -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart
-#LDFLAGS += -T$(LINKCMD) -o $@ -Wl,--start-group $(APPOBJS) $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS))
-
 #### make targets
 
 ########################################################################
@@ -596,23 +581,6 @@ LDFLAGS += -L$(CHIP_BASE_DIR)/Library
 %.d:
 	rm -f $*.o
 
-#CUSTOM_RULE_S_TO_OBJECTDIR_O=1
-#%.o: %.S
-#	$(info Assembling $< ...)
-#	$(CC) -c -o $(subst Source,Build,$@) $(CFLAGS) $(INCFLAGS) $< -MD -MF $*.d -MP
-#	@echo
-
-#CUSTOM_RULE_C_TO_O=1
-#%.o: %.c
-#	$(info Compiling $< ...)
-#	$(CC) -c -o $(subst Source,Build,$@) $(CFLAGS) $(INCFLAGS) $< -MD -MF $*.d -MP
-#	@echo
-
-#CUSTOM_RULE_C_TO_CO=1
-#%.co: %.c
-#	$(TRACE_CC)
-#	$(Q)$(CC) $(CFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
-
 %.elf: $(APPOBJS) $(addsuffix _$(JENNIC_CHIP_FAMILY).a,$(addprefix $(COMPONENTS_BASE_DIR)/Library/lib,$(APPLIBS)))
 	$(info Linking $@ ...)
 	$(CC) -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart $(LDFLAGS) -T$(LINKCMD) -o $@ -Wl,--start-group $(APPOBJS) $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS)) -Wl,--end-group -Wl,-Map,contiki-$(TARGET).map  
@@ -624,28 +592,25 @@ LDFLAGS += -L$(CHIP_BASE_DIR)/Library
 %.dmp: %.elf
 	$(OBJDUMP) -d $< > $@
 
-#/cygdrive/C/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart -TApp_Stack_Size.ld -nostartfiles -mba2_elf -march=ba2 -L/cygdrive/C/Jennic/Chip/JN5168/Build -L/cygdrive/C/Jennic/Chip/JN5168/Library -L/cygdrive/C/Jennic/Platform/DK4/Library -L/cygdrive/C/Jennic/Components/Library -L/cygdrive/C/Jennic/Stack/JIP/Build -L/cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/MibCommon/Build -Wl,--defsym,OND_DEV_TYPE=0x88011174 -Wl,--defsym,OND_CHIPSET=5168 -Wl,--defsym,OND_REVISION=31009 -TAppBuildJip_JN5168.ld -o /cygdrive/c/Users/BN/Documents/GitHub/JN-AN-1190-JenNet-IP-Application-Template/Binary/0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.elf -Wl,--start-group DeviceTemplate.o Node.o Exception.o Security.o AHI_EEPROM.o MibGroupDec.o MibNodeDec.o MibAdcStatusDec.o MibAdcStatusPatch.o MibNodeStatusDec.o MibNodeControlDec.o MibNwkStatusDec.o MibNwkConfigDec.o MibNwkConfigPatch.o MibNwkSecurityDec.o MibNwkSecurityPatch.o Uart.o -lDBG_JN516x -lRecal_JN516x -lPDM_EEPROM_JN516x -lJIP_JN516x -lJenNet_JN516x -l6LP_JN516x -lAppApi_JN516x -lMac_JN516x -lTof_JN516x -lXcv_JN516x -lAES_CCM_SW_PATCH_JN516x -lAes_JN516x -lTimerServer_JN516x -lHardwareApi_JN516x -lMicroSpecific_JN516x -lBoot_JN516x -lMaths_JN516x -lPDM_EEPROM_JN516x -lBoardLib_JN516x  -lMibCommon_JN516x -Wl,--end-group -Wl,-Map,0x11111111s_DeviceTemplate_DR1174_EndDevice_JN5168.map 
-
 # OND Disabled ? 
 #ifeq ($(OND_CHIPSET), 0)
-MYLIBS = $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS))
-#libJPT_JN5168.a
-#MYLIBS = -lAppApi_JN516x -lMac_JN516x -lHardwareApi_JN516x -lMicroSpecific_JN516x -lBoot_JN516x -lMaths_JN516x
-#contiki-$(TARGET).a 
+ALLLIBS = $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS))
 CUSTOM_RULE_LINK=1
 %.$(TARGET): %.co $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) contiki-$(TARGET).a 
 	$(TRACE_LD)
-	$(CC) -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart -T$(LINKCMD) $(LDFLAGS) -o $@ -Wl,--start-group $(TARGET_STARTFILES) ${filter-out %.a,$^} ${filter %.a,$^} $(MYLIBS) -Wl,--end-group -Wl,-Map,contiki-$(TARGET).map
+	$(CC) -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart -T$(LINKCMD) $(LDFLAGS) -o $@ -Wl,--start-group $(TARGET_STARTFILES) ${filter-out %.a,$^} ${filter %.a,$^} $(ALLLIBS) -Wl,--end-group -Wl,-Map,contiki-$(TARGET).map
 	$(info Generating binary ...)
 	$(OBJCOPY) $@ $$( $(OBJDUMP) -h $< | sed -n 's/^ *[0-9]* \(.rom[._[:alnum:]]*\).*/-R \1/p' )
 	$(OBJCOPY) -S -O binary $@ $@.bin
 	$(info JENNIC_CHIP     = $(JENNIC_CHIP))
 	$(info OND_CHIPSET     = $(OND_CHIPSET))
 	$(info DEVICE_NAME     = $(DEVICE_NAME))
+	$(info JENNIC_PCB      = $(JENNIC_PCB))
+	$(info JENNIC_STACK    = $(JENNIC_STACK))
 	$(info JIP_DEVICE_TYPE = $(JIP_DEVICE_TYPE))
 	$(info JIP_DEVICE_ID   = $(JIP_DEVICE_ID))
 	$(info OND_DEVICE_TYPE = $(OND_DEVICE_TYPE))
-	$(info VERSION         = $(VERSION))
+	$(info VERSION         = $(VERSION))	
 	${SIZE} --totals $*.co contiki-$(TARGET).a
 	${SIZE} $@
 	
