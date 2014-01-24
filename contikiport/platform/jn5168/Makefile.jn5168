@@ -27,8 +27,8 @@ JENNIC_CHIP ?= JN5168
 # Default DK4 development kit target hardware
 JENNIC_PCB ?= DEVKIT4
 
-# Stack: JIP, MAC, None
-JENNIC_STACK ?= MAC
+# Stack: JIP, None
+JENNIC_STACK ?= None
 
 # Default driver device is DR1174, (but really has no effect on this template router) 
 DEVICE_NAME ?= DR1174

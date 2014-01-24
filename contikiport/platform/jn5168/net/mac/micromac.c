@@ -76,7 +76,7 @@ MMAC_ISR_handler(uint32 mac_event) {
 	case mac_event & E_MMAC_INT_RX_HEADER: /* MAC header has been received */
 		break;;
 	case mac_event & E_MMAC_INT_RX_COMPLETE: /* Complete frame has been received */
-  process_poll(&micromac_process);
+		process_poll(&micromac_process);
 
 //  last_packet_timestamp = cc2420_sfd_start_time;
 //  pending++;

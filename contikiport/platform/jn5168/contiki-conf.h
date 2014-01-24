@@ -111,7 +111,7 @@ typedef unsigned short uip_stats_t;
 #endif /* NETSTACK_CONF_MAC */
 
 #ifndef NETSTACK_CONF_RDC
-#define NETSTACK_CONF_RDC     nullrdc_driver
+#define NETSTACK_CONF_RDC     micromac_driver
 #endif /* NETSTACK_CONF_RDC */
 
 #ifndef NETSTACK_CONF_RADIO
@@ -119,7 +119,7 @@ typedef unsigned short uip_stats_t;
 #endif /* NETSTACK_CONF_RADIO */
 
 #ifndef NETSTACK_CONF_FRAMER
-#define NETSTACK_CONF_FRAMER  framer_802154
+#define NETSTACK_CONF_FRAMER  framer_nullmac
 #endif /* NETSTACK_CONF_FRAMER */
 
 #define NETSTACK_CONF_NETWORK sicslowpan_driver
