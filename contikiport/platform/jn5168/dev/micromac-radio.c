@@ -46,7 +46,7 @@
 /* XXX hack: these will be made as Chameleon packet attributes */
 rtimer_clock_t micromac_radio_time_of_arrival, micromac_radio_time_of_departure;
 
-static uint8_t volatile pending, micromac_radio_packets_seen++;
+static uint8_t volatile pending, micromac_radio_packets_seen;
 
 #define BUSYWAIT_UNTIL(cond, max_time)                                  \
   do {                                                                  \
@@ -74,8 +74,8 @@ const struct radio_driver micromac_radio_driver =
   	micromac_radio_transmit,
   	micromac_radio_send,
   	micromac_radio_read,
-    /* cc2420_set_channel, */
-    /* detected_energy, */
+    /* micromac_set_channel, */
+    /* micromac_detected_energy, */
   	micromac_radio_cca,
   	micromac_radio_receiving_packet,
   	micromac_radio_pending_packet,
@@ -126,6 +126,9 @@ MMAC_ISR_handler(uint32 mac_event)
 		break;
 	}
 }
+
+volatile static uint16_t u16PanId = IEEE802154_PANDID;
+volatile static uint16_t u16ShortAddress;
 /*---------------------------------------------------------------------------*/
 int
 micromac_radio_init(void)
@@ -139,9 +142,9 @@ micromac_radio_init(void)
   vMMAC_EnableInterrupts(&MMAC_ISR_handler);
 
   vMMAC_ConfigureRadio();
-  vMMAC_SetChannel(RF_CHANNEL);
-  uint16_t u16PanId=IEEE802154_PANDID;
-  uint16_t u16ShortAddress = rimeaddr_node_addr.u8[1]<<8 + rimeaddr_node_addr.u8[0];
+  channel = RF_CHANNEL;
+  vMMAC_SetChannel(channel);
+  u16ShortAddress = rimeaddr_node_addr.u8[1]<<8 + rimeaddr_node_addr.u8[0];
   MAC_ExtAddr_s* psMacAddr = pvAppApiGetMacAddrLocation();
   vMMAC_SetRxAddress(u16PanId, u16ShortAddress, psMacAddr);
   /* these parameters should disable hardware backoff, but still enable autoACK processing and TX CCA */
@@ -195,9 +198,16 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 		return 1;
 	}
 	GET_LOCK();
+	/* copy payload to (soft) tx buffer */
+	tx_frame_buffer.u16DestPAN = packetbuf_addr(PACKETBUF_ATTR_NETWORK_ID);
+	tx_frame_buffer.u16SrcPAN = packetbuf_addr(PACKETBUF_ATTR_NETWORK_ID);
+	tx_frame_buffer.u8PayloadLength = packetbuf_totlen();
+	tx_frame_buffer.uDestAddr = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
+	tx_frame_buffer.uSrcAddr = packetbuf_addr(PACKETBUF_ADDR_SENDER);
+	memcpy(tx_frame_buffer.uPayload, packetbuf_hdrptr(), packetbuf_totlen());
 
-  RELEASE_LOCK();
-  return 0;
+	RELEASE_LOCK();
+	return 0;
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -239,6 +249,7 @@ micromac_radio_set_channel(int c)
 {
   GET_LOCK();
   channel = c;
+  vMMAC_SetChannel(channel);
   RELEASE_LOCK();
   return 1;
 }
@@ -249,7 +260,13 @@ micromac_radio_set_pan_addr(unsigned pan,
                     const uint8_t *ieee_addr)
 {
   GET_LOCK();
-
+  u16PanId = pan;
+  u16ShortAddress = addr;
+  MAC_ExtAddr_s* psMacAddr = (MAC_ExtAddr_s*) ieee_addr;
+  if(ieee_addr == NULL) {
+  	psMacAddr = pvAppApiGetMacAddrLocation();
+  }
+  vMMAC_SetRxAddress(u16PanId, u16ShortAddress, psMacAddr);
   RELEASE_LOCK();
 }
 /*---------------------------------------------------------------------------*/
@@ -381,7 +398,7 @@ micromac_receiving_packet(void)
 }
 /*---------------------------------------------------------------------------*/
 static int
-pending_packet(void)
+micromac_radio_pending_packet(void)
 {
   return pending;
 }
@@ -389,9 +406,9 @@ pending_packet(void)
 void
 micromac_set_cca_threshold(int value)
 {
-  uint16_t shifted = value << 8;
+//  uint16_t shifted = value << 8;
   GET_LOCK();
-  setreg(CC2420_RSSI, shifted);
+//  setreg(CC2420_RSSI, shifted);
   RELEASE_LOCK();
 }
 /*---------------------------------------------------------------------------*/
