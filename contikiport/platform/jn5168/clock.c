@@ -32,9 +32,10 @@
 
 /**
  * \file
- *         Clock implementation for Unix.
+ *         Clock implementation for NXP jn5168.
  * \author
- *         Adam Dunkels <adam@sics.se>
+ *         Beshr Al Nahas <beshr@sics.se>
+ *
  */
 
 #include <AppHardwareApi.h>
@@ -45,54 +46,57 @@
 #include "sys/etimer.h"
 #include "rtimer-arch.h"
 #include "dev/watchdog.h"
-/* Timer */
-//#define TICK_PERIOD_ms                  1UL
-//#define CPU_CLOCK_FREQ_HZ               16000000UL
-//#define TICK_TIMER_TICK_PERIOD_COUNT    (16000UL * TICK_PERIOD_ms)
-/* Timer clocked at (16MHz / (2^TIMER_PRESCALE)) */
-#define TIMER_PRESCALE                  0UL
-/* 1 ms tick timer, CLOCK_SECOND = 1000 ==> 16000UL */
-#define INTERVAL (RTIMER_ARCH_SECOND / CLOCK_SECOND)
 
-#define MAX_TICKS (INTERVAL)
+/**
+ * TickTimer will be used for RTIMER
+ * E_AHI_TIMER_1 will be used for ticking
+ **/
+
+#define DEBUG 0
+#if DEBUG
+#include <stdio.h>
+#define PRINTF(...) printf(__VA_ARGS__)
+#else
+#define PRINTF(...)
+#endif
 
 static volatile unsigned long seconds;
 static volatile uint8_t ticking = FALSE;
-static volatile clock_time_t count = 0;
+static volatile clock_time_t clock_ticks = 0;
 /* last_tar is used for calculating clock_fine */
-static volatile uint32_t last_tick = 0, ticks = 0;
+#define CPU_CLOCK_FREQ_HZ               16000000UL
+//#define TICK_PERIOD_ms                  10UL
+
+#define CLOCK_TIMER 					E_AHI_TIMER_1
+#define CLOCK_TIMER_ISR_DEV  	E_AHI_DEVICE_TIMER1
+//16Mhz / 2^7 = 125Khz
+#define CLOCK_PRESCALE 7
+// 10ms tick --> overflow after ~981/2 days
+#define CLOCK_INTERVAL (125*10)
+#define MAX_TICKS (CLOCK_INTERVAL)
 /*---------------------------------------------------------------------------*/
 void
-vTimerISR(uint32 u32Device, uint32 u32ItemBitmap)
+clockTimerISR(uint32 u32Device, uint32 u32ItemBitmap)
 {
+	if(u32Device != CLOCK_TIMER_ISR_DEV) {
+		return;
+	}
+
 	ENERGEST_ON(ENERGEST_TYPE_IRQ);
+
 	watchdog_start();
-	ticks += INTERVAL - last_tick;
-	last_tick = 0;
-	rtimer_run_next();
-	//do
-	{
-		++count;
 
-		/* Make sure the CLOCK_CONF_SECOND is a power of two, to ensure
-		 that the modulo operation below becomes a logical and and not
-		 an expensive divide. Algorithm from Wikipedia:
-		 http://en.wikipedia.org/wiki/Power_of_two */
-		//#if (CLOCK_CONF_SECOND & (CLOCK_CONF_SECOND - 1)) != 0
-		//#error CLOCK_CONF_SECOND must be a power of two (i.e., 1, 2, 4, 8, 16, 32, 64, ...).
-		//#error Change CLOCK_CONF_SECOND in contiki-conf.h.
-		//#endif
-//		if (count % CLOCK_CONF_SECOND == 0) {
-//			++seconds;
-//			energest_flush();
-//		}
-	} //while((TACCR1 - u32AHI_TickTimerRead()) > INTERVAL);
+	clock_ticks++;
+	if (clock_ticks % CLOCK_CONF_SECOND == 0) {
+		++seconds;
+		energest_flush();
+	}
 
-	if (etimer_pending() && (etimer_next_expiration_time() - count - 1)
-			> MAX_TICKS) {
+	if (etimer_pending() && (etimer_next_expiration_time() - clock_ticks - 1) > MAX_TICKS) {
 		etimer_request_poll();
 		//LPM4_EXIT;
 	}
+
 	/*  if(process_nevents() >= 0) {
 	 LPM4_EXIT;
 	 }*/
@@ -100,6 +104,25 @@ vTimerISR(uint32 u32Device, uint32 u32ItemBitmap)
 	watchdog_stop();
 
   ENERGEST_OFF(ENERGEST_TYPE_IRQ);
+}
+/*---------------------------------------------------------------------------*/
+static void
+clock_timer_init(void)
+{
+  vAHI_TimerEnable(CLOCK_TIMER, CLOCK_PRESCALE, false, true, false);
+  vAHI_TimerClockSelect(CLOCK_TIMER, false, false);
+
+  vAHI_TimerConfigureOutputs(CLOCK_TIMER, false, true);
+  vAHI_TimerDIOControl(CLOCK_TIMER, false);
+
+#if (CLOCK_TIMER==E_AHI_TIMER_0)
+  vAHI_Timer0RegisterCallback(clockTimerISR);
+#elif (CLOCK_TIMER==E_AHI_TIMER_1)
+  vAHI_Timer1RegisterCallback(clockTimerISR);
+#endif
+  clock_ticks = 0;
+	vAHI_TimerStartRepeat(CLOCK_TIMER, 0, CLOCK_INTERVAL);
+	ticking = TRUE;
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -115,15 +138,11 @@ clock_init(void)
 	 */
 	vAHI_SysCtrlRegisterCallback(0);
 
-	/* Initialise tick timer to give periodic interrupt */
-	vAHI_TickTimerConfigure(E_AHI_TICK_TIMER_DISABLE);
-	vAHI_TickTimerWrite(0);
-	vAHI_TickTimerRegisterCallback(vTimerISR);
-	vAHI_TickTimerIntEnable(1);
-	vAHI_TickTimerInterval(INTERVAL);
-	vAHI_TickTimerConfigure(E_AHI_TICK_TIMER_RESTART);
-	ticking = TRUE;
-	(void) u32AHI_Init();
+  //schedule clock tick interrupt
+  clock_timer_init();
+  rtimer_init();
+  (void) u32AHI_Init();
+
 //#ifdef JENNIC_CHIP_FAMILY_JN516x
 	bAHI_SetClockRate(E_AHI_XTAL_32MHZ);
 	vAHI_OptimiseWaitStates();
@@ -131,13 +150,6 @@ clock_init(void)
 	vREG_SysWrite(REG_SYS_PWR_CTRL, u32REG_SysRead(REG_SYS_PWR_CTRL)
 			| REG_SYSCTRL_PWRCTRL_SPIMEN_MASK);
 //#endif
-
-	if (bAHI_WatchdogResetEvent()) {
-		//vPrintf("APP: Watchdog timer has reset device!\r\n");
-	}
-	vAHI_WatchdogStop();
-	vAHI_TickTimerIntEnable(TRUE);
-
 }
 /*---------------------------------------------------------------------------*/
 clock_time_t
@@ -145,8 +157,8 @@ clock_time(void)
 {
   clock_time_t t1, t2;
   do {
-    t1 = count;
-    t2 = count;
+    t1 = clock_ticks;
+    t2 = clock_ticks;
   } while(t1 != t2);
   return t1;
 }
@@ -154,65 +166,60 @@ clock_time(void)
 void
 clock_set(clock_time_t clock, clock_time_t fclock)
 {
-	//vAHI_TickTimerIntEnable(0);
-	vAHI_TickTimerWrite(fclock);
-  //vAHI_TickTimerRegisterCallback(vTimerISR);
-  count = clock;
-  //vAHI_TickTimerIntEnable(1);
-  vAHI_TickTimerInterval(INTERVAL);
-  //vAHI_TickTimerConfigure(E_AHI_TICK_TIMER_RESTART);
+	clock_ticks = clock;
 }
 /*---------------------------------------------------------------------------*/
 int
 clock_fine_max(void)
 {
-  return INTERVAL;
+  return CLOCK_INTERVAL;
 }
 /*---------------------------------------------------------------------------*/
-unsigned short
-clock_fine(void)
-{
-  unsigned short t;
-  /* Assign last_tar to local varible that can not be changed by interrupt */
-  t = last_tick;
-  /* perform calc based on t, TAR will not be changed during interrupt */
-  return (unsigned short) (u32AHI_TickTimerRead() - t);
-}
-/*---------------------------------------------------------------------------*/
-/**
- * Delay the CPU for a multiple of 1 us.
- */
-void
-clock_delay(unsigned int i)
-{
-	volatile uint32_t t = u32AHI_TickTimerRead();
-	//XXX beware of wrapping
-	if(MAX_TICKS-t < i) {
-		while(u32AHI_TickTimerRead() < MAX_TICKS && u32AHI_TickTimerRead() !=0);
-		i-=MAX_TICKS-t;
-		t=0;
-	}
-	while(u32AHI_TickTimerRead()-t < i);
-}
+//rtimer_clock_t
+//clock_fine(void)
+//{
+//	rtimer_clock_t t;
+//  /* Assign last_tar to local variable that can not be changed by interrupt */
+//  t = last_tick;
+//  /* perform calc based on t, TAR will not be changed during interrupt */
+//  return (rtimer_clock_t) (u32AHI_TickTimerRead() - t);
+//}
 /*---------------------------------------------------------------------------*/
 /**
- * Delay the CPU for a multiple of 1 us.
+ * Delay the CPU for a multiple of 0.0625 us.
  */
 void
 clock_delay_usec(uint16_t i)
 {
 	volatile uint32_t t = u32AHI_TickTimerRead();
+#define RTIMER_MAX_TICKS 0xffffffff
 	//XXX beware of wrapping
-	if(MAX_TICKS-t < i) {
-		while(u32AHI_TickTimerRead() < MAX_TICKS && u32AHI_TickTimerRead() !=0);
-		i-=MAX_TICKS-t;
+	if(RTIMER_MAX_TICKS-t < i) {
+		while(u32AHI_TickTimerRead() < RTIMER_MAX_TICKS && u32AHI_TickTimerRead() !=0);
+		i-=RTIMER_MAX_TICKS-t;
 		t=0;
 	}
 	while(u32AHI_TickTimerRead()-t < i);
 }
 /*---------------------------------------------------------------------------*/
 /**
- * Wait for a multiple of 1 ms.
+ * Delay the CPU for a multiple of 8 us.
+ */
+void
+clock_delay(unsigned int i)
+{
+	volatile uint32_t t = u16AHI_TimerReadCount(CLOCK_TIMER);
+	//XXX beware of wrapping
+	if(MAX_TICKS-t < i) {
+		while(u16AHI_TimerReadCount(CLOCK_TIMER) < MAX_TICKS && u16AHI_TimerReadCount(CLOCK_TIMER) !=0);
+		i-=MAX_TICKS-t;
+		t=0;
+	}
+	while(u16AHI_TimerReadCount(CLOCK_TIMER)-t < i);
+}
+/*---------------------------------------------------------------------------*/
+/**
+ * Wait for a multiple of 10 ms.
  *
  */
 void
@@ -244,12 +251,13 @@ clock_seconds(void)
 rtimer_clock_t
 clock_counter(void)
 {
-  rtimer_clock_t t1, t2;
-  do {
-    t1 = u32AHI_TickTimerRead();
-    t2 = u32AHI_TickTimerRead();
-  } while(t1 != t2);
-  return t1;
+//  rtimer_clock_t t1, t2;
+//  do {
+//    t1 = u32AHI_TickTimerRead();
+//    t2 = u32AHI_TickTimerRead();
+//  } while(t1 != t2);
+//  return t1;
+	return rtimer_arch_now();
 }
-/*---------------------------------------------------------------------------*/
+
 

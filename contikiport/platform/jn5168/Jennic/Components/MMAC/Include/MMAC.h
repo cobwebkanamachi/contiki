@@ -42,11 +42,22 @@ extern "C" {
 /***        Include Files                                                 ***/
 /****************************************************************************/
 #include "jendefs.h"
-#include "mac_sap.h"
 
 /****************************************************************************/
 /***        Macro/Type Definitions                                        ***/
 /****************************************************************************/
+typedef struct
+{
+    uint32 u32L;  /**< Low word */
+    uint32 u32H;  /**< High word */
+} tsExtAddr;
+
+typedef union
+{
+    uint16    u16Short;
+    tsExtAddr sExt;
+} tuAddr;
+
 /* Structure for building a MAC frame, where the MAC header alignment is
    handled by the hardware */
 typedef struct
@@ -56,8 +67,8 @@ typedef struct
     uint16          u16FCF;
     uint16          u16DestPAN;
     uint16          u16SrcPAN;
-    MAC_Addr_u      uDestAddr;
-    MAC_Addr_u      uSrcAddr;
+    tuAddr          uDestAddr;
+    tuAddr          uSrcAddr;
     uint16          u16FCS;
     uint16          u16Unused;
     union
@@ -161,14 +172,16 @@ PUBLIC void vMMAC_SetChannel(uint8 u8Channel);
 
 /* Miscellaneous */
 PUBLIC uint32 u32MMAC_GetTime(void);
+PUBLIC void vMMAC_RadioOff(void);
 
 /* Receive */
-PUBLIC void vMMAC_SetRxAddress(uint16 u16PanId, uint16 u16Short,
-                               MAC_ExtAddr_s *psMacAddr);
+PUBLIC void vMMAC_SetRxAddress(uint32 u32PanId, uint16 u16Short,
+                               tsExtAddr *psMacAddr);
 PUBLIC void vMMAC_SetRxStartTime(uint32 u32Time);
 PUBLIC void vMMAC_StartMacReceive(tsMacFrame *psFrame, teRxOption eOptions);
 PUBLIC void vMMAC_StartPhyReceive(tsPhyFrame *psFrame, teRxOption eOptions);
 PUBLIC uint32 u32MMAC_GetRxErrors(void);
+PUBLIC uint32 u32MMAC_GetRxTime(void);
 
 /* Transmit */
 PUBLIC void vMMAC_SetTxParameters(uint8 u8Attempts, uint8 u8MinBE,

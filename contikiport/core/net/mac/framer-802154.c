@@ -168,7 +168,7 @@ create(void)
 
   params.payload = packetbuf_dataptr();
   params.payload_len = packetbuf_datalen();
-  len = frame802154_hdrlen(&params);
+  len = 28; //frame802154_hdrlen(&params);
   if(packetbuf_hdralloc(len)) {
     frame802154_create(&params, packetbuf_hdrptr(), len);
 

@@ -13,7 +13,15 @@ endif
 CONTIKI_TARGET_DIRS = . dev
 CONTIKI_TARGET_MAIN = ${addprefix $(OBJECTDIR)/,contiki-main.o}
 
-CONTIKI_TARGET_SOURCEFILES = contiki-main.c clock.c sprintf.c uart0.c watchdog.c timer-arch.c leds-arch.c
+CONTIKI_TARGET_SOURCEFILES = contiki-main.c clock.c sprintf.c uart0.c watchdog.c timer-arch.c leds-arch.c 
+
+#For MicroMAC (radio) library
+CONTIKI_TARGET_SOURCEFILES += micromac-radio.c
+APPLIBS += MMAC 
+STACKLIBS += JPT
+#For reading internal MAC address using pvAppApiGetMacAddrLocation()
+JENNIC_STACK = MAC
+
 #leds.c leds-arch.c \
 #                button-sensor.c pir-sensor.c vib-sensor.c xmem.c \
 #                sensors.c irq.c 
@@ -27,16 +35,13 @@ JENNIC_CHIP ?= JN5168
 # Default DK4 development kit target hardware
 JENNIC_PCB ?= DEVKIT4
 
-# Stack: JIP, None
-JENNIC_STACK ?= None
-
 # Default driver device is DR1174, (but really has no effect on this template router) 
 DEVICE_NAME ?= DR1174
 
 
 .SUFFIXES:
 
-#SDK_BASE_DIR ?= $(abspath $(CONTIKI)/platform/jn5168/Jennic)
+SDK_BASE_DIR ?= $(abspath $(CONTIKI)/platform/jn5168/Jennic)
 ### Define the CPU directory
 CONTIKI_CPU=$(CONTIKI)/cpu/jn516x
 include $(CONTIKI)/cpu/jn516x/Makefile.jn51xx

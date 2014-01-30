@@ -201,7 +201,7 @@ PROCESS_THREAD(micromac_process, ev, data)
 
     packetbuf_clear();
     packetbuf_set_attr(PACKETBUF_ATTR_TIMESTAMP, last_packet_timestamp);
-    len = cc2420_read(packetbuf_dataptr(), PACKETBUF_SIZE);
+//    len = cc2420_read(packetbuf_dataptr(), PACKETBUF_SIZE);
 
     packetbuf_set_datalen(len);
 

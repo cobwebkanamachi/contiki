@@ -37,6 +37,7 @@
 
 #include "dev/watchdog.h"
 #include <AppHardwareApi.h>
+#include <AppApi.h>
 #include "dev/uart0.h"
 
 #include "contiki.h"
@@ -67,13 +68,16 @@
 //SENSORS(&pir_sensor, &vib_sensor, &button_sensor);
 
 /*---------------------------------------------------------------------------*/
-#include "mac_sap.h"
+#include "MMAC.h"
 static void
-MAC_vReadExtAddress(MAC_ExtAddr_s *psExtAddress)
+MAC_vReadExtAddress(tsExtAddr *psExtAddress)
 {
-    uint32 *pu32Mac = pvAppApiGetMacAddrLocation();
-    psExtAddress->u32H = pu32Mac[0];
-    psExtAddress->u32L = pu32Mac[1];
+	//WRONG: Does not respect field order. The CPU uses BIG_ENDIAN, and the struct has u32L first.
+	//memcpy(psExtAddress, pvAppApiGetMacAddrLocation(), sizeof(tsExtAddr));
+	// From jennic support:
+	uint32 *pu32Mac = pvAppApiGetMacAddrLocation();
+	psExtAddress->u32H = pu32Mac[0];
+	psExtAddress->u32L = pu32Mac[1];
 }
 /*---------------------------------------------------------------------------*/
 
@@ -124,9 +128,10 @@ set_rime_addr(void)
 #if UIP_CONF_IPV6
   memcpy(addr.u8, pvAppApiGetMacAddrLocation(), sizeof(addr.u8));
 #else
-    for(i = 0; i < sizeof(rimeaddr_t); ++i) {
-      addr.u8[i] = ((unsigned char*)pvAppApiGetMacAddrLocation())[7 - i];
-    }
+  memcpy(addr.u8, pvAppApiGetMacAddrLocation(), sizeof(addr.u8));
+//    for(i = 0; i < sizeof(rimeaddr_t); ++i) {
+//      addr.u8[i] = ((unsigned char*)pvAppApiGetMacAddrLocation())[i];
+//    }
 #endif
   rimeaddr_set_node_addr(&addr);
   printf("Rime started with address ");
@@ -147,12 +152,19 @@ main(void)
   leds_arch_set(LEDS_ALL);
   process_init();
   ctimer_init();
-  /* Wait for clock to stablise */
-  while(bAHI_Clock32MHzStable() == FALSE);
-  uart0_init(E_AHI_UART_RATE_115200); /* Must come before first printf */
 
   queuebuf_init();
   serial_line_init();
+  uart0_init(E_AHI_UART_RATE_115200); /* Must come before first printf */
+
+  //check for reset source
+  if (bAHI_WatchdogResetEvent()) {
+		printf("Init: Watchdog timer has reset device!\r\n");
+	}
+	vAHI_WatchdogStop();
+
+  /* Wait for clock to stablise */
+  while(bAHI_Clock32MHzStable() == FALSE);
 
   process_start(&etimer_process, NULL);
   set_rime_addr();
@@ -200,13 +212,15 @@ main(void)
   while(1) {
 
     //etimer_request_poll();
-    int r;
-    do {
-      /* Reset watchdog. */
-      watchdog_periodic(); //   vAHI_WatchdogRestart();
-      r = process_run();
-    } while(r > 0);
-
+//    int r;
+//    do {
+//      /* Reset watchdog. */
+//       //   vAHI_WatchdogRestart();
+//      r = process_run();
+//    } while(r > 0);
+  	watchdog_periodic();
+  	process_run();
+    etimer_request_poll();
     /*
      * Idle processing.
      */

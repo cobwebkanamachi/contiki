@@ -65,6 +65,13 @@
 #include "net/mac/frame802154.h"
 #include <string.h>
 
+#define DEBUG 1
+#if DEBUG
+#include <stdio.h>
+#define PRINTF(...) printf(__VA_ARGS__)
+#else
+#define PRINTF(...) do {} while (0)
+#endif
 /**
  *  \brief Structure that contains the lengths of the various addressing and security fields
  *  in the 802.15.4 header.  This structure is used in \ref frame802154_create()
@@ -176,12 +183,76 @@ frame802154_hdrlen(frame802154_t *p)
  *   \return The length of the frame header or 0 if there was
  *   insufficient space in the buffer for the frame headers.
 */
+//int
+//frame802154_create(frame802154_t *p, uint8_t *buf, int buf_len)
+//{
+//  int c;
+//  field_length_t flen;
+//  uint8_t *tx_frame_buffer;
+//  uint8_t pos;
+//
+//  field_len(p, &flen);
+//
+//  if(3 + flen.dest_pid_len + flen.dest_addr_len +
+//     flen.src_pid_len + flen.src_addr_len + flen.aux_sec_len > buf_len) {
+//    /* Too little space for headers. */
+//    return 0;
+//  }
+//
+//  /* OK, now we have field lengths.  Time to actually construct */
+//  /* the outgoing frame, and store it in tx_frame_buffer */
+//  tx_frame_buffer = buf;
+//  tx_frame_buffer[0] = (p->fcf.frame_type & 7) |
+//    ((p->fcf.security_enabled & 1) << 3) |
+//    ((p->fcf.frame_pending & 1) << 4) |
+//    ((p->fcf.ack_required & 1) << 5) |
+//    ((p->fcf.panid_compression & 1) << 6);
+//  tx_frame_buffer[1] = ((p->fcf.dest_addr_mode & 3) << 2) |
+//    ((p->fcf.frame_version & 3) << 4) |
+//    ((p->fcf.src_addr_mode & 3) << 6);
+//
+//  /* sequence number */
+//  tx_frame_buffer[2] = p->seq;
+//  pos = 3;
+//
+//  /* Destination PAN ID */
+//  if(flen.dest_pid_len == 2) {
+//    tx_frame_buffer[pos++] = p->dest_pid & 0xff;
+//    tx_frame_buffer[pos++] = (p->dest_pid >> 8) & 0xff;
+//  }
+//
+//  /* Destination address */
+//  for(c = flen.dest_addr_len; c > 0; c--) {
+//    tx_frame_buffer[pos++] = p->dest_addr[c - 1];
+//  }
+//
+//  /* Source PAN ID */
+//  if(flen.src_pid_len == 2) {
+//    tx_frame_buffer[pos++] = p->src_pid & 0xff;
+//    tx_frame_buffer[pos++] = (p->src_pid >> 8) & 0xff;
+//  }
+//
+//  /* Source address */
+//  for(c = flen.src_addr_len; c > 0; c--) {
+//    tx_frame_buffer[pos++] = p->src_addr[c - 1];
+//  }
+//
+//  /* Aux header */
+//  if(flen.aux_sec_len) {
+//    /* TODO Aux security header not yet implemented */
+///*     pos += flen.aux_sec_len; */
+//  }
+//
+//  return (int)pos;
+//}
+#include "MMAC.h"
 int
 frame802154_create(frame802154_t *p, uint8_t *buf, int buf_len)
 {
+	PRINTF("frame802154_create: %d bytes\n", buf_len);
   int c;
   field_length_t flen;
-  uint8_t *tx_frame_buffer;
+  tsMacFrame *tx_frame_buffer;
   uint8_t pos;
 
   field_len(p, &flen);
@@ -194,48 +265,58 @@ frame802154_create(frame802154_t *p, uint8_t *buf, int buf_len)
 
   /* OK, now we have field lengths.  Time to actually construct */
   /* the outgoing frame, and store it in tx_frame_buffer */
-  tx_frame_buffer = buf;
-  tx_frame_buffer[0] = (p->fcf.frame_type & 7) |
+  tx_frame_buffer = (tsMacFrame *)buf;
+
+  pos = (uint8_t *) &(tx_frame_buffer->uPayload) - buf;
+
+  /* sequence number */
+  tx_frame_buffer->u8SequenceNum = p->seq;
+
+  tx_frame_buffer->u16FCF = 0xff & ((p->fcf.frame_type & 7) |
     ((p->fcf.security_enabled & 1) << 3) |
     ((p->fcf.frame_pending & 1) << 4) |
     ((p->fcf.ack_required & 1) << 5) |
-    ((p->fcf.panid_compression & 1) << 6);
-  tx_frame_buffer[1] = ((p->fcf.dest_addr_mode & 3) << 2) |
+    ((p->fcf.panid_compression & 1) << 6));
+  tx_frame_buffer->u16FCF |= 0xff00 & ((((p->fcf.dest_addr_mode & 3) << 2) |
     ((p->fcf.frame_version & 3) << 4) |
-    ((p->fcf.src_addr_mode & 3) << 6);
+    ((p->fcf.src_addr_mode & 3) << 6))<<8);
 
-  /* sequence number */
-  tx_frame_buffer[2] = p->seq;
-  pos = 3;
-
+  tx_frame_buffer->u8PayloadLength=3; //seqNo+FCF
   /* Destination PAN ID */
   if(flen.dest_pid_len == 2) {
-    tx_frame_buffer[pos++] = p->dest_pid & 0xff;
-    tx_frame_buffer[pos++] = (p->dest_pid >> 8) & 0xff;
+    tx_frame_buffer->u16DestPAN = p->dest_pid;
+    tx_frame_buffer->u8PayloadLength+=2;
   }
 
   /* Destination address */
-  for(c = flen.dest_addr_len; c > 0; c--) {
-    tx_frame_buffer[pos++] = p->dest_addr[c - 1];
+  if(flen.dest_addr_len == 8) {
+  	memcpy(&(tx_frame_buffer->uDestAddr.sExt), p->dest_addr, flen.dest_addr_len);
+  } else {
+    memcpy(&(tx_frame_buffer->uDestAddr.u16Short), p->dest_addr, flen.dest_addr_len);
   }
+  tx_frame_buffer->u8PayloadLength+=flen.dest_addr_len;
 
   /* Source PAN ID */
   if(flen.src_pid_len == 2) {
-    tx_frame_buffer[pos++] = p->src_pid & 0xff;
-    tx_frame_buffer[pos++] = (p->src_pid >> 8) & 0xff;
+    tx_frame_buffer->u16SrcPAN = p->src_pid;
+    tx_frame_buffer->u8PayloadLength+=flen.src_pid_len;
   }
 
   /* Source address */
-  for(c = flen.src_addr_len; c > 0; c--) {
-    tx_frame_buffer[pos++] = p->src_addr[c - 1];
+  if(flen.src_addr_len == 8) {
+  	memcpy(&(tx_frame_buffer->uSrcAddr.sExt), p->src_addr, flen.src_addr_len);
+  } else {
+    memcpy(&(tx_frame_buffer->uSrcAddr.u16Short), p->src_addr, flen.src_addr_len);
+
   }
+  tx_frame_buffer->u8PayloadLength+=flen.src_addr_len;
 
   /* Aux header */
   if(flen.aux_sec_len) {
     /* TODO Aux security header not yet implemented */
 /*     pos += flen.aux_sec_len; */
   }
-
+  PRINTF("frame802154_create: pos %d\n", pos);
   return (int)pos;
 }
 /*----------------------------------------------------------------------------*/

@@ -41,7 +41,7 @@ watchdog_init(void)
 void
 watchdog_start(void)
 {
-  vAHI_WatchdogStart(8); /* about 1s timeout */
+  vAHI_WatchdogStart(9); /* about 2s timeout */
 }
 /*---------------------------------------------------------------------------*/
 void

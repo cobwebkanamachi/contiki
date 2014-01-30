@@ -1,60 +1,178 @@
 /*
+
  * Copyright (c) 2006, Swedish Institute of Computer Science.
+
  * All rights reserved.
+
  *
+
  * Redistribution and use in source and binary forms, with or without
+
  * modification, are permitted provided that the following conditions
+
  * are met:
+
  * 1. Redistributions of source code must retain the above copyright
+
  *    notice, this list of conditions and the following disclaimer.
+
  * 2. Redistributions in binary form must reproduce the above copyright
+
  *    notice, this list of conditions and the following disclaimer in the
+
  *    documentation and/or other materials provided with the distribution.
+
  * 3. Neither the name of the Institute nor the names of its contributors
+
  *    may be used to endorse or promote products derived from this software
+
  *    without specific prior written permission.
+
  *
+
  * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+
  * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+
  * SUCH DAMAGE.
+
  *
+
  * This file is part of the Contiki operating system.
+
  *
+
  */
 
 /**
+
  * \file
+
  *         A very simple Contiki application showing how Contiki programs look
+
  * \author
+
  *         Adam Dunkels <adam@sics.se>
+
  */
 
+//#include "contiki.h"
+
+//
+
+//#include <stdio.h> /* For printf() */
+
+///*---------------------------------------------------------------------------*/
+
+//PROCESS(hello_world_process, "Hello world process");
+
+//AUTOSTART_PROCESSES(&hello_world_process);
+
+///*---------------------------------------------------------------------------*/
+
+//PROCESS_THREAD(hello_world_process, ev, data)
+
+//{
+
+//  PROCESS_BEGIN();
+
+//  static unsigned char leds=0;
+
+//  void leds_arch_set(unsigned char);
+
+//  while(1) {
+
+//  	printf("Hello, world\n");
+
+//  	leds_arch_set(leds ? 7:0 );
+
+//  	leds=!leds;
+
+//  }
+
+//
+
+//  PROCESS_END();
+
+//}
+
+///*---------------------------------------------------------------------------*/
 #include "contiki.h"
+#include "net/rime.h"
+//#include "dev/button-sensor.h"
+#include "dev/leds.h"
+#include <stdio.h>
+#include <string.h>
 
-#include <stdio.h> /* For printf() */
+void leds_arch_set(unsigned char);
+
 /*---------------------------------------------------------------------------*/
-PROCESS(hello_world_process, "Hello world process");
-AUTOSTART_PROCESSES(&hello_world_process);
+PROCESS(example_unicast_process, "Example unicast");
+AUTOSTART_PROCESSES(&example_unicast_process);
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(hello_world_process, ev, data)
+
+static void
+recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
 {
-  PROCESS_BEGIN();
-  static unsigned char leds=0;
-  void leds_arch_set(unsigned char);
-  while(1) {
-  	printf("Hello, world\n");
-  	leds_arch_set(leds ? 7:0 );
-  	leds=!leds;
-  }
-
-  PROCESS_END();
+	printf("unicast message %s received from %d.%d\n",	(char *) packetbuf_dataptr(), from->u8[0], from->u8[1]);
 }
+
+static const struct unicast_callbacks unicast_callbacks = { recv_uc };
+static struct unicast_conn uc;
 /*---------------------------------------------------------------------------*/
+
+PROCESS_THREAD(example_unicast_process, ev, data)
+{
+	PROCESS_EXITHANDLER(unicast_close(&uc);)
+	PROCESS_BEGIN();
+
+	unicast_open(&uc, 146, &unicast_callbacks);
+
+	while(1) {
+		static struct etimer et;
+		static rimeaddr_t addr;
+		static unsigned char leds=0;
+		static char msg[15];
+
+		etimer_set(&et, CLOCK_SECOND);
+
+		sprintf(msg, "Hello: %d\n", ++leds);
+
+		leds_arch_set( leds );
+		packetbuf_copyfrom(msg, strlen(msg));
+
+
+		addr.u8[0] = 222;
+		addr.u8[1] = 173;
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+
+		if(rimeaddr_cmp(&addr, &rimeaddr_node_addr)) {
+			addr.u8[0] = 3;
+			addr.u8[1] = 0;
+		}
+		printf("Sending to %d.%d: %s", addr.u8[0], addr.u8[1], msg);
+		unicast_send(&uc, &addr);
+	}
+
+	PROCESS_END();
+
+}
+
+/*---------------------------------------------------------------------------*/
+
