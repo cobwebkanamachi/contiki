@@ -119,7 +119,7 @@
 #include "dev/leds.h"
 #include <stdio.h>
 #include <string.h>
-
+#include <random.h>
 void leds_arch_set(unsigned char);
 
 /*---------------------------------------------------------------------------*/
@@ -130,7 +130,8 @@ AUTOSTART_PROCESSES(&example_unicast_process);
 static void
 recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
 {
-	printf("unicast message %s received from %d.%d\n",	(char *) packetbuf_dataptr(), from->u8[0], from->u8[1]);
+	static int count=0;
+	printf("%d: unicast message %s received from %d.%d\n",	++count, (char *) packetbuf_dataptr(), from->u8[0], from->u8[1]);
 }
 
 static const struct unicast_callbacks unicast_callbacks = { recv_uc };
@@ -150,29 +151,27 @@ PROCESS_THREAD(example_unicast_process, ev, data)
 		static unsigned char leds=0;
 		static char msg[15];
 
-		etimer_set(&et, CLOCK_SECOND);
+		etimer_set(&et, CLOCK_SECOND + random_rand()%(CLOCK_SECOND));
 
 		sprintf(msg, "Hello: %d\n", ++leds);
 
 		leds_arch_set( leds );
-		packetbuf_copyfrom(msg, strlen(msg));
+		packetbuf_copyfrom(msg, strlen(msg)+1);
 
+		addr.u8[0] = 3;
+		addr.u8[1] = 0;
 
-		addr.u8[0] = 222;
-		addr.u8[1] = 173;
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
 
 		if(rimeaddr_cmp(&addr, &rimeaddr_node_addr)) {
-			addr.u8[0] = 3;
-			addr.u8[1] = 0;
+			addr.u8[0] = 0xde;
+			addr.u8[1] = 0xad;
 		}
-		printf("Sending to %d.%d: %s", addr.u8[0], addr.u8[1], msg);
+		printf("Sending to %02x.%02x: %s", addr.u8[0], addr.u8[1], msg);
 		unicast_send(&uc, &addr);
 	}
 
 	PROCESS_END();
 
 }
-
 /*---------------------------------------------------------------------------*/
-

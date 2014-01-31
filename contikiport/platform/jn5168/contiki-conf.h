@@ -82,6 +82,7 @@ typedef uint32_t rtimer_clock_t;
 /* 10ms timer tick */
 #define CLOCK_CONF_SECOND 100
 
+#define RIMESTATS_CONF_ENABLED 1
 
 #ifndef NETSTACK_CONF_MAC
 #define NETSTACK_CONF_MAC     nullmac_driver
@@ -283,7 +284,7 @@ typedef uint32_t rtimer_clock_t;
 #else /* WITH_UIP6 */
 #define UIP_CONF_IP_FORWARD      1
 #define UIP_CONF_BUFFER_SIZE     108
-
+#define RIMEADDR_CONF_SIZE       2
 #endif /* WITH_UIP6 */
 
 

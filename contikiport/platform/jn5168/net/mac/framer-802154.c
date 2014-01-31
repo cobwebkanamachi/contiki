@@ -41,6 +41,8 @@
 #include "net/packetbuf.h"
 #include "lib/random.h"
 #include <string.h>
+#include "dev/micromac-radio.h"
+#include <MMAC.h>
 
 #define DEBUG 0
 
@@ -128,7 +130,7 @@ create(void)
      \todo For phase 1 the addresses are all long. We'll need a mechanism
      in the rime attributes to tell the mac to use long or short for phase 2.
   */
-  if(sizeof(rimeaddr_t) == 2) {
+  if(RIMEADDR_SIZE == 2) {
     /* Use short address mode if rimeaddr size is short. */
     params.fcf.src_addr_mode = FRAME802154_SHORTADDRMODE;
   } else {
@@ -150,7 +152,7 @@ create(void)
     rimeaddr_copy((rimeaddr_t *)&params.dest_addr,
                   packetbuf_addr(PACKETBUF_ADDR_RECEIVER));
     /* Use short address mode if rimeaddr size is small */
-    if(sizeof(rimeaddr_t) == 2) {
+    if(RIMEADDR_SIZE == 2) {
       params.fcf.dest_addr_mode = FRAME802154_SHORTADDRMODE;
     } else {
       params.fcf.dest_addr_mode = FRAME802154_LONGADDRMODE;
@@ -168,7 +170,7 @@ create(void)
 
   params.payload = packetbuf_dataptr();
   params.payload_len = packetbuf_datalen();
-  len = frame802154_hdrlen(&params);
+  len = MICROMAC_HEADER_LEN; //frame802154_hdrlen(&params);
   if(packetbuf_hdralloc(len)) {
     frame802154_create(&params, packetbuf_hdrptr(), len);
 
@@ -183,7 +185,6 @@ create(void)
   }
 }
 /*---------------------------------------------------------------------------*/
-static int
 parse(void)
 {
   frame802154_t frame;

@@ -11,8 +11,6 @@
 #include "contiki.h"
 
 #include "dev/leds.h"
-#include "dev/micromac-radio.h"
-#include "MMAC.h"
 
 #include "net/packetbuf.h"
 #include "net/rime/rimestats.h"
@@ -20,6 +18,8 @@
 #include "JPT.h"
 #include <AppHardwareApi.h>
 #include <AppApi.h>
+#include <MMAC.h>
+#include "micromac-radio.h"
 
 #ifndef IEEE802154_PANID
 #	ifdef IEEE802154_CONF_PANID
@@ -36,7 +36,7 @@
 /* XXX JN5168_CONF_CCA_THRESH has an arbitrary value */
 // an integer between 0 and 255
 #ifndef JN5168_CONF_CCA_THRESH
-#define JN5168_CONF_CCA_THRESH 75
+#define JN5168_CONF_CCA_THRESH 127
 #endif /* JN5168_CONF_CCA_THRESH */
 
 #define WITH_SEND_CCA 1
@@ -81,6 +81,7 @@ volatile uint8_t micromac_radio_sfd_counter = 0, micromac_packets_read = 0;
 //volatile uint16_t micromac_radio_sfd_end_time;
 
 static volatile uint32_t last_packet_timestamp = 0;
+static volatile uint32_t micromac_radio_rx_garbage = 0, micromac_radio_tx_completed=0;
 
 //TODO: consider making a list
 static volatile tsMacFrame tx_frame_buffer;
@@ -99,13 +100,13 @@ static int channel;
 static void
 on(void)
 {
-	vMMAC_StartMacReceive(&rx_frame_buffer, E_MMAC_RX_START_NOW | E_MMAC_RX_USE_AUTO_ACK | E_MMAC_RX_ALLOW_MALFORMED | E_MMAC_RX_NO_FCS_ERROR | E_MMAC_RX_ADDRESS_MATCH);
+	vMMAC_StartMacReceive(&rx_frame_buffer, E_MMAC_RX_START_NOW | E_MMAC_RX_USE_AUTO_ACK | E_MMAC_RX_ALLOW_MALFORMED | E_MMAC_RX_ALLOW_FCS_ERROR | E_MMAC_RX_NO_ADDRESS_MATCH );
 }
 /*---------------------------------------------------------------------------*/
 static void
 off(void)
 {
-	off();
+	vMMAC_RadioOff();
 }
 /*---------------------------------------------------------------------------*/
 static uint8_t locked, lock_on, lock_off;
@@ -130,15 +131,20 @@ micromac_radio_interrupt(uint32 mac_event)
 {
 	if (mac_event & E_MMAC_INT_TX_COMPLETE) { /* Transmission attempt has finished */
 		tx_in_progress = 0;
+		micromac_radio_tx_completed++;
 	}	else if (mac_event & E_MMAC_INT_RX_HEADER) { /* MAC header has been received */
 		micromac_radio_sfd_counter++;
 	}	else if (mac_event & E_MMAC_INT_RX_COMPLETE) { /* Complete frame has been received */
 		rx_in_progress = 0;
-		process_poll(&micromac_radio_process);
-		last_packet_timestamp = u32MMAC_GetRxTime();
-		micromac_radio_time_of_arrival = last_packet_timestamp;
-		pending++;
-		micromac_radio_packets_seen++;
+		if(!u32MMAC_GetRxErrors()) {
+			process_poll(&micromac_radio_process);
+			last_packet_timestamp = u32MMAC_GetRxTime();
+			micromac_radio_time_of_arrival = last_packet_timestamp;
+			pending++;
+			micromac_radio_packets_seen++;
+		} else {
+			micromac_radio_rx_garbage++;
+		}
 	}
 }
 
@@ -153,24 +159,30 @@ micromac_radio_init(void)
 	}
 	GET_LOCK();
 	tx_in_progress = 0;
-	u32JPT_Init();
+	uint32_t jpt_ver = u32JPT_Init();
   vMMAC_Enable();
   vMMAC_EnableInterrupts(&micromac_radio_interrupt);
 
   vMMAC_ConfigureRadio();
   channel = RF_CHANNEL;
   vMMAC_SetChannel(channel);
-  u16ShortAddress = (rimeaddr_node_addr.u8[1]<<8) + rimeaddr_node_addr.u8[0];
-  tsExtAddr* psMacAddr = (tsExtAddr*) pvAppApiGetMacAddrLocation();
-  vMMAC_SetRxAddress(u16PanId, u16ShortAddress, psMacAddr);
+  u16ShortAddress = rimeaddr_node_addr.u8[1] + (rimeaddr_node_addr.u8[0]<<8);
+  tsExtAddr psExtAddress;
+	uint32 *pu32Mac = pvAppApiGetMacAddrLocation();
+	psExtAddress.u32H = pu32Mac[0];
+	psExtAddress.u32L = pu32Mac[1];
+  vMMAC_SetRxAddress(u16PanId, u16ShortAddress, &psExtAddress);
   /* these parameters should disable hardware backoff, but still enable autoACK processing and TX CCA */
   uint8_t u8TxAttempts=1, /* 1 transmission attempt without ACK */
-  u8MinBE=1, /* min backoff exponent */
+  u8MinBE=0, /* min backoff exponent */
   u8MaxBE=1, /* max backoff exponent */
-  u8MaxBackoffs=0; /* backoff before aborting */
+  u8MaxBackoffs=1; /* backoff before aborting */
   vMMAC_SetTxParameters(u8TxAttempts, u8MinBE, u8MaxBE, u8MaxBackoffs);
+  rx_in_progress=1;
+  on();
 	RELEASE_LOCK();
   process_start(&micromac_radio_process, NULL);
+  PRINTF("micromac_radio init: RXAddress %04x == %08x.%08x @ PAN %04x, channel: %d, u32JPT_Init: %d\n", u16ShortAddress, psExtAddress.u32H, psExtAddress.u32L, u16PanId, channel, jpt_ver);
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -190,12 +202,16 @@ micromac_radio_transmit(unsigned short payload_len)
   uint32_t tx_error = u32MMAC_GetTxErrors();
   if( tx_error == 0) {
     ret = RADIO_TX_OK;
+    RIMESTATS_ADD(acktx);
   } else if(tx_error & E_MMAC_TXSTAT_CCA_BUSY){
     ret =  RADIO_TX_COLLISION;
+    RIMESTATS_ADD(contentiondrop);
   } else if(tx_error & E_MMAC_TXSTAT_NO_ACK){
     ret =  RADIO_TX_NOACK;
+    RIMESTATS_ADD(noacktx);
   } else if(tx_error & E_MMAC_TXSTAT_ABORTED){
     ret = RADIO_TX_ERR;
+    RIMESTATS_ADD(sendingdrop);
   }
   RELEASE_LOCK();
   return ret;
@@ -206,7 +222,7 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 {
   GET_LOCK();
 
-  PRINTF("micromac_radio: sending %d bytes\n", payload_len);
+  PRINTF("micromac_radio: sending %dB. packets_seen %d, rx_garbage %d, sfd_counter %d, noacktx %d, acktx %d, tx_completed %d, contentiondrop %d, sendingdrop %d\n", payload_len, micromac_radio_packets_seen, micromac_radio_rx_garbage, micromac_radio_sfd_counter, RIMESTATS_GET(noacktx), RIMESTATS_GET(acktx), micromac_radio_tx_completed, RIMESTATS_GET(contentiondrop), RIMESTATS_GET(sendingdrop));
 
   RIMESTATS_ADD(lltx);
 
@@ -216,54 +232,9 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 	GET_LOCK();
 	/* copy payload to (soft) tx buffer */
 	/* XXX use packetbuf_dataptr() or packetbuf_hdrptr(); also, packetbuf_datalen() or packetbuf_totallen()?? */
-//  memcpy(&(tx_frame_buffer.u16DestPAN), packetbuf_addr(PACKETBUF_ATTR_NETWORK_ID), sizeof(tx_frame_buffer.u16DestPAN));
-//  //rimeaddr_copy()
-//	tx_frame_buffer.u16SrcPAN = tx_frame_buffer.u16DestPAN;
-//	//tx_frame_buffer.u8PayloadLength = packetbuf_datalen();
-//	//tx_frame_buffer.u16FCF = packetbuf_attr(PACKETBUF_ATTR_);
-//	rimeaddr_copy(&(tx_frame_buffer.uDestAddr), packetbuf_addr(PACKETBUF_ADDR_RECEIVER));
-//  //memcpy(&(tx_frame_buffer.uDestAddr), packetbuf_addr(PACKETBUF_ADDR_RECEIVER), sizeof(tx_frame_buffer.uDestAddr));
-// // memcpy(&(tx_frame_buffer.uSrcAddr), packetbuf_addr(PACKETBUF_ADDR_SENDER), sizeof(tx_frame_buffer.uSrcAddr));
-//	rimeaddr_copy(&(tx_frame_buffer.uSrcAddr), packetbuf_addr(PACKETBUF_ADDR_SENDER));
-//	memcpy(&(tx_frame_buffer.uPayload), packetbuf_dataptr(), packetbuf_datalen());
-//	tx_frame_buffer.u8PayloadLength = packetbuf_totlen();
-	//((tsMacFrame*)payload)->u8PayloadLength
 	memcpy(&(tx_frame_buffer), payload, packetbuf_totlen());
 	tx_frame_buffer.u8PayloadLength += packetbuf_datalen();
 	tx_frame_buffer.u16Unused = packetbuf_datalen()%4;
-//  tx_frame_buffer.u16FCF = payload[0]<<8;
-//  tx_frame_buffer.u16FCF |= payload[1];
-//	  /* sequence number */
-//	  tx_frame_buffer.u8SequenceNum = payload[2];
-
-
-
-//	  //tx_frame_buffer->u8PayloadLength=3; //seqNo+FCF
-//	  /* Destination PAN ID */
-//	  if(flen.dest_pid_len == 2) {
-//	    tx_frame_buffer->u16DestPAN = p->dest_pid;
-//	    tx_frame_buffer->u8PayloadLength+=2;
-//	  }
-//
-//	  /* Destination address */
-//	  rimeaddr_copy(&(tx_frame_buffer->uDestAddr), &(p->dest_addr));
-//	  tx_frame_buffer->u8PayloadLength+=flen.dest_addr_len;
-//
-//	  /* Source PAN ID */
-//	  if(flen.src_pid_len == 2) {
-//	    tx_frame_buffer->u16SrcPAN = p->src_pid;
-//	    tx_frame_buffer->u8PayloadLength+=flen.src_pid_len;
-//	  }
-//
-//	  /* Source address */
-//	  rimeaddr_copy(&(tx_frame_buffer->uSrcAddr), &(p->src_addr));
-//	  tx_frame_buffer->u8PayloadLength+=flen.src_addr_len;
-//
-//	  /* Aux header */
-//	  if(flen.aux_sec_len) {
-//	    /* TODO Aux security header not yet implemented */
-//	/*     pos += flen.aux_sec_len; */
-//	  }
 	RELEASE_LOCK();
 	return 0;
 }
@@ -280,6 +251,7 @@ micromac_radio_off(void)
 {
   GET_LOCK();
   off();
+  rx_in_progress=0;
   RELEASE_LOCK();
   return 1;
 }
@@ -331,27 +303,29 @@ micromac_radio_read(void *buf, unsigned short bufsize)
 {
 	pending = 0;
 
+
 	GET_LOCK();
 
 	micromac_packets_read++;
-	int len = rx_frame_buffer.u8PayloadLength;
-	memcpy(packetbuf_hdrptr(), &(rx_frame_buffer.uPayload), len);
-	packetbuf_set_addr(PACKETBUF_ATTR_NETWORK_ID, (rimeaddr_t *)&(rx_frame_buffer.u16DestPAN));
-	packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, (rimeaddr_t *)&(rx_frame_buffer.uDestAddr));
-	packetbuf_set_addr(PACKETBUF_ADDR_SENDER, (rimeaddr_t *)&(rx_frame_buffer.uSrcAddr));
-  packetbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, rx_frame_buffer.u8SequenceNum);
+	int len = rx_frame_buffer.u8PayloadLength + MICROMAC_HEADER_LEN;
+	memcpy(packetbuf_hdrptr(), &(rx_frame_buffer), len);
+//	packetbuf_set_addr(PACKETBUF_ATTR_NETWORK_ID, (rimeaddr_t *)&(rx_frame_buffer.u16DestPAN));
+//	packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, (rimeaddr_t *)&(rx_frame_buffer.uDestAddr));
+//	packetbuf_set_addr(PACKETBUF_ADDR_SENDER, (rimeaddr_t *)&(rx_frame_buffer.uSrcAddr));
+//  packetbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, rx_frame_buffer.u8SequenceNum);
 
 	//  packetbuf_set_attr(PACKETBUF_ATTR_RSSI, cc2420_last_rssi);
 	//  packetbuf_set_attr(PACKETBUF_ATTR_LINK_QUALITY, cc2420_last_correlation);
 	RELEASE_LOCK();
+  PRINTF("micromac_radio: reading %d bytes\n", len);
 	return len;
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(micromac_radio_process, ev, data)
 {
-  int len;
-  PROCESS_BEGIN();
 
+  PROCESS_BEGIN();
+  static int len;
   PRINTF("micromac_radio_process: started\n");
 
   while(1) {
@@ -362,7 +336,7 @@ PROCESS_THREAD(micromac_radio_process, ev, data)
     packetbuf_clear();
     /* XXX PACKETBUF_ATTR_TIMESTAMP is 16bits while last_packet_timestamp is 32bits*/
     packetbuf_set_attr(PACKETBUF_ATTR_TIMESTAMP, (uint16_t)last_packet_timestamp);
-    len = micromac_radio_read(packetbuf_dataptr(), PACKETBUF_SIZE);
+    len = micromac_radio_read(packetbuf_hdrptr(), PACKETBUF_SIZE+MICROMAC_HEADER_LEN);
     packetbuf_set_datalen(len);
     NETSTACK_RDC.input();
   }
@@ -441,9 +415,9 @@ micromac_radio_cca(void)
   }
 
   GET_LOCK();
-  cca = bJPT_CCA(channel, E_JPT_CCA_MODE_CARRIER, JN5168_CONF_CCA_THRESH);
+  cca = bJPT_CCA(channel, E_JPT_CCA_MODE_CARRIER_OR_ENERGY, JN5168_CONF_CCA_THRESH);
   RELEASE_LOCK();
-  return cca;
+  return !cca;
 }
 /*---------------------------------------------------------------------------*/
 int
@@ -466,6 +440,14 @@ micromac_radio_pending_packet(void)
 ////  setreg(CC2420_RSSI, shifted);
 //  RELEASE_LOCK();
 //}
+void copy_from_rimeaddress(tuAddr* tu_addr, rimeaddr_t* addr) {
+#if(RIMEADDR_SIZE==8)
+	tu_addr->sExt.u32L=addr->u8[7] | addr->u8[6]<<8 | addr->u8[5]<<16 | addr->u8[4]<<24 ;
+	tu_addr->sExt.u32H=addr->u8[3] | addr->u8[2]<<8 | addr->u8[1]<<16 | addr->u8[0]<<24 ;
+#elif(RIMEADDR_SIZE==2)
+	tu_addr->u16Short=addr->u8[1] | addr->u8[0]<<8;
+#endif
+}
 /*---------------------------------------------------------------------------*/
 const struct radio_driver micromac_radio_driver =
 {

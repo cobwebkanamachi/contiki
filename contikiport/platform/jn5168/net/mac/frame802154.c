@@ -64,6 +64,8 @@
 #include "sys/cc.h"
 #include "net/mac/frame802154.h"
 #include <string.h>
+#include "dev/micromac-radio.h"
+#include <MMAC.h>
 
 #define DEBUG 1
 #if DEBUG
@@ -186,9 +188,10 @@ frame802154_hdrlen(frame802154_t *p)
 int
 frame802154_create(frame802154_t *p, uint8_t *buf, int buf_len)
 {
+	PRINTF("frame802154_create: %d bytes\n", buf_len);
   int c;
   field_length_t flen;
-  uint8_t *tx_frame_buffer;
+  tsMacFrame *tx_frame_buffer;
   uint8_t pos;
 
   field_len(p, &flen);
@@ -201,47 +204,81 @@ frame802154_create(frame802154_t *p, uint8_t *buf, int buf_len)
 
   /* OK, now we have field lengths.  Time to actually construct */
   /* the outgoing frame, and store it in tx_frame_buffer */
-  tx_frame_buffer = buf;
-  tx_frame_buffer[0] = (p->fcf.frame_type & 7) |
+  tx_frame_buffer = (tsMacFrame *)buf;
+
+  pos = (uint8_t *) &(tx_frame_buffer->uPayload) - buf;
+
+  /* sequence number */
+  tx_frame_buffer->u8SequenceNum = p->seq;
+
+  tx_frame_buffer->u16FCF = 0xff & ((p->fcf.frame_type & 7) |
     ((p->fcf.security_enabled & 1) << 3) |
     ((p->fcf.frame_pending & 1) << 4) |
     ((p->fcf.ack_required & 1) << 5) |
-    ((p->fcf.panid_compression & 1) << 6);
-  tx_frame_buffer[1] = ((p->fcf.dest_addr_mode & 3) << 2) |
+    ((p->fcf.panid_compression & 1) << 6));
+  tx_frame_buffer->u16FCF |= 0xff00 & ((((p->fcf.dest_addr_mode & 3) << 2) |
     ((p->fcf.frame_version & 3) << 4) |
-    ((p->fcf.src_addr_mode & 3) << 6);
+    ((p->fcf.src_addr_mode & 3) << 6))<<8);
 
-  /* sequence number */
-  tx_frame_buffer[2] = p->seq;
-  pos = 3;
-
+  tx_frame_buffer->u8PayloadLength=3; //seqNo+FCF
   /* Destination PAN ID */
   if(flen.dest_pid_len == 2) {
-    tx_frame_buffer[pos++] = p->dest_pid & 0xff;
-    tx_frame_buffer[pos++] = (p->dest_pid >> 8) & 0xff;
+    tx_frame_buffer->u16DestPAN = p->dest_pid;
+    tx_frame_buffer->u8PayloadLength+=2;
   }
 
   /* Destination address */
-  for(c = flen.dest_addr_len; c > 0; c--) {
-    tx_frame_buffer[pos++] = p->dest_addr[c - 1];
-  }
+//  if(p->fcf.dest_addr_mode == FRAME802154_LONGADDRMODE) {
+//  	memcpy(&(tx_frame_buffer->uDestAddr.sExt), p->dest_addr, 8);
+//  	tx_frame_buffer->u8PayloadLength+=8;
+//  } else if(p->fcf.dest_addr_mode == FRAME802154_SHORTADDRMODE){
+//    memcpy(&(tx_frame_buffer->uDestAddr.u16Short), p->dest_addr, 2);
+//    tx_frame_buffer->u8PayloadLength+=2;
+//  }
+  //copy_from_rimeaddress(&(tx_frame_buffer->uDestAddr), &(p->dest_addr));
+  copy_from_rimeaddress((tuAddr*)&(tx_frame_buffer->uDestAddr), (rimeaddr_t*)&(p->dest_addr));
+  tx_frame_buffer->u8PayloadLength+=RIMEADDR_SIZE;
 
   /* Source PAN ID */
   if(flen.src_pid_len == 2) {
-    tx_frame_buffer[pos++] = p->src_pid & 0xff;
-    tx_frame_buffer[pos++] = (p->src_pid >> 8) & 0xff;
+    tx_frame_buffer->u16SrcPAN = p->src_pid;
+    tx_frame_buffer->u8PayloadLength+=2;
   }
 
+
   /* Source address */
-  for(c = flen.src_addr_len; c > 0; c--) {
-    tx_frame_buffer[pos++] = p->src_addr[c - 1];
-  }
+//  if(p->fcf.src_addr_mode == FRAME802154_LONGADDRMODE) {
+//  	tx_frame_buffer->u8PayloadLength+=8;
+//  	//memcpy(&(tx_frame_buffer->uSrcAddr.sExt), p->src_addr, 8);
+//  } else if(p->fcf.src_addr_mode == FRAME802154_SHORTADDRMODE) {
+//    memcpy(&(tx_frame_buffer->uSrcAddr.u16Short), p->src_addr, 2);
+//    tx_frame_buffer->u8PayloadLength+=2;
+//  }
+  copy_from_rimeaddress((tuAddr*)&(tx_frame_buffer->uSrcAddr), (rimeaddr_t*)&(p->src_addr));
+  tx_frame_buffer->u8PayloadLength+=RIMEADDR_SIZE;
 
   /* Aux header */
   if(flen.aux_sec_len) {
     /* TODO Aux security header not yet implemented */
 /*     pos += flen.aux_sec_len; */
   }
+//unsigned char tmp[3]={1,2,3};
+//  PRINTF("frame802154_create: u8PayloadLength %d, u8SequenceNum %d, \
+//u16FCF 0x%02x, u16DestPAN 0x%02x, u16SrcPAN 0x%02x, uDestAddr 0x%04x, \
+//uSrcAddr 0x%04x, fcf.src_addr_mode %d, flen.src_addr_len %d,\n \
+//RIMEADDR_SIZE %d, sizeof(rimeaddr_t) %d, sizeof(uchar) %d, sizeof(tmp) %d, pos %d\n",
+//  		tx_frame_buffer->u8PayloadLength,
+//  		tx_frame_buffer->u8SequenceNum,
+//  		tx_frame_buffer->u16FCF,
+//  		tx_frame_buffer->u16DestPAN,
+//  		tx_frame_buffer->u16SrcPAN,
+//  		tx_frame_buffer->uDestAddr.u16Short,
+//  		tx_frame_buffer->uSrcAddr.u16Short,
+//  		p->fcf.src_addr_mode,
+//  		flen.src_addr_len,
+//  		RIMEADDR_SIZE,
+//  		sizeof(rimeaddr_t), sizeof(unsigned char), sizeof(tmp),
+//  		pos);
 
   return (int)pos;
 }
@@ -258,54 +295,49 @@ frame802154_create(frame802154_t *p, uint8_t *buf, int buf_len)
 int
 frame802154_parse(uint8_t *data, int len, frame802154_t *pf)
 {
-  uint8_t *p;
+	tsMacFrame *p;
   frame802154_fcf_t fcf;
-  int c;
+  int c=3,i;
 
   if(len < 3) {
     return 0;
   }
 
-  p = data;
+  p = (tsMacFrame *)data;
 
   /* decode the FCF */
-  fcf.frame_type = p[0] & 7;
-  fcf.security_enabled = (p[0] >> 3) & 1;
-  fcf.frame_pending = (p[0] >> 4) & 1;
-  fcf.ack_required = (p[0] >> 5) & 1;
-  fcf.panid_compression = (p[0] >> 6) & 1;
+  fcf.frame_type = p->u16FCF & 7;
+  fcf.security_enabled = (p->u16FCF >> 3) & 1;
+  fcf.frame_pending = (p->u16FCF >> 4) & 1;
+  fcf.ack_required = (p->u16FCF >> 5) & 1;
+  fcf.panid_compression = (p->u16FCF >> 6) & 1;
 
-  fcf.dest_addr_mode = (p[1] >> 2) & 3;
-  fcf.frame_version = (p[1] >> 4) & 3;
-  fcf.src_addr_mode = (p[1] >> 6) & 3;
+  uint8_t fcf_h = p->u16FCF >> 8;
+  fcf.dest_addr_mode = (fcf_h >> 2) & 3;
+  fcf.frame_version = (fcf_h >> 4) & 3;
+  fcf.src_addr_mode = (fcf_h >> 6) & 3;
 
   /* copy fcf and seqNum */
   memcpy(&pf->fcf, &fcf, sizeof(frame802154_fcf_t));
-  pf->seq = p[2];
-  p += 3;                             /* Skip first three bytes */
+  pf->seq =  p->u8SequenceNum;
 
   /* Destination address, if any */
   if(fcf.dest_addr_mode) {
     /* Destination PAN */
-    pf->dest_pid = p[0] + (p[1] << 8);
-    p += 2;
-
+    pf->dest_pid = p->u16DestPAN;
+    c+=2;
     /* Destination address */
-/*     l = addr_len(fcf.dest_addr_mode); */
-/*     for(c = 0; c < l; c++) { */
-/*       pf->dest_addr.u8[c] = p[l - c - 1]; */
-/*     } */
-/*     p += l; */
     if(fcf.dest_addr_mode == FRAME802154_SHORTADDRMODE) {
       rimeaddr_copy((rimeaddr_t *)&(pf->dest_addr), &rimeaddr_null);
-      pf->dest_addr[0] = p[1];
-      pf->dest_addr[1] = p[0];
-      p += 2;
+      pf->dest_addr[0] = p->uDestAddr.u16Short >>8;
+      pf->dest_addr[1] = p->uDestAddr.u16Short & 0xff;
+      c+=2;
     } else if(fcf.dest_addr_mode == FRAME802154_LONGADDRMODE) {
-      for(c = 0; c < 8; c++) {
-        pf->dest_addr[c] = p[7 - c];
+    	c+=8;
+      for(i = 0; i < 4; i++) {
+        pf->dest_addr[i] = p->uDestAddr.sExt.u32H >> ((3-i)*8);
+        pf->dest_addr[i+4] = p->uDestAddr.sExt.u32L >> ((3-i)*8);
       }
-      p += 8;
     }
   } else {
     rimeaddr_copy((rimeaddr_t *)&(pf->dest_addr), &rimeaddr_null);
@@ -316,28 +348,24 @@ frame802154_parse(uint8_t *data, int len, frame802154_t *pf)
   if(fcf.src_addr_mode) {
     /* Source PAN */
     if(!fcf.panid_compression) {
-      pf->src_pid = p[0] + (p[1] << 8);
-      p += 2;
+      pf->src_pid = p->u16SrcPAN;
+      c+=2;
     } else {
       pf->src_pid = pf->dest_pid;
     }
 
     /* Source address */
-/*     l = addr_len(fcf.src_addr_mode); */
-/*     for(c = 0; c < l; c++) { */
-/*       pf->src_addr.u8[c] = p[l - c - 1]; */
-/*     } */
-/*     p += l; */
     if(fcf.src_addr_mode == FRAME802154_SHORTADDRMODE) {
+    	c+=2;
       rimeaddr_copy((rimeaddr_t *)&(pf->src_addr), &rimeaddr_null);
-      pf->src_addr[0] = p[1];
-      pf->src_addr[1] = p[0];
-      p += 2;
+      pf->src_addr[0] = p->uSrcAddr.u16Short >>8;
+      pf->src_addr[1] = p->uSrcAddr.u16Short & 0xff;
     } else if(fcf.src_addr_mode == FRAME802154_LONGADDRMODE) {
-      for(c = 0; c < 8; c++) {
-        pf->src_addr[c] = p[7 - c];
+    	c+=8;
+      for(i = 0; i < 4; i++) {
+        pf->src_addr[i] = p->uSrcAddr.sExt.u32H >> ((3-i)*8);
+        pf->src_addr[i+4] = p->uSrcAddr.sExt.u32L >> ((3-i)*8);
       }
-      p += 8;
     }
   } else {
     rimeaddr_copy((rimeaddr_t *)&(pf->src_addr), &rimeaddr_null);
@@ -349,14 +377,25 @@ frame802154_parse(uint8_t *data, int len, frame802154_t *pf)
 /*     return 0; */
   }
 
-  /* header length */
-  c = p - data;
+  /* header length = c*/
+
   /* payload length */
   pf->payload_len = (len - c);
   /* payload */
-  pf->payload = p;
+  pf->payload = p->uPayload.au8Byte;
 
+  PRINTF("frame802154_parse: u8PayloadLength %d, u8SequenceNum %d, \
+u16FCF 0x%02x, u16DestPAN 0x%02x, u16SrcPAN 0x%02x, uDestAddr 0x%04x, \
+uSrcAddr 0x%04x, len %d\n",
+  		p->u8PayloadLength,
+  		p->u8SequenceNum,
+  		p->u16FCF,
+  		p->u16DestPAN,
+  		p->u16SrcPAN,
+  		p->uDestAddr.u16Short,
+  		p->uSrcAddr.u16Short,
+  		len);
   /* return header length if successful */
-  return c > len ? 0 : c;
+  return (len < MICROMAC_HEADER_LEN) ? 0 : MICROMAC_HEADER_LEN; //c > len ? 0 : c;
 }
 /** \}   */

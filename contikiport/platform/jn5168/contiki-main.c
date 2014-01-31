@@ -124,21 +124,35 @@ set_rime_addr(void)
   rimeaddr_t addr;
   int i;
 
-  memset(&addr, 0, sizeof(rimeaddr_t));
+  memset(&addr, 0, sizeof(addr));
 #if UIP_CONF_IPV6
   memcpy(addr.u8, pvAppApiGetMacAddrLocation(), sizeof(addr.u8));
 #else
   memcpy(addr.u8, pvAppApiGetMacAddrLocation(), sizeof(addr.u8));
-//    for(i = 0; i < sizeof(rimeaddr_t); ++i) {
-//      addr.u8[i] = ((unsigned char*)pvAppApiGetMacAddrLocation())[i];
-//    }
+  //memcpy(addr.u8, pvAppApiGetMacAddrLocation()+6, sizeof(addr.u8));
 #endif
   rimeaddr_set_node_addr(&addr);
   printf("Rime started with address ");
   for(i = 0; i < sizeof(addr.u8) - 1; i++) {
-    printf("%d.", addr.u8[i]);
+    printf("%02x.", addr.u8[i]);
   }
-  printf("%d\n", addr.u8[i]);
+  printf("%02x\n", addr.u8[i]);
+
+  /** Different ways for reading HW MAC address. All work.
+  unsigned char macaddr[8];
+  memcpy(macaddr, pvAppApiGetMacAddrLocation(), sizeof(macaddr));
+	for(i = 0; i < 8; ++i) {
+		macaddr[i] = ((unsigned char*)pvAppApiGetMacAddrLocation())[i];
+	}
+  printf("HW MAC address:\n");
+  for(i=0; i<7; i++) {
+  	printf("%02x.", macaddr[i]);
+  }
+  printf("%02x\n", macaddr[i]);
+  */
+  tsExtAddr psExtAddress;
+  MAC_vReadExtAddress(&psExtAddress);
+  printf("HW MAC tsExtAddr: %08x.%08x\n", psExtAddress.u32H, psExtAddress.u32L);
 }
 
 

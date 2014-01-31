@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Swedish Institute of Computer Science.
+ * Copyright (c) 2009, Swedish Institute of Computer Science.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,62 +26,21 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * This file is part of the Contiki operating system.
- *
  */
 
 /**
  * \file
- *         MICROMAC_RADIO driver header file
+ *         A MAC framer for IEEE 802.15.4
  * \author
- *         Adam Dunkels <adam@sics.se>
+ *         Niclas Finne <nfi@sics.se>
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#ifndef MICROMAC_RADIO_H_
-#define MICROMAC_RADIO_H_
+#ifndef FRAMER_802154_H_
+#define FRAMER_802154_H_
 
-#include "contiki.h"
-#include "dev/radio.h"
-#include <MMAC.h>
-void copy_from_rimeaddress(tuAddr*, rimeaddr_t* );
-#define MICROMAC_HEADER_LEN (28)
+#include "net/mac/framer.h"
 
-int micromac_radio_init(void);
+extern const struct framer framer_802154;
 
-#define MICROMAC_RADIO_MAX_PACKET_LEN      127
-
-int micromac_radio_set_channel(int channel);
-int micromac_radio_get_channel(void);
-
-void micromac_radio_set_pan_addr(unsigned pan,
-                                unsigned addr,
-                                const uint8_t *ieee_addr);
-
-//extern signed char micromac_radio_last_rssi;
-//extern uint8_t micromac_radio_last_correlation;
-
-int micromac_radio_rssi(void);
-
-extern const struct radio_driver micromac_radio_driver;
-
-/**
- * \param power Between 0 and 3.
- */
-void micromac_radio_set_txpower(uint8_t power);
-int micromac_radio_get_txpower(void);
-#define MICROMAC_RADIO_TXPOWER_MAX  3
-#define MICROMAC_RADIO_TXPOWER_MIN  0
-
-///* XXX hack: these will be made as Chameleon packet attributes */
-//extern rtimer_clock_t micromac_radio_time_of_arrival,
-//  micromac_radio_time_of_departure;
-
-int micromac_radio_on(void);
-int micromac_radio_off(void);
-
-void micromac_radio_set_cca_threshold(int value);
-
-
-
-#endif /* MICROMAC_RADIO_H_ */
+#endif /* FRAMER_802154_H_ */
