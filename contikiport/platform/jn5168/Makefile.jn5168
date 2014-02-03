@@ -6,13 +6,13 @@ ifeq ($(UIP_CONF_IPV6),1)
 CFLAGS += -DWITH_UIP6=1
 endif
 
-CONTIKI_TARGET_DIRS = . dev net net/mac
+CONTIKI_TARGET_DIRS = . dev net net/mac net/rime
 CONTIKI_TARGET_MAIN = ${addprefix $(OBJECTDIR)/,contiki-main.o}
 
 CONTIKI_TARGET_SOURCEFILES = contiki-main.c clock.c sprintf.c uart0.c watchdog.c timer-arch.c leds-arch.c 
 
 #For MicroMAC (radio) library
-CONTIKI_TARGET_SOURCEFILES += micromac-radio.c packetbuf.c frame802154.c framer-802154.c 
+CONTIKI_TARGET_SOURCEFILES += micromac-radio.c packetbuf.c frame802154.c framer-802154.c chameleon-bitopt.c
 APPLIBS += MMAC 
 STACKLIBS += JPT
 #For reading internal MAC address using pvAppApiGetMacAddrLocation()

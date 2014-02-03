@@ -130,7 +130,7 @@ create(void)
      \todo For phase 1 the addresses are all long. We'll need a mechanism
      in the rime attributes to tell the mac to use long or short for phase 2.
   */
-  if(RIMEADDR_SIZE == 2) {
+  if(sizeof(rimeaddr_t) == 2) {
     /* Use short address mode if rimeaddr size is short. */
     params.fcf.src_addr_mode = FRAME802154_SHORTADDRMODE;
   } else {
@@ -177,7 +177,10 @@ create(void)
     PRINTF("15.4-OUT: %2X", params.fcf.frame_type);
     PRINTADDR(params.dest_addr);
     PRINTF("%d %u (%u)\n", len, packetbuf_datalen(), packetbuf_totlen());
-
+    int i;
+    for(i=0; i<packetbuf_totlen(); i++) {
+    	PRINTF("%02x ", ((uint8_t*)packetbuf_hdrptr())[i]);
+    }
     return len;
   } else {
     PRINTF("15.4-OUT: too large header: %u\n", len);

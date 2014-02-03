@@ -142,8 +142,11 @@ micromac_radio_interrupt(uint32 mac_event)
 			micromac_radio_time_of_arrival = last_packet_timestamp;
 			pending++;
 			micromac_radio_packets_seen++;
+			on();
 		} else {
 			micromac_radio_rx_garbage++;
+			//XXX: Always ON!!
+			on();
 		}
 	}
 }
@@ -223,7 +226,11 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
   GET_LOCK();
 
   PRINTF("micromac_radio: sending %dB. packets_seen %d, rx_garbage %d, sfd_counter %d, noacktx %d, acktx %d, tx_completed %d, contentiondrop %d, sendingdrop %d\n", payload_len, micromac_radio_packets_seen, micromac_radio_rx_garbage, micromac_radio_sfd_counter, RIMESTATS_GET(noacktx), RIMESTATS_GET(acktx), micromac_radio_tx_completed, RIMESTATS_GET(contentiondrop), RIMESTATS_GET(sendingdrop));
-
+  int i;
+//  for(i=0; i<payload_len; i++) {
+//  	PRINTF("%02x ", ((uint8_t*)payload)[i]);
+//  }
+  PRINTF("\n");
   RIMESTATS_ADD(lltx);
 
 	if(tx_in_progress) {
@@ -234,7 +241,7 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 	/* XXX use packetbuf_dataptr() or packetbuf_hdrptr(); also, packetbuf_datalen() or packetbuf_totallen()?? */
 	memcpy(&(tx_frame_buffer), payload, packetbuf_totlen());
 	tx_frame_buffer.u8PayloadLength += packetbuf_datalen();
-	tx_frame_buffer.u16Unused = packetbuf_datalen()%4;
+	//tx_frame_buffer.u16Unused = packetbuf_datalen()%4;
 	RELEASE_LOCK();
 	return 0;
 }

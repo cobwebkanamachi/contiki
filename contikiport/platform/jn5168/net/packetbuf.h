@@ -321,7 +321,7 @@ struct packetbuf_attr {
 /*   uint8_t type; */
   packetbuf_attr_t val;
 };
-struct packetbuf_addr {
+struct __attribute__((__packed__)) packetbuf_addr {
 /*   uint8_t type; */
   rimeaddr_t addr;
 };
@@ -356,7 +356,7 @@ enum {
   PACKETBUF_ATTR_MAX_REXMIT,
   PACKETBUF_ATTR_NUM_REXMIT,
   PACKETBUF_ATTR_PENDING,
-  
+
   /* Scope 2 attributes: used between end-to-end nodes. */
   PACKETBUF_ATTR_HOPS,
   PACKETBUF_ATTR_TTL,
@@ -369,7 +369,7 @@ enum {
   PACKETBUF_ADDR_RECEIVER,
   PACKETBUF_ADDR_ESENDER,
   PACKETBUF_ADDR_ERECEIVER,
-  
+
   PACKETBUF_ATTR_MAX
 };
 
@@ -439,7 +439,7 @@ void              packetbuf_attr_copyfrom(struct packetbuf_attr *attrs,
 struct packetbuf_attrlist {
   uint8_t type;
   uint8_t len;
-};
+} __attribute__((__packed__));
 
 #endif /* PACKETBUF_H_ */
 /** @} */
