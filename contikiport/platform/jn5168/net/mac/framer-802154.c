@@ -44,7 +44,7 @@
 #include "dev/micromac-radio.h"
 #include <MMAC.h>
 
-#define DEBUG 0
+#define DEBUG 1
 
 #if DEBUG
 #include <stdio.h>
@@ -178,9 +178,9 @@ create(void)
     PRINTADDR(params.dest_addr);
     PRINTF("%d %u (%u)\n", len, packetbuf_datalen(), packetbuf_totlen());
     int i;
-    for(i=0; i<packetbuf_totlen(); i++) {
-    	PRINTF("%02x ", ((uint8_t*)packetbuf_hdrptr())[i]);
-    }
+//    for(i=0; i<packetbuf_totlen(); i++) {
+//    	PRINTF("%02x ", ((uint8_t*)packetbuf_hdrptr())[i]);
+//    }
     return len;
   } else {
     PRINTF("15.4-OUT: too large header: %u\n", len);
@@ -193,7 +193,7 @@ parse(void)
   frame802154_t frame;
   int len;
   len = packetbuf_datalen();
-  if(frame802154_parse(packetbuf_dataptr(), len, &frame) &&
+  if(frame802154_parse(packetbuf_hdrptr(), len, &frame) &&
      packetbuf_hdrreduce(len - frame.payload_len)) {
     if(frame.fcf.dest_addr_mode) {
       if(frame.dest_pid != mac_src_pan_id &&

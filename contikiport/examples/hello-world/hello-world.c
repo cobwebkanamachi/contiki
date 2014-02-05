@@ -151,9 +151,9 @@ PROCESS_THREAD(example_unicast_process, ev, data)
 		static unsigned char leds=0;
 		static char msg[15];
 
-		etimer_set(&et, CLOCK_SECOND + random_rand()%(CLOCK_SECOND));
+		etimer_set(&et, 5*CLOCK_SECOND + random_rand()%(CLOCK_SECOND));
 
-		sprintf(msg, "Hello: %d %d\n", ++leds, sizeof(rimeaddr_t));
+		sprintf(msg, "Hello: %d %u\n", ++leds, sizeof(rimeaddr_t));
 
 		leds_arch_set( leds );
 		packetbuf_copyfrom(msg, strlen(msg)+1);

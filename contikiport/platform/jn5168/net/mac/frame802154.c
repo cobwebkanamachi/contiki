@@ -384,7 +384,7 @@ frame802154_parse(uint8_t *data, int len, frame802154_t *pf)
   /* payload */
   pf->payload = p->uPayload.au8Byte;
 
-  PRINTF("frame802154_parse: u8PayloadLength %d, u8SequenceNum %d, \
+  printf("frame802154_parse: u8PayloadLength %d, u8SequenceNum %d, \
 u16FCF 0x%02x, u16DestPAN 0x%02x, u16SrcPAN 0x%02x, uDestAddr 0x%04x, \
 uSrcAddr 0x%04x, len %d\n",
   		p->u8PayloadLength,
