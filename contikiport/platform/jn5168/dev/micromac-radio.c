@@ -45,7 +45,7 @@
 
 #define AUX_LEN (CHECKSUM_LEN + FOOTER_LEN)
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -84,22 +84,26 @@ static volatile uint32_t last_packet_timestamp = 0;
 static volatile uint32_t micromac_radio_rx_garbage = 0, micromac_radio_tx_completed=0, rx_state;
 
 //TODO: consider making a list
-#define RX_LIST_SIZE 4
-static volatile tsMacFrame tx_frame_buffer;
-static volatile tsMacFrame rx_frame_buffer[RX_LIST_SIZE];
-static volatile tsMacFrame *rx_frame_buffer_write_ptr, *rx_frame_buffer_read_ptr;
+#define RX_LIST_SIZE 10
+static tsMacFrame tx_frame_buffer;
+static tsMacFrame rx_frame_buffer[RX_LIST_SIZE];
+static tsMacFrame * volatile rx_frame_buffer_write_ptr, * volatile rx_frame_buffer_read_ptr, * volatile rx_frame_buffer_recent_ptr;;
 static volatile uint32_t rx_frame_buffer_write_index = 0, rx_frame_buffer_read_index=0;
 
 static void
 switch_rx_receive_buffer() {
-	rx_frame_buffer_write_index = ++rx_frame_buffer_write_index % RX_LIST_SIZE;
-	rx_frame_buffer_write_ptr=&(rx_frame_buffer[rx_frame_buffer_write_index]);
+	rx_frame_buffer_recent_ptr = rx_frame_buffer_write_ptr;
+	rx_frame_buffer_write_index = (rx_frame_buffer_write_index+1) % RX_LIST_SIZE;
+	rx_frame_buffer_write_ptr = &(rx_frame_buffer[rx_frame_buffer_write_index]);
+	if(rx_frame_buffer_write_ptr == rx_frame_buffer_read_ptr) {
+		rx_frame_buffer_write_ptr = rx_frame_buffer_recent_ptr;
+	}
 //	rx_frame_buffer_read_ptr=rx_frame_buffer_write_ptr;
 }
 static void
 switch_rx_read_buffer() {
-	rx_frame_buffer_read_index = ++rx_frame_buffer_read_index % RX_LIST_SIZE;
-	rx_frame_buffer_read_ptr=&(rx_frame_buffer[rx_frame_buffer_read_index]);
+	rx_frame_buffer_read_index = (1+rx_frame_buffer_read_index) % RX_LIST_SIZE;
+	rx_frame_buffer_read_ptr = &(rx_frame_buffer[rx_frame_buffer_read_index]);
 //	rx_frame_buffer_read_ptr=rx_frame_buffer_write_ptr;
 }
 /*---------------------------------------------------------------------------*/
@@ -116,7 +120,9 @@ static int channel;
 static void
 on(void)
 {
-	vMMAC_StartMacReceive(rx_frame_buffer_write_ptr, E_MMAC_RX_START_NOW | E_MMAC_RX_USE_AUTO_ACK | E_MMAC_RX_NO_MALFORMED | E_MMAC_RX_NO_FCS_ERROR | E_MMAC_RX_ADDRESS_MATCH );
+	vMMAC_StartMacReceive(rx_frame_buffer_write_ptr, E_MMAC_RX_START_NOW
+			| E_MMAC_RX_USE_AUTO_ACK | E_MMAC_RX_NO_MALFORMED
+			| E_MMAC_RX_NO_FCS_ERROR | E_MMAC_RX_ADDRESS_MATCH);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -155,38 +161,39 @@ micromac_radio_interrupt(uint32 mac_event)
 		rx_state = u32MMAC_GetRxErrors();
 		if( rx_state & E_MMAC_RXSTAT_ABORTED) {
 			rx_aborted++;
+	    RIMESTATS_ADD(badsynch);
 		} else if(rx_state & E_MMAC_RXSTAT_ERROR) {
 			rx_error++;
+	    RIMESTATS_ADD(badcrc);
 		} else if(rx_state & E_MMAC_RXSTAT_MALFORMED) {
 			rx_malformed++;
+	    RIMESTATS_ADD(toolong);
 		} else if(!rx_state) {
+			switch_rx_receive_buffer();
+			uint8_t ack_needed = (rx_frame_buffer_recent_ptr->u16FCF >> 5) & 1;
 			process_poll(&micromac_radio_process);
 			last_packet_timestamp = u32MMAC_GetRxTime();
 			micromac_radio_time_of_arrival = last_packet_timestamp;
 			pending++;
 			micromac_radio_packets_seen++;
 			process_poll(&micromac_radio_process);
-		}
-		//check if ACk is needed!
-		if((rx_frame_buffer_write_ptr->u16FCF >> 5) & 1) {
-			rx_ackneeded++;
-			switch_rx_receive_buffer();
-		} else {
-			rx_noackneeded++;
-			switch_rx_receive_buffer();
-			//XXX: Always ON!!
-			on();
+			//check if ACk is needed!
+			if(ack_needed) {
+				rx_ackneeded++;
+			} else {
+				rx_noackneeded++;
+				//XXX: Always ON!!
+				on();
+			}
 		}
 	}	else if (mac_event & E_MMAC_INT_RX_COMPLETE) { /* Complete frame has been received and ACKed*/
 		//rx_in_progress = 0;
 		rx_complete++;
-		rx_state = u32MMAC_GetRxErrors();
-		if (rx_state) {
-			micromac_radio_rx_garbage++;
-		}
-		switch_rx_receive_buffer();
+		uint8_t ack_needed = (rx_frame_buffer_recent_ptr->u16FCF >> 5) & 1;
 		//XXX: Always ON!!
-		on();
+		if(ack_needed) {
+			on();
+		}
 	}
 }
 
@@ -203,6 +210,7 @@ micromac_radio_init(void)
 	tx_in_progress = 0;
 	rx_frame_buffer_write_ptr=&(rx_frame_buffer[0]);
 	rx_frame_buffer_read_ptr=rx_frame_buffer_write_ptr;
+	rx_frame_buffer_recent_ptr=rx_frame_buffer_write_ptr;
 	uint32_t jpt_ver = u32JPT_Init();
   vMMAC_Enable();
   vMMAC_EnableInterrupts(&micromac_radio_interrupt);
@@ -264,7 +272,7 @@ micromac_radio_transmit(unsigned short payload_len)
 static int
 micromac_radio_prepare(const void *payload, unsigned short payload_len)
 {
-	printf(
+	PRINTF(
 			"micromac_radio: sending %dB. rx_ackneeded %u, rx_noackneeded %u, rx_state %u, rx_complete %d, rx_error %d, rx_malformed %d, rx_aborted %d, packets_seen %d, rx_garbage %u, sfd_counter %d, noacktx %u, acktx %u, tx_completed %u, contentiondrop %u, sendingdrop %u\n",
 			payload_len, rx_ackneeded, rx_noackneeded, rx_state, rx_complete, rx_error, rx_malformed, rx_aborted,
 			micromac_radio_packets_seen, micromac_radio_rx_garbage,
@@ -351,14 +359,19 @@ micromac_radio_set_pan_addr(unsigned pan,
 static int
 micromac_radio_read(void *buf, unsigned short bufsize)
 {
+  uint8_t footer[2];
+  int len;
 	GET_LOCK();
-	pending--;
+	if(--pending) {
+		process_poll(&micromac_radio_process);
+	}
 	micromac_packets_read++;
-	int len = rx_frame_buffer_read_ptr->u8PayloadLength + sizeof(tsMacFrame)-32*sizeof(uint32); //MICROMAC_HEADER_LEN;
+	len = rx_frame_buffer_read_ptr->u8PayloadLength + sizeof(tsMacFrame)-32*sizeof(uint32); //MICROMAC_HEADER_LEN;
 	memcpy(buf, rx_frame_buffer_read_ptr, len);
 	switch_rx_read_buffer();
 	//  packetbuf_set_attr(PACKETBUF_ATTR_RSSI, cc2420_last_rssi);
 	//  packetbuf_set_attr(PACKETBUF_ATTR_LINK_QUALITY, cc2420_last_correlation);
+  RIMESTATS_ADD(llrx);
 	RELEASE_LOCK();
 	int i;
 
@@ -382,7 +395,8 @@ PROCESS_THREAD(micromac_radio_process, ev, data)
     PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
 
     PRINTF("micromac_radio_process: calling receiver callback\n");
-    while(pending) {
+    //while(pending)
+    {
     packetbuf_clear();
 			/* XXX PACKETBUF_ATTR_TIMESTAMP is 16bits while last_packet_timestamp is 32bits*/
 			packetbuf_set_attr(PACKETBUF_ATTR_TIMESTAMP, (uint16_t)last_packet_timestamp);

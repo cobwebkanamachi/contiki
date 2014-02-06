@@ -131,7 +131,7 @@ static void
 recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
 {
 	static int count=0;
-	printf("%d: unicast message %s received from %d.%d\n",	++count, (char *) packetbuf_dataptr(), from->u8[0], from->u8[1]);
+	printf("%d: %uB unicast message %s received from %d.%d\n",	++count, packetbuf_datalen(),(char *) packetbuf_dataptr(), from->u8[0], from->u8[1]);
 }
 
 static const struct unicast_callbacks unicast_callbacks = { recv_uc };
@@ -151,12 +151,12 @@ PROCESS_THREAD(example_unicast_process, ev, data)
 		static unsigned char leds=0;
 		static char msg[15];
 
-		etimer_set(&et, 5*CLOCK_SECOND + random_rand()%(CLOCK_SECOND));
+		etimer_set(&et, 2*CLOCK_SECOND + random_rand()%(CLOCK_SECOND));
 
-		sprintf(msg, "Hello: %d %u\n", ++leds, sizeof(rimeaddr_t));
+		sprintf(msg, "%03d NXP: %03d\n", ++leds, leds);
 
 		leds_arch_set( leds );
-		packetbuf_copyfrom(msg, strlen(msg)+1);
+		packetbuf_copyfrom(msg, strlen(msg));
 
 		addr.u8[0] = 3;
 		addr.u8[1] = 0;
