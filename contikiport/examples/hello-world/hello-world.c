@@ -168,6 +168,8 @@ PROCESS_THREAD(example_unicast_process, ev, data)
 			addr.u8[1] = 0xad;
 		}
 		printf("Sending to %02x.%02x: %s", addr.u8[0], addr.u8[1], msg);
+		//does not work with rime!
+		//packetbuf_set_attr(PACKETBUF_ATTR_RELIABLE, 1);
 		unicast_send(&uc, &addr);
 	}
 

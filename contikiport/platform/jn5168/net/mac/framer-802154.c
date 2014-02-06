@@ -208,14 +208,17 @@ parse(void)
     }
     packetbuf_set_addr(PACKETBUF_ADDR_SENDER, (rimeaddr_t *)&frame.src_addr);
     packetbuf_set_attr(PACKETBUF_ATTR_PENDING, frame.fcf.frame_pending);
-    /*    packetbuf_set_attr(PACKETBUF_ATTR_RELIABLE, frame.fcf.ack_required);*/
+    packetbuf_set_attr(PACKETBUF_ATTR_RELIABLE, frame.fcf.ack_required);
     packetbuf_set_attr(PACKETBUF_ATTR_PACKET_ID, frame.seq);
 
     PRINTF("15.4-IN: %2X", frame.fcf.frame_type);
     PRINTADDR(packetbuf_addr(PACKETBUF_ADDR_SENDER));
     PRINTADDR(packetbuf_addr(PACKETBUF_ADDR_RECEIVER));
-    PRINTF("%u (%u)\n", packetbuf_datalen(), len);
-
+    int i;
+    for(i=0; i<packetbuf_totlen(); i++) {
+			PRINTF("%02x ", ((uint8_t*)packetbuf_dataptr())[i]);
+		}
+    PRINTF(" datalen %u, len (%u)\n", packetbuf_datalen(), len);
     return len - frame.payload_len;
   }
   return FRAMER_FAILED;

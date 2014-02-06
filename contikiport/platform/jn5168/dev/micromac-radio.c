@@ -67,7 +67,7 @@
 /* XXX hack: these will be made as Chameleon packet attributes */
 rtimer_clock_t micromac_radio_time_of_arrival, micromac_radio_time_of_departure;
 
-static uint8_t volatile pending, micromac_radio_packets_seen, rx_aborted=0, rx_complete, rx_malformed, rx_error;
+static uint8_t volatile pending=0, micromac_radio_packets_seen=0, rx_ackneeded=0, rx_noackneeded=0, rx_aborted=0, rx_complete, rx_malformed, rx_error;
 
 #define BUSYWAIT_UNTIL(cond, max_time)                                  \
   do {                                                                  \
@@ -84,8 +84,24 @@ static volatile uint32_t last_packet_timestamp = 0;
 static volatile uint32_t micromac_radio_rx_garbage = 0, micromac_radio_tx_completed=0, rx_state;
 
 //TODO: consider making a list
+#define RX_LIST_SIZE 4
 static volatile tsMacFrame tx_frame_buffer;
-static volatile tsMacFrame rx_frame_buffer;
+static volatile tsMacFrame rx_frame_buffer[RX_LIST_SIZE];
+static volatile tsMacFrame *rx_frame_buffer_write_ptr, *rx_frame_buffer_read_ptr;
+static volatile uint32_t rx_frame_buffer_write_index = 0, rx_frame_buffer_read_index=0;
+
+static void
+switch_rx_receive_buffer() {
+	rx_frame_buffer_write_index = ++rx_frame_buffer_write_index % RX_LIST_SIZE;
+	rx_frame_buffer_write_ptr=&(rx_frame_buffer[rx_frame_buffer_write_index]);
+//	rx_frame_buffer_read_ptr=rx_frame_buffer_write_ptr;
+}
+static void
+switch_rx_read_buffer() {
+	rx_frame_buffer_read_index = ++rx_frame_buffer_read_index % RX_LIST_SIZE;
+	rx_frame_buffer_read_ptr=&(rx_frame_buffer[rx_frame_buffer_read_index]);
+//	rx_frame_buffer_read_ptr=rx_frame_buffer_write_ptr;
+}
 /*---------------------------------------------------------------------------*/
 PROCESS(micromac_radio_process, "micromac_radio_driver");
 /*---------------------------------------------------------------------------*/
@@ -100,7 +116,7 @@ static int channel;
 static void
 on(void)
 {
-	vMMAC_StartMacReceive(&rx_frame_buffer, E_MMAC_RX_START_NOW | E_MMAC_RX_USE_AUTO_ACK | E_MMAC_RX_NO_MALFORMED | E_MMAC_RX_NO_FCS_ERROR | E_MMAC_RX_ADDRESS_MATCH );
+	vMMAC_StartMacReceive(rx_frame_buffer_write_ptr, E_MMAC_RX_START_NOW | E_MMAC_RX_USE_AUTO_ACK | E_MMAC_RX_NO_MALFORMED | E_MMAC_RX_NO_FCS_ERROR | E_MMAC_RX_ADDRESS_MATCH );
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -143,20 +159,32 @@ micromac_radio_interrupt(uint32 mac_event)
 			rx_error++;
 		} else if(rx_state & E_MMAC_RXSTAT_MALFORMED) {
 			rx_malformed++;
-		}
-	}	else if (mac_event & E_MMAC_INT_RX_COMPLETE) { /* Complete frame has been received */
-		//rx_in_progress = 0;
-		rx_complete++;
-		rx_state = u32MMAC_GetRxErrors();
-		if (rx_state) {
-			micromac_radio_rx_garbage++;
-		} else {
+		} else if(!rx_state) {
+			process_poll(&micromac_radio_process);
 			last_packet_timestamp = u32MMAC_GetRxTime();
 			micromac_radio_time_of_arrival = last_packet_timestamp;
 			pending++;
 			micromac_radio_packets_seen++;
 			process_poll(&micromac_radio_process);
 		}
+		//check if ACk is needed!
+		if((rx_frame_buffer_write_ptr->u16FCF >> 5) & 1) {
+			rx_ackneeded++;
+			switch_rx_receive_buffer();
+		} else {
+			rx_noackneeded++;
+			switch_rx_receive_buffer();
+			//XXX: Always ON!!
+			on();
+		}
+	}	else if (mac_event & E_MMAC_INT_RX_COMPLETE) { /* Complete frame has been received and ACKed*/
+		//rx_in_progress = 0;
+		rx_complete++;
+		rx_state = u32MMAC_GetRxErrors();
+		if (rx_state) {
+			micromac_radio_rx_garbage++;
+		}
+		switch_rx_receive_buffer();
 		//XXX: Always ON!!
 		on();
 	}
@@ -173,6 +201,8 @@ micromac_radio_init(void)
 	}
 	GET_LOCK();
 	tx_in_progress = 0;
+	rx_frame_buffer_write_ptr=&(rx_frame_buffer[0]);
+	rx_frame_buffer_read_ptr=rx_frame_buffer_write_ptr;
 	uint32_t jpt_ver = u32JPT_Init();
   vMMAC_Enable();
   vMMAC_EnableInterrupts(&micromac_radio_interrupt);
@@ -235,16 +265,14 @@ static int
 micromac_radio_prepare(const void *payload, unsigned short payload_len)
 {
 	printf(
-			"micromac_radio: sending %dB. rx_state %u, rx_complete %d, rx_error %d, rx_malformed %d, rx_aborted %d, packets_seen %d, rx_garbage %u, sfd_counter %d, noacktx %u, acktx %u, tx_completed %u, contentiondrop %u, sendingdrop %u\n",
-			payload_len, rx_state, rx_complete, rx_error, rx_malformed, rx_aborted,
+			"micromac_radio: sending %dB. rx_ackneeded %u, rx_noackneeded %u, rx_state %u, rx_complete %d, rx_error %d, rx_malformed %d, rx_aborted %d, packets_seen %d, rx_garbage %u, sfd_counter %d, noacktx %u, acktx %u, tx_completed %u, contentiondrop %u, sendingdrop %u\n",
+			payload_len, rx_ackneeded, rx_noackneeded, rx_state, rx_complete, rx_error, rx_malformed, rx_aborted,
 			micromac_radio_packets_seen, micromac_radio_rx_garbage,
 			micromac_radio_sfd_counter, RIMESTATS_GET(noacktx), RIMESTATS_GET(acktx),
 			micromac_radio_tx_completed, RIMESTATS_GET(contentiondrop),
 			RIMESTATS_GET(sendingdrop));
   int i;
-//  for(i=0; i<payload_len; i++) {
-//  	PRINTF("%02x ", ((uint8_t*)payload)[i]);
-//  }
+
   PRINTF("\n");
   RIMESTATS_ADD(lltx);
 
@@ -324,14 +352,22 @@ static int
 micromac_radio_read(void *buf, unsigned short bufsize)
 {
 	GET_LOCK();
-	pending = 0;
+	pending--;
 	micromac_packets_read++;
-	int len = rx_frame_buffer.u8PayloadLength + MICROMAC_HEADER_LEN;
-	memcpy(packetbuf_hdrptr(), &(rx_frame_buffer), len);
+	int len = rx_frame_buffer_read_ptr->u8PayloadLength + sizeof(tsMacFrame)-32*sizeof(uint32); //MICROMAC_HEADER_LEN;
+	memcpy(buf, rx_frame_buffer_read_ptr, len);
+	switch_rx_read_buffer();
 	//  packetbuf_set_attr(PACKETBUF_ATTR_RSSI, cc2420_last_rssi);
 	//  packetbuf_set_attr(PACKETBUF_ATTR_LINK_QUALITY, cc2420_last_correlation);
 	RELEASE_LOCK();
+	int i;
+
+	PRINTF("len: %u, u8PayloadLength %u, sizeof(tsMacFrame) %u, 32*sizeof(uint32) %u\n", len, rx_frame_buffer_read_ptr->u8PayloadLength, sizeof(tsMacFrame), 32*sizeof(uint32) );
+  for(i=0; i<len; i++) {
+		PRINTF("%02x ", ((uint8_t*)buf)[i]);
+	}
   PRINTF("micromac_radio: reading %d bytes\n", len);
+
 	return len;
 }
 /*---------------------------------------------------------------------------*/
@@ -346,13 +382,14 @@ PROCESS_THREAD(micromac_radio_process, ev, data)
     PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
 
     PRINTF("micromac_radio_process: calling receiver callback\n");
-
+    while(pending) {
     packetbuf_clear();
-    /* XXX PACKETBUF_ATTR_TIMESTAMP is 16bits while last_packet_timestamp is 32bits*/
-    packetbuf_set_attr(PACKETBUF_ATTR_TIMESTAMP, (uint16_t)last_packet_timestamp);
-    len = micromac_radio_read(packetbuf_hdrptr(), PACKETBUF_SIZE);
-    packetbuf_set_datalen(len);
-    NETSTACK_RDC.input();
+			/* XXX PACKETBUF_ATTR_TIMESTAMP is 16bits while last_packet_timestamp is 32bits*/
+			packetbuf_set_attr(PACKETBUF_ATTR_TIMESTAMP, (uint16_t)last_packet_timestamp);
+			len = micromac_radio_read(packetbuf_hdrptr(), PACKETBUF_SIZE);
+			packetbuf_set_datalen(len);
+			NETSTACK_RDC.input();
+    }
   }
 
   PROCESS_END();
