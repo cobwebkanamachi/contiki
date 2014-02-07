@@ -130,7 +130,7 @@ create(void)
      \todo For phase 1 the addresses are all long. We'll need a mechanism
      in the rime attributes to tell the mac to use long or short for phase 2.
   */
-  if(sizeof(rimeaddr_t) == 2) {
+  if(RIMEADDR_SIZE == 2) {
     /* Use short address mode if rimeaddr size is short. */
     params.fcf.src_addr_mode = FRAME802154_SHORTADDRMODE;
   } else {
