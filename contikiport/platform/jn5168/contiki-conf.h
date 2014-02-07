@@ -33,6 +33,14 @@
 #ifndef CONTIKI_CONF_H_
 #define CONTIKI_CONF_H_
 
+/* include the project config */
+/* PROJECT_CONF_H might be defined in the project Makefile */
+#ifdef PROJECT_CONF_H
+#include PROJECT_CONF_H
+#endif /* PROJECT_CONF_H */
+
+//#define WITH_UIP6 1
+
 //#include <inttypes.h>
 #include <jendefs.h>
 
@@ -114,55 +122,6 @@ typedef uint32_t rtimer_clock_t;
 #define XMAC_CONF_COMPOWER               1
 #define CXMAC_CONF_COMPOWER              1
 
-#if WITH_UIP6
-/* Network setup for IPv6 */
-#define NETSTACK_CONF_NETWORK sicslowpan_driver
-
-/* Specify a minimum packet size for 6lowpan compression to be
-   enabled. This is needed for ContikiMAC, which needs packets to be
-   larger than a specified size, if no ContikiMAC header should be
-   used. */
-#define SICSLOWPAN_CONF_COMPRESSION_THRESHOLD 63
-#define CONTIKIMAC_CONF_WITH_CONTIKIMAC_HEADER 0
-
-#define CXMAC_CONF_ANNOUNCEMENTS         0
-#define XMAC_CONF_ANNOUNCEMENTS          0
-
-#ifndef QUEUEBUF_CONF_NUM
-#define QUEUEBUF_CONF_NUM                8
-#endif
-
-#else /* WITH_UIP6 */
-
-/* Network setup for non-IPv6 (rime). */
-
-#define NETSTACK_CONF_NETWORK rime_driver
-
-#define COLLECT_CONF_ANNOUNCEMENTS       1
-#define CXMAC_CONF_ANNOUNCEMENTS         0
-#define XMAC_CONF_ANNOUNCEMENTS          0
-#define CONTIKIMAC_CONF_ANNOUNCEMENTS    0
-
-#ifndef COLLECT_NEIGHBOR_CONF_MAX_COLLECT_NEIGHBORS
-#define COLLECT_NEIGHBOR_CONF_MAX_COLLECT_NEIGHBORS     32
-#endif /* COLLECT_NEIGHBOR_CONF_MAX_COLLECT_NEIGHBORS */
-
-#ifndef QUEUEBUF_CONF_NUM
-#define QUEUEBUF_CONF_NUM                16
-#endif /* QUEUEBUF_CONF_NUM */
-
-#ifndef TIMESYNCH_CONF_ENABLED
-#define TIMESYNCH_CONF_ENABLED           0
-#endif /* TIMESYNCH_CONF_ENABLED */
-
-//#if TIMESYNCH_CONF_ENABLED
-///* CC2420 SDF timestamps must be on if timesynch is enabled. */
-//#undef CC2420_CONF_SFD_TIMESTAMPS
-//#define CC2420_CONF_SFD_TIMESTAMPS       1
-//#endif /* TIMESYNCH_CONF_ENABLED */
-
-#endif /* WITH_UIP6 */
-
 #define PACKETBUF_CONF_ATTRS_INLINE 1
 
 #ifdef RF_CHANNEL
@@ -204,6 +163,22 @@ typedef uint32_t rtimer_clock_t;
 /*#define PROCESS_CONF_FASTPOLL    4*/
 
 #ifdef WITH_UIP6
+/* Network setup for IPv6 */
+#define NETSTACK_CONF_NETWORK sicslowpan_driver
+
+/* Specify a minimum packet size for 6lowpan compression to be
+   enabled. This is needed for ContikiMAC, which needs packets to be
+   larger than a specified size, if no ContikiMAC header should be
+   used. */
+#define SICSLOWPAN_CONF_COMPRESSION_THRESHOLD 63
+#define CONTIKIMAC_CONF_WITH_CONTIKIMAC_HEADER 0
+
+#define CXMAC_CONF_ANNOUNCEMENTS         0
+#define XMAC_CONF_ANNOUNCEMENTS          0
+
+#ifndef QUEUEBUF_CONF_NUM
+#define QUEUEBUF_CONF_NUM                8
+#endif
 
 #define RIMEADDR_CONF_SIZE              8
 
@@ -282,6 +257,34 @@ typedef uint32_t rtimer_clock_t;
 #define UIP_CONF_TCP       			 1
 #define UIP_CONF_LOGGING         0
 #else /* WITH_UIP6 */
+
+/* Network setup for non-IPv6 (rime). */
+
+#define NETSTACK_CONF_NETWORK rime_driver
+
+#define COLLECT_CONF_ANNOUNCEMENTS       1
+#define CXMAC_CONF_ANNOUNCEMENTS         0
+#define XMAC_CONF_ANNOUNCEMENTS          0
+#define CONTIKIMAC_CONF_ANNOUNCEMENTS    0
+
+#ifndef COLLECT_NEIGHBOR_CONF_MAX_COLLECT_NEIGHBORS
+#define COLLECT_NEIGHBOR_CONF_MAX_COLLECT_NEIGHBORS     32
+#endif /* COLLECT_NEIGHBOR_CONF_MAX_COLLECT_NEIGHBORS */
+
+#ifndef QUEUEBUF_CONF_NUM
+#define QUEUEBUF_CONF_NUM                16
+#endif /* QUEUEBUF_CONF_NUM */
+
+#ifndef TIMESYNCH_CONF_ENABLED
+#define TIMESYNCH_CONF_ENABLED           0
+#endif /* TIMESYNCH_CONF_ENABLED */
+
+//#if TIMESYNCH_CONF_ENABLED
+///* CC2420 SDF timestamps must be on if timesynch is enabled. */
+//#undef CC2420_CONF_SFD_TIMESTAMPS
+//#define CC2420_CONF_SFD_TIMESTAMPS       1
+//#endif /* TIMESYNCH_CONF_ENABLED */
+
 #define UIP_CONF_IP_FORWARD      1
 #define UIP_CONF_BUFFER_SIZE     108
 #define RIMEADDR_CONF_SIZE       2
@@ -294,11 +297,5 @@ typedef uint32_t rtimer_clock_t;
 //#define RIMEADDR_CONF_SIZE            8
 //#define UIP_CONF_LL_802154            1
 //#define UIP_CONF_LLH_LEN              14
-
-/* include the project config */
-/* PROJECT_CONF_H might be defined in the project Makefile */
-#ifdef PROJECT_CONF_H
-#include PROJECT_CONF_H
-#endif /* PROJECT_CONF_H */
 
 #endif /* CONTIKI_CONF_H_ */

@@ -2,9 +2,12 @@ all: udp-client udp-server
 APPS=servreg-hack
 CONTIKI=../../..
 
+WITH_UIP6=1
 UIP_CONF_IPV6=1
-
-CFLAGS+= -DUIP_CONF_IPV6_RPL
+CFLAGS += -DPROJECT_CONF_H=\"project-conf.h\"
+SMALL = 1
+CFLAGS+= -DUIP_CONF_IPV6_RPL -DWITH_UIP6 -DUIP_CONF_IPV6
+CONTIKI_PROJECT = udp-server udp-client
 
 ifdef WITH_COMPOWER
 APPS+=powertrace

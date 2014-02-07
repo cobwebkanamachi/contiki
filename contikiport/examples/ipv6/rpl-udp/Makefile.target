@@ -1,1 +1,1 @@
-TARGET = sky
+TARGET ?= jn5168

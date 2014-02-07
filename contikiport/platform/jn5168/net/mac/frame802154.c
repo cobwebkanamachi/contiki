@@ -67,7 +67,7 @@
 #include "dev/micromac-radio.h"
 #include <MMAC.h>
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -381,20 +381,31 @@ frame802154_parse(uint8_t *data, int len, frame802154_t *pf)
 
   /* payload length */
   pf->payload_len = p->u8PayloadLength - p->u16Unused; //(len - c);
-  /* payload */
-  pf->payload = p->uPayload.au8Byte;
+	/* payload */
+	pf->payload = p->uPayload.au8Byte;
 
-  PRINTF("frame802154_parse: u8PayloadLength %d, u8SequenceNum %d, \
-u16FCF 0x%02x, u16DestPAN 0x%02x, u16SrcPAN 0x%02x, uDestAddr 0x%04x, \
-uSrcAddr 0x%04x, len %d\n",
-  		p->u8PayloadLength,
-  		p->u8SequenceNum,
-  		p->u16FCF,
-  		p->u16DestPAN,
-  		p->u16SrcPAN,
-  		p->uDestAddr.u16Short,
-  		p->uSrcAddr.u16Short,
-  		len);
+	PRINTF("frame802154_parse: u8PayloadLength %d, u8SequenceNum %d, \
+u16FCF 0x%02x, u16DestPAN 0x%02x, u16SrcPAN 0x%02x, len %d,",
+			p->u8PayloadLength,
+			p->u8SequenceNum,
+			p->u16FCF,
+			p->u16DestPAN,
+			p->u16SrcPAN,
+			len);
+	if (fcf.src_addr_mode == FRAME802154_LONGADDRMODE) {
+		PRINTF(" longSrcAddr 0x%08x.0x%08x,",
+				p->uSrcAddr.sExt.u32H, p->uSrcAddr.sExt.u32L);
+	} else if (fcf.src_addr_mode == FRAME802154_SHORTADDRMODE) {
+		PRINTF(" shortSrcAddr 0x%04x, ",
+				p->uSrcAddr.u16Short);
+	}
+	if (fcf.dest_addr_mode == FRAME802154_LONGADDRMODE) {
+		PRINTF(" longDstAddr 0x%08x.0x%08x\n",
+				p->uDestAddr.sExt.u32H, p->uDestAddr.sExt.u32L);
+	} else if (fcf.dest_addr_mode == FRAME802154_SHORTADDRMODE) {
+		PRINTF(" shortDstAddr 0x%04x\n",
+				p->uDestAddr.u16Short);
+	}
   /* return header length if successful */
   //return (len < MICROMAC_HEADER_LEN) ? 0 : MICROMAC_HEADER_LEN+c; //c > len ? 0 : c;
   return c > len ? 0 : c;

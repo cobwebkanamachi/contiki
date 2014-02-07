@@ -375,6 +375,7 @@ micromac_radio_set_pan_addr(unsigned pan, unsigned addr,
 static int
 micromac_radio_read(void *buf, unsigned short bufsize)
 {
+	//XXX disable printf
 	uint8_t footer[2];
 	int len, unused;
 	GET_LOCK();
@@ -397,10 +398,10 @@ micromac_radio_read(void *buf, unsigned short bufsize)
 	//  packetbuf_set_attr(PACKETBUF_ATTR_LINK_QUALITY, cc2420_last_correlation);
 	RIMESTATS_ADD(llrx);
 	RELEASE_LOCK();
-//	int i;
-//	for (i = 0; i < len; i++) {
-//		PRINTF("%02x ", ((uint8_t*)buf)[i]);
-//	}
+	int i;
+	for (i = 0; i < len; i++) {
+		printf("%02x ", ((uint8_t*)buf)[i]);
+	}
 	PRINTF("micromac_radio: reading %d bytes\n", len);
 
 	return len;
