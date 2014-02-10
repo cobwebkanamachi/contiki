@@ -33,14 +33,6 @@
 #ifndef CONTIKI_CONF_H_
 #define CONTIKI_CONF_H_
 
-/* include the project config */
-/* PROJECT_CONF_H might be defined in the project Makefile */
-#ifdef PROJECT_CONF_H
-#include PROJECT_CONF_H
-#endif /* PROJECT_CONF_H */
-
-//#define WITH_UIP6 1
-
 //#include <inttypes.h>
 #include <jendefs.h>
 
@@ -163,6 +155,7 @@ typedef uint32_t rtimer_clock_t;
 /*#define PROCESS_CONF_FASTPOLL    4*/
 
 #ifdef WITH_UIP6
+#define UIP_CONF_BROADCAST 1
 /* Network setup for IPv6 */
 #define NETSTACK_CONF_NETWORK sicslowpan_driver
 
@@ -198,6 +191,7 @@ typedef uint32_t rtimer_clock_t;
 #define UIP_CONF_MAX_ROUTES   20
 #endif /* UIP_CONF_MAX_ROUTES */
 
+//XXX: change UIP_CONF_ND6_SEND_RA to 0??
 #define UIP_CONF_ND6_SEND_RA		0
 #define UIP_CONF_ND6_REACHABLE_TIME     600000
 #define UIP_CONF_ND6_RETRANS_TIMER      10000
@@ -232,7 +226,6 @@ typedef uint32_t rtimer_clock_t;
 #define UIP_CONF_ICMP_DEST_UNREACH 1
 
 #define UIP_CONF_DHCP_LIGHT
-#define UIP_CONF_LLH_LEN         0
 #ifndef  UIP_CONF_RECEIVE_WINDOW
 #define UIP_CONF_RECEIVE_WINDOW  48
 #endif
@@ -244,7 +237,10 @@ typedef uint32_t rtimer_clock_t;
 #define UIP_CONF_UDP_CONNS       12
 #define UIP_CONF_FWCACHE_SIZE    30
 #define UIP_CONF_BROADCAST       1
-//#define UIP_ARCH_IPCHKSUM        0
+// TODO implement architecture optimized functions
+//#define UIP_ARCH_IPCHKSUM
+#define UIP_ARCH_CHKSUM 				 0
+#define UIP_ARCH_ADD32					 0
 #define UIP_CONF_UDP             1
 #define UIP_CONF_UDP_CHECKSUMS   1
 #define UIP_CONF_PINGADDRCONF    0
@@ -290,12 +286,14 @@ typedef uint32_t rtimer_clock_t;
 #define RIMEADDR_CONF_SIZE       2
 #endif /* WITH_UIP6 */
 
-
-
 //#define JENNIC_CONF_BUTTON_PIN (IRQ_DIO9|IRQ_DIO10)
 //
-//#define RIMEADDR_CONF_SIZE            8
-//#define UIP_CONF_LL_802154            1
-//#define UIP_CONF_LLH_LEN              14
+
+
+/* include the project config */
+/* PROJECT_CONF_H might be defined in the project Makefile */
+#ifdef PROJECT_CONF_H
+#include PROJECT_CONF_H
+#endif /* PROJECT_CONF_H */
 
 #endif /* CONTIKI_CONF_H_ */

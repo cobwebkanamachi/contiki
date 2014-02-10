@@ -283,8 +283,8 @@ micromac_radio_transmit(unsigned short payload_len)
 static int
 micromac_radio_prepare(const void *payload, unsigned short payload_len)
 {
-	PRINTF(
-			"micromac_radio: sending payload_len %dB u8PayloadLength %u + packetbuf_datalen %u, rx_overflow %u, rx_ackneeded %u, rx_noackneeded %u, rx_state %u, rx_complete %d, rx_error %d, rx_malformed %d, rx_aborted %d, packets_seen %d, rx_garbage %u, sfd_counter %d, noacktx %u, acktx %u, tx_completed %u, contentiondrop %u, sendingdrop %u\n",
+	printf(
+			"micromac_radio: sending payload_len %dB u8PayloadLength %u + packetbuf_datalen %u, rx_overflow %u, rx_ackneeded %u, rx_noackneeded %u, rx_state %u, rx_complete %d, rx_error %d, rx_malformed %d, rx_aborted %d, packets_seen %d, rx_garbage %u,\nsfd_counter %d, noacktx %u, acktx %u, tx_completed %u, contentiondrop %u, sendingdrop %u\n",
 			payload_len, ((tsMacFrame*) payload)->u8PayloadLength,
 			packetbuf_datalen(), rx_overflow, rx_ackneeded, rx_noackneeded, rx_state,
 			rx_complete, rx_error, rx_malformed, rx_aborted,
@@ -306,7 +306,7 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 	memcpy(&(tx_frame_buffer), payload, payload_len);
 	tx_frame_buffer.u16Unused = packetbuf_datalen()%4;
 	tx_frame_buffer.u8PayloadLength += packetbuf_datalen() - tx_frame_buffer.u16Unused;
-	PRINTF(
+	printf(
 			"micromac_radio: sending payload_len %dB u8PayloadLength %u + packetbuf_datalen %u, u16Unused %u, rx_overflow %u\n",
 			payload_len, ((tsMacFrame*) payload)->u8PayloadLength,
 			packetbuf_datalen(), tx_frame_buffer.u16Unused, rx_overflow);
