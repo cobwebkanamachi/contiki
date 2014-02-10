@@ -49,10 +49,10 @@
 #include "net/uip-debug.h"
 
 #ifndef PERIOD
-#define PERIOD 60
+#define PERIOD 10
 #endif
 
-#define START_INTERVAL		(15 * CLOCK_SECOND)
+#define START_INTERVAL		(5 * CLOCK_SECOND)
 #define SEND_INTERVAL		(PERIOD * CLOCK_SECOND)
 #define SEND_TIME		(random_rand() % (SEND_INTERVAL))
 #define MAX_PAYLOAD_LEN		30
@@ -130,7 +130,7 @@ set_global_address(void)
  *
  * Note the IPCMV6 checksum verification depends on the correct uncompressed addresses.
  */
- 
+
 #if 0
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
@@ -156,18 +156,18 @@ PROCESS_THREAD(udp_client_process, ev, data)
   PROCESS_PAUSE();
 
   set_global_address();
-  
+
   PRINTF("UDP client process started\n");
 
   print_local_addresses();
 
   /* new connection with remote host */
-  client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL); 
+  client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL);
   if(client_conn == NULL) {
     PRINTF("No UDP connection available, exiting the process!\n");
     PROCESS_EXIT();
   }
-  udp_bind(client_conn, UIP_HTONS(UDP_CLIENT_PORT)); 
+  udp_bind(client_conn, UIP_HTONS(UDP_CLIENT_PORT));
 
   PRINTF("Created a connection with the server ");
   PRINT6ADDR(&client_conn->ripaddr);
@@ -184,7 +184,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
     if(ev == tcpip_event) {
       tcpip_handler();
     }
-    
+
     if(etimer_expired(&periodic)) {
       etimer_reset(&periodic);
       ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);
