@@ -6,10 +6,12 @@
 #include "Button.h"
 #include "dev/leds.h"
 
+#define BUTTONS_ENABELED_CONF 1
+
 #ifdef BUTTONS_ENABELED_CONF
 #define BUTTONS_ENABELED BUTTONS_ENABELED_CONF
 #else
-#define BUTTONS_ENABELED 1
+#define BUTTONS_ENABELED 0
 #endif
 
 #define DEBUG 1
@@ -45,6 +47,7 @@ void button_ISR(uint32 u32DeviceId,	uint32 u32ItemBitmap)
 		/* let the debounce process know about this to enable it again */
 		process_poll(&debounce_process);
 	  leds_on(LEDS_ALL);
+		PRINTF("button_ISR\n");
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -72,30 +75,34 @@ configure(int type, int value)
 	if (BUTTONS_ENABELED) {
 		switch (type) {
 		case SENSORS_HW_INIT:
-			vButtonInitRfd();
-			//vAHI_DioSetDirection(BUTTONS_DIO, 0x00);
-			vAHI_SysCtrlRegisterCallback(button_ISR);
-			PRINTF("SENSORS_HW_INIT\n");
-			//vAHI_DioInterruptEdge(uint32 u32Rising,	uint32 u32Falling);
-			val = u8ButtonReadRfd();
-	    //val = (u32AHI_DioReadInput() & BUTTONS_DIO);
-			return 1;
+//			//vButtonInitRfd();
+//			vAHI_DioSetDirection(BUTTONS_DIO, 0x00);
+//			vAHI_SysCtrlRegisterCallback(button_ISR);
+//			PRINTF("SENSORS_HW_INIT\n");
+//			//vAHI_DioInterruptEdge(uint32 u32Rising,	uint32 u32Falling);
+//			//val = u8ButtonReadRfd();
+//	    val = (u32AHI_DioReadInput() & BUTTONS_DIO);
+//	  	process_start(&debounce_process, NULL);
+//			return 1;
 		case SENSORS_ACTIVE:
 			PRINTF("SENSORS_ACTIVE %u\n", value);
 			if (!value) {
 				//deactivate
 				vAHI_DioInterruptEnable(0, BUTTON0_DIO);
 			} else {
-				//activate
 				vButtonInitRfd();
-							//vAHI_DioSetDirection(BUTTONS_DIO, 0x00);
-							vAHI_SysCtrlRegisterCallback(button_ISR);
-							PRINTF("SENSORS_HW_INIT\n");
-							//vAHI_DioInterruptEdge(uint32 u32Rising,	uint32 u32Falling);
-							val = u8ButtonReadRfd();
-					    //val = (u32AHI_DioReadInput() & BUTTONS_DIO);
+				val = u8ButtonReadRfd();
+//				vAHI_DioSetDirection(BUTTONS_DIO, 0x00);
+//		    val = (u32AHI_DioReadInput() & BUTTONS_DIO);
 
+				PRINTF("SENSORS_HW_INIT\n");
+
+				vAHI_SysCtrlRegisterCallback(button_ISR);
+				//activate
 				vAHI_DioInterruptEnable(BUTTON0_DIO, 0);
+				vAHI_DioInterruptEdge(0, BUTTON0_DIO);
+
+				process_start(&debounce_process, NULL);
 			}
 			break;
 		case SENSORS_READY:
@@ -135,7 +142,7 @@ PROCESS_THREAD(debounce_process, ev, data)
 				//reactivate IRQ
 				vAHI_DioInterruptEnable(BUTTON0_DIO, 0);
 			  leds_off(LEDS_ALL);
-			} else if(ev==PROCESS_EVENT_POLL){
+			} else if(ev==PROCESS_EVENT_POLL) {
 				etimer_set(&et, DEBOUNCE_TIME);
 				PRINTF("debounce_process set timer to reactivate IRQ\n");
 			}
