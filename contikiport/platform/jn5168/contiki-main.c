@@ -48,7 +48,7 @@
 #include "net/uip.h"
 #include "dev/leds.h"
 
-//#include "dev/button-sensor.h"
+#include "dev/button-sensor.h"
 //#include "dev/pir-sensor.h"
 //#include "dev/vib-sensor.h"
 
@@ -64,8 +64,8 @@
 #define SELECT_MAX 8
 #endif
 
-
-//SENSORS(&pir_sensor, &vib_sensor, &button_sensor);
+/*&pir_sensor, &vib_sensor*/
+SENSORS(&button_sensor);
 
 /*---------------------------------------------------------------------------*/
 #include "MMAC.h"
@@ -162,8 +162,8 @@ int
 main(void)
 {
   clock_init();
-  leds_arch_init();
-  leds_arch_set(LEDS_ALL);
+  leds_init();
+  leds_on(LEDS_ALL);
   process_init();
   ctimer_init();
 
@@ -222,6 +222,7 @@ main(void)
 
   watchdog_start();
   autostart_start(autostart_processes);
+  leds_off(LEDS_ALL);
 
   while(1) {
 
