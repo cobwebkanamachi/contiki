@@ -304,11 +304,12 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 	/* copy payload to (soft) tx buffer */
 	/* XXX use packetbuf_dataptr() or packetbuf_hdrptr(); also, packetbuf_datalen() or packetbuf_totallen()?? */
 	memcpy(&(tx_frame_buffer), payload, payload_len);
-	tx_frame_buffer.u16Unused = packetbuf_datalen()%4;
-	tx_frame_buffer.u8PayloadLength += packetbuf_datalen() - tx_frame_buffer.u16Unused;
+	tx_frame_buffer.u8PayloadLength += packetbuf_datalen();
+	tx_frame_buffer.u16Unused = tx_frame_buffer.u8PayloadLength % 4;
+
 	printf(
-			"micromac_radio: sending payload_len %dB u8PayloadLength %u + packetbuf_datalen %u, u16Unused %u, rx_overflow %u\n",
-			payload_len, ((tsMacFrame*) payload)->u8PayloadLength,
+			"micromac_radio: sending payload_len %dB u8PayloadLength %u -> %u + packetbuf_datalen %u, u16Unused %u, rx_overflow %u\n",
+			payload_len, ((tsMacFrame*) payload)->u8PayloadLength, tx_frame_buffer.u8PayloadLength,
 			packetbuf_datalen(), tx_frame_buffer.u16Unused, rx_overflow);
 	RELEASE_LOCK();
 	return 0;
