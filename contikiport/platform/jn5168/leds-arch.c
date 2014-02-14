@@ -44,6 +44,7 @@ void
 leds_arch_init(void)
 {
 	vLedInitRfd();
+	leds=0;
 }
 /*---------------------------------------------------------------------------*/
 unsigned char
@@ -56,26 +57,8 @@ void
 leds_arch_set(unsigned char c)
 {
   leds = c;
-  if ((c==LEDS_ALL) || (c&LEDS_RED && c&LEDS_GREEN && c&LEDS_YELLOW)) {
-  	vLedControl(LED_S0_PIN, TRUE);
-  	vLedControl(LED_S1_PIN, TRUE);
-  	vLedControl(LED_S2_PIN, TRUE);
-  } else if (c&LEDS_RED) {
-  	vLedControl(LED_S0_PIN, TRUE);
-  	vLedControl(LED_S1_PIN, FALSE);
-  	vLedControl(LED_S2_PIN, FALSE);
-  } else if (c&LEDS_GREEN) {
-  	vLedControl(LED_S1_PIN, TRUE);
-  	vLedControl(LED_S0_PIN, FALSE);
-  	vLedControl(LED_S2_PIN, FALSE);
-  } else if (c&LEDS_YELLOW) {
-  	vLedControl(LED_S1_PIN, FALSE);
-  	vLedControl(LED_S0_PIN, FALSE);
-  	vLedControl(LED_S2_PIN, TRUE);
-  } else {
-  	vLedControl(LED_S0_PIN, FALSE);
-  	vLedControl(LED_S1_PIN, FALSE);
-  	vLedControl(LED_S2_PIN, FALSE);
-  }
+  vLedControl(LED_S0_PIN, leds&LEDS_RED);
+  vLedControl(LED_S1_PIN, leds&LEDS_GREEN);
+  vLedControl(LED_S2_PIN, leds&LEDS_YELLOW);
 }
 

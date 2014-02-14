@@ -5,6 +5,6 @@ SMALL = 1
 
 CONTIKI_PROJECT = udp-server udp-client
 
-all: udp-server udp-client
+all: udp-server udp-client test-button
 CONTIKI = ../..
 include $(CONTIKI)/Makefile.include

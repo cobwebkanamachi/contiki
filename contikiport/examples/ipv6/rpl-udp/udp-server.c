@@ -42,7 +42,6 @@
 
 #define SERVER_REPLY 1
 #define DEBUG DEBUG_PRINT
-
 #include "net/uip-debug.h"
 
 #define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
@@ -107,7 +106,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
 
   PROCESS_PAUSE();
 
-//  SENSORS_ACTIVATE(button_sensor);
+  SENSORS_ACTIVATE(button_sensor);
 
   PRINTF("UDP server started\n");
 
@@ -164,15 +163,20 @@ PROCESS_THREAD(udp_server_process, ev, data)
   PRINTF(" local/remote port %u/%u\n", UIP_HTONS(server_conn->lport),
          UIP_HTONS(server_conn->rport));
 
+  rpl_repair_root(RPL_DEFAULT_INSTANCE);
+  static uint32_t count=0;
   while(1) {
     PROCESS_YIELD();
     if(ev == tcpip_event) {
       tcpip_handler();
+      if(!(count++%5)) {
+        PRINTF("Initiaing global repair\n");
+        rpl_repair_root(RPL_DEFAULT_INSTANCE);
+      }
+    } else if (ev == sensors_event && data == &button_sensor) {
+      PRINTF("Button: Initiaing global repair\n");
+      rpl_repair_root(RPL_DEFAULT_INSTANCE);
     }
-//    else if (ev == sensors_event && data == &button_sensor) {
-//      PRINTF("Initiaing global repair\n");
-//      rpl_repair_root(RPL_DEFAULT_INSTANCE);
-//    }
   }
 
   PROCESS_END();

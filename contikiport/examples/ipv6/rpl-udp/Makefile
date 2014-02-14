@@ -1,4 +1,4 @@
-all: udp-client udp-server
+all: udp-client udp-server test-button
 APPS=servreg-hack
 CONTIKI=../../..
 

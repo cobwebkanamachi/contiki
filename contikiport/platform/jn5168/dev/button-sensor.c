@@ -6,6 +6,64 @@
 #include "Button.h"
 #include "dev/leds.h"
 
+#define BUTTON_MAP_DR1199
+
+#if (defined BUTTON_MAP_DR1199)
+
+	typedef enum {
+		APP_E_BUTTONS_BUTTON_1 = 0,
+		APP_E_BUTTONS_BUTTON_SW4,
+		APP_E_BUTTONS_BUTTON_SW3,
+		APP_E_BUTTONS_BUTTON_SW2,
+		APP_E_BUTTONS_BUTTON_SW1
+	} APP_teButtons;
+
+    #define APP_BUTTONS_NUM             (5UL)
+    #define APP_BUTTONS_BUTTON_1        (8)
+	#define APP_BUTTONS_BUTTON_SW4		(1)
+	#define APP_BUTTONS_BUTTON_SW3		(11)
+	#define APP_BUTTONS_BUTTON_SW2		(12)
+	#define APP_BUTTONS_BUTTON_SW1		(17)
+    #define APP_BUTTONS_DIO_MASK        ((1 << APP_BUTTONS_BUTTON_1)|(1 << APP_BUTTONS_BUTTON_SW4) | (1 << APP_BUTTONS_BUTTON_SW3) | (1 << APP_BUTTONS_BUTTON_SW2) | (1 << APP_BUTTONS_BUTTON_SW1))
+	#define APP_BUTTONS_DIO_MASK_FOR_DEEP_SLEEP        ((1 << APP_BUTTONS_BUTTON_SW4) | (1 << APP_BUTTONS_BUTTON_SW3) | (1 << APP_BUTTONS_BUTTON_SW2) | (1 << APP_BUTTONS_BUTTON_SW1))
+
+#else
+	typedef enum {
+		APP_E_BUTTONS_BUTTON_1 = 0,
+		APP_E_BUTTONS_BUTTON_2,
+		APP_E_BUTTONS_BUTTON_3
+	} APP_teButtons;
+
+    #define APP_BUTTONS_NUM             (3UL)
+		#define APP_BUTTONS_BUTTON_3        (8)
+		#define APP_BUTTONS_BUTTON_1        (9)
+    #define APP_BUTTONS_BUTTON_2        (10)
+    #define APP_BUTTONS_DIO_MASK        ( (1 << APP_BUTTONS_BUTTON_3) | (1 << APP_BUTTONS_BUTTON_1) | (1 << APP_BUTTONS_BUTTON_2) )
+#endif
+
+#if (defined BUTTON_MAP_DR1199)
+    PRIVATE uint8 s_u8ButtonDebounce[APP_BUTTONS_NUM] = { 0xff,0xff,0xff,0xff,0xff };
+    PRIVATE uint8 s_u8ButtonState[APP_BUTTONS_NUM] = { 0,0,0,0,0 };
+    PRIVATE const uint8 s_u8ButtonDIOLine[APP_BUTTONS_NUM] =
+    {
+        APP_BUTTONS_BUTTON_1,
+        APP_BUTTONS_BUTTON_SW4,
+        APP_BUTTONS_BUTTON_SW3,
+        APP_BUTTONS_BUTTON_SW2,
+        APP_BUTTONS_BUTTON_SW1
+
+    };
+#else
+    PRIVATE uint8 s_u8ButtonDebounce[APP_BUTTONS_NUM] = { 0xff, 0xff, 0xff };
+    PRIVATE uint8 s_u8ButtonState[APP_BUTTONS_NUM] = { 0, 0, 0 };
+    PRIVATE const uint8 s_u8ButtonDIOLine[APP_BUTTONS_NUM] =
+    {
+    		APP_BUTTONS_BUTTON_1,
+        APP_BUTTONS_BUTTON_2,
+    		APP_BUTTONS_BUTTON_3
+    };
+#endif
+
 #define BUTTONS_ENABELED_CONF 1
 
 #ifdef BUTTONS_ENABELED_CONF
@@ -31,7 +89,54 @@ static uint32_t volatile irq_val=0,
 #define BUTTON0_INT E_AHI_DIO8_INT
 
 PROCESS(debounce_process, "button debounce");
-#define DEBOUNCE_TIME (CLOCK_SECOND/50)
+#define DEBOUNCE_TIME (CLOCK_SECOND/20)
+
+/****************************************************************************
+ *
+ * NAME: APP_bButtonInitialise
+ *
+ * DESCRIPTION:
+ * Button Initialization
+ *
+ * PARAMETER: void
+ *
+ * RETURNS: bool
+ *
+ ****************************************************************************/
+static uint8_t APP_bButtonInitialise(void)
+{
+    /* Set DIO lines to inputs with buttons connected */
+    vAHI_DioSetDirection(APP_BUTTONS_DIO_MASK, 0);
+
+    /* Turn on pull-ups for DIO lines with buttons connected */
+    vAHI_DioSetPullup(APP_BUTTONS_DIO_MASK, 0);
+
+    /* Set the edge detection for falling edges */
+    vAHI_DioInterruptEdge(0, APP_BUTTONS_DIO_MASK);
+
+    /* Enable interrupts to occur on selected edge */
+    vAHI_DioInterruptEnable(APP_BUTTONS_DIO_MASK, 0);
+
+    uint32 u32Buttons = u32AHI_DioReadInput() & APP_BUTTONS_DIO_MASK;
+    if (u32Buttons != APP_BUTTONS_DIO_MASK)
+    {
+        return true;
+    }
+    return false;
+}
+/****************************************************************************
+ *
+ * NAME: vISR_SystemController
+ *
+ * DESCRIPTION:
+ * ISR called on system controller interrupt. This may be from the synchronous driver
+ * (if used) or user pressing a button the the DK4 build
+ *
+ * PARAMETER:
+ *
+ * RETURNS:
+ *
+ ****************************************************************************/
 /*---------------------------------------------------------------------------*/
 void button_ISR(uint32 u32DeviceId,	uint32 u32ItemBitmap)
 {
@@ -39,15 +144,31 @@ void button_ISR(uint32 u32DeviceId,	uint32 u32ItemBitmap)
 //  	if(! (u32DeviceId & E_AHI_DEVICE_SYSCTRL && u32ItemBitmap & BUTTON0_INT)) {
 //  		return;
 //  	}
-  	/* announce the change */
-  	sensors_changed(&button_sensor);
-  	/* disable this IRQ while the button stops oscillating */
-		vAHI_DioInterruptEnable(0, BUTTON0_DIO);
-		//irq_val = u8ButtonReadRfd();
-		/* let the debounce process know about this to enable it again */
-		process_poll(&debounce_process);
-	  leds_on(LEDS_ALL);
-		PRINTF("button_ISR\n");
+
+  	/* clear pending DIO changed bits by reading register */
+  		uint8 u8WakeInt = u8AHI_WakeTimerFiredStatus();
+  		uint32 u32IOStatus=u32AHI_DioInterruptStatus();
+
+  	    if( u32IOStatus & APP_BUTTONS_DIO_MASK )
+  	    {
+  	    	/* disable this IRQ while the button stops oscillating */
+  	    	/* disable edge detection until scan complete */
+  	    	vAHI_DioInterruptEnable(0, APP_BUTTONS_DIO_MASK);
+  	    	/* announce the change */
+  	    	sensors_changed(&button_sensor);
+  	  		/* let the debounce process know about this to enable it again */
+  	  		process_poll(&debounce_process);
+  	  	  leds_on(LEDS_ALL);
+  	  		PRINTF("button_ISR\n");
+  	    }
+
+  		if (u8WakeInt & E_AHI_WAKE_TIMER_MASK_1)
+  		{
+  			/* wake timer interrupt got us here */
+//  			DBG_vPrintf(TRACE_APP_BUTTON, "APP: Wake Timer 1 Interrupt\n");
+//  			PWRM_vWakeInterruptCallback();
+  			PRINTF("button_ISR: u8WakeInt\n");
+  		}
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -88,20 +209,18 @@ configure(int type, int value)
 			PRINTF("SENSORS_ACTIVE %u\n", value);
 			if (!value) {
 				//deactivate
-				vAHI_DioInterruptEnable(0, BUTTON0_DIO);
+				vAHI_DioInterruptEnable(0, APP_BUTTONS_DIO_MASK);
 			} else {
-				vButtonInitRfd();
-				val = u8ButtonReadRfd();
+//				vButtonInitRfd();
+//				val = u8ButtonReadRfd();
 //				vAHI_DioSetDirection(BUTTONS_DIO, 0x00);
 //		    val = (u32AHI_DioReadInput() & BUTTONS_DIO);
 
+				APP_bButtonInitialise();
 				PRINTF("SENSORS_HW_INIT\n");
 
 				vAHI_SysCtrlRegisterCallback(button_ISR);
 				//activate
-				vAHI_DioInterruptEnable(BUTTON0_DIO, 0);
-				vAHI_DioInterruptEdge(0, BUTTON0_DIO);
-
 				process_start(&debounce_process, NULL);
 			}
 			break;
@@ -118,7 +237,7 @@ configure(int type, int value)
 static int
 status(int type)
 {
-  return u8ButtonReadRfd() & type;
+  return u32AHI_DioReadInput() & APP_BUTTONS_DIO_MASK; //u8ButtonReadRfd() & type;
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(debounce_process, ev, data)
@@ -128,7 +247,8 @@ PROCESS_THREAD(debounce_process, ev, data)
 	if (BUTTONS_ENABELED) {
 		PROCESS_BEGIN();
 		PRINTF("debounce_process begin\n");
-
+		//xxx
+		//etimer_set(&et, DEBOUNCE_TIME);
 		while (1) {
 			PROCESS_YIELD_UNTIL(ev==PROCESS_EVENT_POLL || ev==PROCESS_EVENT_TIMER);
 
@@ -140,7 +260,9 @@ PROCESS_THREAD(debounce_process, ev, data)
 //				}
 				PRINTF("debounce_process reactivate IRQ\n");
 				//reactivate IRQ
-				vAHI_DioInterruptEnable(BUTTON0_DIO, 0);
+				//vAHI_DioInterruptEnable(BUTTON0_DIO, 0);
+		    /* Enable interrupts to occur on selected edge */
+		    vAHI_DioInterruptEnable(APP_BUTTONS_DIO_MASK, 0);
 			  leds_off(LEDS_ALL);
 			} else if(ev==PROCESS_EVENT_POLL) {
 				etimer_set(&et, DEBOUNCE_TIME);
