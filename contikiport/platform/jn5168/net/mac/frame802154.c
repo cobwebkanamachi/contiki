@@ -228,16 +228,19 @@ frame802154_create(frame802154_t *p, uint8_t *buf, int buf_len)
   }
 
   /* Destination address */
-//  if(p->fcf.dest_addr_mode == FRAME802154_LONGADDRMODE) {
-//  	memcpy(&(tx_frame_buffer->uDestAddr.sExt), p->dest_addr, 8);
-//  	tx_frame_buffer->u8PayloadLength+=8;
-//  } else if(p->fcf.dest_addr_mode == FRAME802154_SHORTADDRMODE){
-//    memcpy(&(tx_frame_buffer->uDestAddr.u16Short), p->dest_addr, 2);
-//    tx_frame_buffer->u8PayloadLength+=2;
-//  }
+  if(p->fcf.dest_addr_mode == FRAME802154_LONGADDRMODE) {
+  	//memcpy(&(tx_frame_buffer->uDestAddr.sExt), p->dest_addr, 8);
+  	copy_from_rimeaddress((tuAddr*)&(tx_frame_buffer->uDestAddr), (rimeaddr_t*)&(p->dest_addr));
+//    tx_frame_buffer->uDestAddr.sExt.u32H=(p->dest_addr[0]<<24) + (p->dest_addr[1]<<16) + (p->dest_addr[2]<<8) + p->dest_addr[3];
+//    tx_frame_buffer->uDestAddr.sExt.u32L= (p->dest_addr[4]<<24) + (p->dest_addr[5]<<16)+ (p->dest_addr[6]<<8)+ p->dest_addr[7];
+  	tx_frame_buffer->u8PayloadLength+=8;
+  } else if(p->fcf.dest_addr_mode == FRAME802154_SHORTADDRMODE){
+    tx_frame_buffer->uDestAddr.u16Short=(p->dest_addr[0]<<8) + p->dest_addr[1];
+    tx_frame_buffer->u8PayloadLength+=2;
+  }
   //copy_from_rimeaddress(&(tx_frame_buffer->uDestAddr), &(p->dest_addr));
-  copy_from_rimeaddress((tuAddr*)&(tx_frame_buffer->uDestAddr), (rimeaddr_t*)&(p->dest_addr));
-  tx_frame_buffer->u8PayloadLength+=RIMEADDR_SIZE;
+//  copy_from_rimeaddress((tuAddr*)&(tx_frame_buffer->uDestAddr), (rimeaddr_t*)&(p->dest_addr));
+//  tx_frame_buffer->u8PayloadLength+=RIMEADDR_SIZE;
 
   /* Source PAN ID */
   if(flen.src_pid_len == 2) {
@@ -245,41 +248,46 @@ frame802154_create(frame802154_t *p, uint8_t *buf, int buf_len)
     tx_frame_buffer->u8PayloadLength+=2;
   }
 
-
   /* Source address */
-//  if(p->fcf.src_addr_mode == FRAME802154_LONGADDRMODE) {
-//  	tx_frame_buffer->u8PayloadLength+=8;
-//  	//memcpy(&(tx_frame_buffer->uSrcAddr.sExt), p->src_addr, 8);
-//  } else if(p->fcf.src_addr_mode == FRAME802154_SHORTADDRMODE) {
-//    memcpy(&(tx_frame_buffer->uSrcAddr.u16Short), p->src_addr, 2);
-//    tx_frame_buffer->u8PayloadLength+=2;
-//  }
-  copy_from_rimeaddress((tuAddr*)&(tx_frame_buffer->uSrcAddr), (rimeaddr_t*)&(p->src_addr));
-  tx_frame_buffer->u8PayloadLength+=RIMEADDR_SIZE;
+  if(p->fcf.src_addr_mode == FRAME802154_LONGADDRMODE) {
+  	//    tx_frame_buffer->uSrcAddr.sExt.u32H=(p->src_addr[0]<<24) + (p->src_addr[1]<<16) + (p->src_addr[2]<<8) + p->src_addr[3];
+  	//    tx_frame_buffer->uSrcAddr.sExt.u32L= (p->src_addr[4]<<24) + (p->src_addr[5]<<16)+ (p->src_addr[6]<<8)+ p->src_addr[7];
+  	tx_frame_buffer->u8PayloadLength+=8;
+  	copy_from_rimeaddress((tuAddr*)&(tx_frame_buffer->uSrcAddr), (rimeaddr_t*)&(p->src_addr));
+  } else if(p->fcf.src_addr_mode == FRAME802154_SHORTADDRMODE) {
+    memcpy(&(tx_frame_buffer->uSrcAddr.u16Short), p->src_addr, 2);
+    tx_frame_buffer->uSrcAddr.u16Short=(p->src_addr[0]<<8) + p->src_addr[1];
+    tx_frame_buffer->u8PayloadLength+=2;
+  }
 
   /* Aux header */
   if(flen.aux_sec_len) {
     /* TODO Aux security header not yet implemented */
 /*     pos += flen.aux_sec_len; */
   }
-//unsigned char tmp[3]={1,2,3};
-//  PRINTF("frame802154_create: u8PayloadLength %d, u8SequenceNum %d, \
-//u16FCF 0x%02x, u16DestPAN 0x%02x, u16SrcPAN 0x%02x, uDestAddr 0x%04x, \
-//uSrcAddr 0x%04x, fcf.src_addr_mode %d, flen.src_addr_len %d,\n \
-//RIMEADDR_SIZE %d, sizeof(rimeaddr_t) %d, sizeof(uchar) %d, sizeof(tmp) %d, pos %d\n",
-//  		tx_frame_buffer->u8PayloadLength,
-//  		tx_frame_buffer->u8SequenceNum,
-//  		tx_frame_buffer->u16FCF,
-//  		tx_frame_buffer->u16DestPAN,
-//  		tx_frame_buffer->u16SrcPAN,
-//  		tx_frame_buffer->uDestAddr.u16Short,
-//  		tx_frame_buffer->uSrcAddr.u16Short,
-//  		p->fcf.src_addr_mode,
-//  		flen.src_addr_len,
-//  		RIMEADDR_SIZE,
-//  		sizeof(rimeaddr_t), sizeof(unsigned char), sizeof(tmp),
-//  		pos);
 
+	PRINTF("frame802154_create: u8PayloadLength %d, u8SequenceNum %d, \
+u16FCF 0x%02x, u16DestPAN 0x%02x, u16SrcPAN 0x%02x, pos %d,",
+tx_frame_buffer->u8PayloadLength,
+tx_frame_buffer->u8SequenceNum,
+tx_frame_buffer->u16FCF,
+tx_frame_buffer->u16DestPAN,
+tx_frame_buffer->u16SrcPAN,
+			pos);
+	if (p->fcf.src_addr_mode == FRAME802154_LONGADDRMODE) {
+		PRINTF(" longSrcAddr 0x%08x.0x%08x,",
+				tx_frame_buffer->uSrcAddr.sExt.u32H, tx_frame_buffer->uSrcAddr.sExt.u32L);
+	} else if (p->fcf.src_addr_mode == FRAME802154_SHORTADDRMODE) {
+		PRINTF(" shortSrcAddr 0x%04x, ",
+				tx_frame_buffer->uSrcAddr.u16Short);
+	}
+	if (p->fcf.dest_addr_mode == FRAME802154_LONGADDRMODE) {
+		PRINTF(" longDstAddr 0x%08x.0x%08x\n",
+				tx_frame_buffer->uDestAddr.sExt.u32H, tx_frame_buffer->uDestAddr.sExt.u32L);
+	} else if (p->fcf.dest_addr_mode == FRAME802154_SHORTADDRMODE) {
+		PRINTF(" shortDstAddr 0x%04x\n",
+				tx_frame_buffer->uDestAddr.u16Short);
+	}
   return (int)pos;
 }
 /*----------------------------------------------------------------------------*/
