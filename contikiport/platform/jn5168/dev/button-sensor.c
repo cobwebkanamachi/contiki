@@ -90,7 +90,7 @@ static uint32_t volatile irq_val=0,
 
 PROCESS(debounce_process, "button debounce");
 #define DEBOUNCE_TIME (CLOCK_SECOND/20)
-
+volatile static uint8_t button_enabled_status = 0;
 /****************************************************************************
  *
  * NAME: APP_bButtonInitialise
@@ -187,7 +187,18 @@ value(int type)
 //	case BUTTON_1_MASK:
 //		return val & BUTTON_1_MASK;
 	}
-	return 0;
+	return BUTTONS_ENABELED && button_enabled_status && (u32AHI_DioReadInput() & APP_BUTTONS_DIO_MASK); //& type;
+}
+/*---------------------------------------------------------------------------*/
+static int
+status(int type)
+{
+  switch (type) {
+  case SENSORS_ACTIVE:
+  case SENSORS_READY:
+    return button_enabled_status;
+  }
+  return 0;
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -196,32 +207,21 @@ configure(int type, int value)
 	if (BUTTONS_ENABELED) {
 		switch (type) {
 		case SENSORS_HW_INIT:
-//			//vButtonInitRfd();
-//			vAHI_DioSetDirection(BUTTONS_DIO, 0x00);
-//			vAHI_SysCtrlRegisterCallback(button_ISR);
-//			PRINTF("SENSORS_HW_INIT\n");
-//			//vAHI_DioInterruptEdge(uint32 u32Rising,	uint32 u32Falling);
-//			//val = u8ButtonReadRfd();
-//	    val = (u32AHI_DioReadInput() & BUTTONS_DIO);
-//	  	process_start(&debounce_process, NULL);
-//			return 1;
 		case SENSORS_ACTIVE:
 			PRINTF("SENSORS_ACTIVE %u\n", value);
-			if (!value) {
-				//deactivate
-				vAHI_DioInterruptEnable(0, APP_BUTTONS_DIO_MASK);
+			if (value) {
+				if (!status(SENSORS_ACTIVE)) {
+					uint8_t buttons_init = APP_bButtonInitialise();
+					button_enabled_status = 1;
+					PRINTF("SENSORS_HW_INIT %d\n", buttons_init);
+					vAHI_SysCtrlRegisterCallback(button_ISR);
+					//activate
+					//process_start(&debounce_process, NULL);
+				}
 			} else {
-//				vButtonInitRfd();
-//				val = u8ButtonReadRfd();
-//				vAHI_DioSetDirection(BUTTONS_DIO, 0x00);
-//		    val = (u32AHI_DioReadInput() & BUTTONS_DIO);
-
-				APP_bButtonInitialise();
-				PRINTF("SENSORS_HW_INIT\n");
-
-				vAHI_SysCtrlRegisterCallback(button_ISR);
-				//activate
-				process_start(&debounce_process, NULL);
+				//deactivate by disabling IRQ
+				vAHI_DioInterruptEnable(0, APP_BUTTONS_DIO_MASK);
+				button_enabled_status = 0;
 			}
 			break;
 		case SENSORS_READY:
@@ -232,12 +232,6 @@ configure(int type, int value)
 		}
 	}
 	return 1;
-}
-/*---------------------------------------------------------------------------*/
-static int
-status(int type)
-{
-  return u32AHI_DioReadInput() & APP_BUTTONS_DIO_MASK; //u8ButtonReadRfd() & type;
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(debounce_process, ev, data)
