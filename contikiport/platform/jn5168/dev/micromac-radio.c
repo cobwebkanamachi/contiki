@@ -303,6 +303,7 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 	GET_LOCK();
 	/* copy payload to (soft) tx buffer */
 	/* XXX use packetbuf_dataptr() or packetbuf_hdrptr(); also, packetbuf_datalen() or packetbuf_totallen()?? */
+	payload_len += payload_len%4;
 	memcpy(&(tx_frame_buffer), payload, payload_len);
 	tx_frame_buffer.u8PayloadLength += packetbuf_datalen();
 	tx_frame_buffer.u16Unused = tx_frame_buffer.u8PayloadLength % 4;
