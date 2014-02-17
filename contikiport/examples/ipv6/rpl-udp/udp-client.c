@@ -39,6 +39,8 @@
 #endif
 #include <stdio.h>
 #include <string.h>
+#include "dev/button-sensor.h"
+#include "dev/leds.h"
 
 #define UDP_CLIENT_PORT 8765
 #define UDP_SERVER_PORT 5678
@@ -147,6 +149,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
 {
   static struct etimer periodic;
   static struct ctimer backoff_timer;
+  static uint8_t count = 0;
 #if WITH_COMPOWER
   static int print = 0;
 #endif
@@ -184,6 +187,11 @@ PROCESS_THREAD(udp_client_process, ev, data)
     if(ev == tcpip_event) {
       tcpip_handler();
     }
+
+    if(ev == sensors_event && data == &button_sensor) {
+				leds_toggle(LEDS_ALL);
+				printf("Press %u\n", count++);
+		}
 
     if(etimer_expired(&periodic)) {
       etimer_reset(&periodic);

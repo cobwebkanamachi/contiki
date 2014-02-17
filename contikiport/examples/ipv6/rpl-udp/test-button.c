@@ -75,19 +75,15 @@ PROCESS_THREAD(test_button_process, ev, data)
 //		leds_toggle(count-1);
 //	}
 	printf("Press the button to toggle the leds.\n");
+	while(u8ButtonReadRfd()) {
+	  leds_on(LEDS_ALL);
+	}
 	leds_off(LEDS_ALL);
 	count=0;
   while(1) {
-  	while(u8ButtonReadRfd()) {
-  	  leds_on(LEDS_ALL);
-  	}
-	  leds_off(LEDS_RED);
-
-    PROCESS_WAIT_EVENT_UNTIL(ev == sensors_event &&
-			     data == &button_sensor);
+    PROCESS_WAIT_EVENT_UNTIL(ev == sensors_event && data == &button_sensor);
     leds_toggle(LEDS_ALL);
     printf("Press %u\n", count++);
-
   }
 
   PROCESS_END();
