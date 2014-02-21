@@ -39,6 +39,7 @@
 
 #ifndef __TSCH_H__
 #define __TSCH_H__
+#include "contiki-conf.h"
 
 #include "net/mac/rdc.h"
 
@@ -50,7 +51,7 @@ typedef struct {
 	uint8_t dsn;                // data sequence number
 	uint16_t capturedTime;       // last captures time
 	uint16_t syncTimeout;        // how many slots left before looses sync
-	bool isSync;             // TRUE iff mote synchronized to network
+	uint8_t isSync;             // TRUE iff mote synchronized to network
 //   OpenQueueEntry_t*  dataToSend;         // pointer to the data to send
 //   OpenQueueEntry_t*  dataReceived;       // pointer to the data received
 //   OpenQueueEntry_t*  ackToSend;          // pointer to the ack to send

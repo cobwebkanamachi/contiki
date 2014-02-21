@@ -397,24 +397,31 @@ static struct rtimer rt;
 #ifndef MIN
 #define MIN(a, b) ((a) < (b)? (a) : (b))
 #endif /* MIN */
-
+static int keep_radio_on=0;
+int cc2420_set_channel(int c);
+#define NETSTACK_RADIO_set_channel cc2420_set_channel
 
 int
 timeslot_tx(/*rtimer_clock_t start, */const void * payload, unsigned short payload_len)
 {
 	rtimer_clock_t start = RTIMER_NOW();
 	uint8_t is_broadcast =0, len, seqno;
+
+	NETSTACK_RADIO_set_channel(11+ieee154e_vars.asn%16);
+	ieee154e_vars.asn++;
 	//XXX read seqno from payload not packetbuf!!
 	seqno = packetbuf_attr(PACKETBUF_ATTR_MAC_SEQNO);
-
+	ieee154e_vars.dsn=seqno;
 	//prepare packet to send
 	uint8_t success = !NETSTACK_RADIO.prepare(payload, payload_len);
 	//delay before CCA
 	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsCCAOffset));
+	on();
 	//CCA
-	BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.channel_clear(), start + TsCCAOffset + TsCCA);
-	if(NETSTACK_RADIO.channel_clear() == 0) {
-		//off();
+	uint8_t cca_status=0;
+	BUSYWAIT_UNTIL_ABS(!(cca_status |= NETSTACK_RADIO.channel_clear()), start + TsCCAOffset + TsCCA);
+	off(keep_radio_on);
+	if(cca_status == 0) {
 		return MAC_TX_COLLISION;
   }
 	//delay before TX
@@ -423,18 +430,18 @@ timeslot_tx(/*rtimer_clock_t start, */const void * payload, unsigned short paylo
 	//send
 	success = NETSTACK_RADIO.transmit(payload_len);
 	rtimer_clock_t tx_end_time = RTIMER_NOW();
-
+	off(keep_radio_on);
 	if(success != RADIO_TX_OK) {
 		//failed
-		off();
+
 		return MAC_TX_COLLISION;
 	}
 
 	//delay wait for ack: after tx
-	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset + MIN(tx_end_time, wdDataDuration) + TsTxAckDelay - TsShortGT/2));
-
+	while(RTIMER_CLOCK_LT(RTIMER_NOW(), MIN(tx_end_time, start + TsTxOffset + wdDataDuration) + TsTxAckDelay - TsShortGT));
+	on();
 	//wait for detecting ACK
-	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset + MIN(tx_end_time, wdDataDuration) + TsTxAckDelay + TsShortGT/2)) {
+	while(RTIMER_CLOCK_LT(RTIMER_NOW(), MIN(tx_end_time, start + TsTxOffset + wdDataDuration) + TsTxAckDelay + TsShortGT)) {
 		if(!is_broadcast && (NETSTACK_RADIO.receiving_packet() ||
 												 NETSTACK_RADIO.pending_packet() ||
 												 NETSTACK_RADIO.channel_clear() == 0)) {
@@ -452,7 +459,7 @@ timeslot_tx(/*rtimer_clock_t start, */const void * payload, unsigned short paylo
 			}
 		}
   }
-	off();
+	off(keep_radio_on);
 	if(success == RADIO_TX_NOACK) {
 		return MAC_TX_NOACK;
 	} else if(success == RADIO_TX_OK) {
