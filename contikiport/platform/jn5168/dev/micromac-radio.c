@@ -283,7 +283,7 @@ micromac_radio_transmit(unsigned short payload_len)
 static int
 micromac_radio_prepare(const void *payload, unsigned short payload_len)
 {
-	printf(
+	PRINTF(
 			"micromac_radio: sending payload_len %dB u8PayloadLength %u + packetbuf_datalen %u, rx_overflow %u, rx_ackneeded %u, rx_noackneeded %u, rx_state %u, rx_complete %d, rx_error %d, rx_malformed %d, rx_aborted %d, packets_seen %d, rx_garbage %u,\nsfd_counter %d, noacktx %u, acktx %u, tx_completed %u, contentiondrop %u, sendingdrop %u\n",
 			payload_len, ((tsMacFrame*) payload)->u8PayloadLength,
 			packetbuf_datalen(), rx_overflow, rx_ackneeded, rx_noackneeded, rx_state,
@@ -302,15 +302,15 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 	}
 	GET_LOCK();
 	/* copy payload to (soft) tx buffer */
-	/* XXX use packetbuf_dataptr() or packetbuf_hdrptr(); also, packetbuf_datalen() or packetbuf_totallen()?? */
-	//payload_len += payload_len%4;
-	memcpy(&(tx_frame_buffer), payload, packetbuf_totlen());
-	tx_frame_buffer.u8PayloadLength = packetbuf_datalen();
+
+	#define MMAC_HEADER 28
+	memcpy(&(tx_frame_buffer), payload, payload_len);
+	tx_frame_buffer.u8PayloadLength = payload_len - MMAC_HEADER;
 	tx_frame_buffer.u16Unused = tx_frame_buffer.u8PayloadLength % 4;
 
-	printf(
-			"micromac_radio: sending payload_len %dB u8PayloadLength %u -> %u + packetbuf_datalen %u, u16Unused %u, rx_overflow %u\n",
-			payload_len, ((tsMacFrame*) payload)->u8PayloadLength, tx_frame_buffer.u8PayloadLength,
+	PRINTF(
+			"micromac_radio: sending packetbuf_totlen() %u payload_len %dB u8PayloadLength %u -> %u + packetbuf_datalen %u, u16Unused %u, rx_overflow %u\n",
+			packetbuf_totlen(), payload_len, ((tsMacFrame*) payload)->u8PayloadLength, tx_frame_buffer.u8PayloadLength,
 			packetbuf_datalen(), tx_frame_buffer.u16Unused, rx_overflow);
 	RELEASE_LOCK();
 	return 0;
