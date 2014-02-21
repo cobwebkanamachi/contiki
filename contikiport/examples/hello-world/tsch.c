@@ -393,27 +393,22 @@ channel_check_interval(void)
   } while(0)
 
 static struct rtimer rt;
-static int
-cc2420_prepare(const void *payload, unsigned short payload_len);
-#define radio_prepare cc2420_prepare
-static int
-cc2420_transmit(unsigned short payload_len)
-#define radio_transmit cc2420_transmit
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b)? (a) : (b))
 #endif /* MIN */
 
 
-static int
-timeslot_tx(rtimer_clock_t start, struct rtimer t, const void * payload, unsigned short payload_len)
+int
+timeslot_tx(/*rtimer_clock_t start, */const void * payload, unsigned short payload_len)
 {
+	rtimer_clock_t start = RTIMER_NOW();
 	uint8_t is_broadcast =0, len, seqno;
 	//XXX read seqno from payload not packetbuf!!
 	seqno = packetbuf_attr(PACKETBUF_ATTR_MAC_SEQNO);
-	//rtimer_clock_t start = RTIMER_NOW();
+
 	//prepare packet to send
-	uint8_t success = !radio_prepare(payload, payload_len);
+	uint8_t success = !NETSTACK_RADIO.prepare(payload, payload_len);
 	//delay before CCA
 	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsCCAOffset));
 	//CCA
@@ -426,7 +421,7 @@ timeslot_tx(rtimer_clock_t start, struct rtimer t, const void * payload, unsigne
 	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset - delayTx));
 	on();
 	//send
-	success = radio_transmit(payload_len);
+	success = NETSTACK_RADIO.transmit(payload_len);
 	rtimer_clock_t tx_end_time = RTIMER_NOW();
 
 	if(success != RADIO_TX_OK) {
