@@ -380,6 +380,61 @@ channel_check_interval(void)
   return 0;
 }
 /*---------------------------------------------------------------------------*/
+/**
+MLME-SET-SLOTFRAME.request (
+	slotframeHandle,
+	operation,
+	size
+)
+
+MLME-SET-SLOTFRAME.confirm (
+	slotframeHandle,
+	status
+)
+*/
+
+
+/**
+MLME-SET-LINK.request (
+	operation,
+	linkHandle,
+	slotframeHandle,
+	timeslot,
+	channelOffset,
+	linkOptions,
+	linkType,
+	nodeAddr
+	)
+
+MLME-SET-LINK.confirm (
+	status,
+	linkHandle,
+	slotframeHandle
+)
+*/
+
+/**
+MLME-TSCH-MODE.request (
+	TSCHModeOnOff
+)
+
+MLME-TSCH-MODE.confirm (
+TSCHModeOnOff,
+status
+)
+*/
+
+/**
+MLME-KEEP-ALIVE.request (
+	dstAddr,
+	keepAlivePeriod
+)
+
+MLME-KEEP-ALIVE.confirm (
+	status
+)
+ */
+
 #define BUSYWAIT_UNTIL(cond, max_time)                                  \
   do {                                                                  \
     rtimer_clock_t t0;                                                  \
@@ -401,14 +456,124 @@ static int keep_radio_on=0;
 int cc2420_set_channel(int c);
 #define NETSTACK_RADIO_set_channel cc2420_set_channel
 
+/* to get last packet timing information */
+extern volatile uint16_t cc2420_sfd_start_time;
+uint16_t get_sfd_start_time(void) {
+	return cc2420_sfd_start_time;
+}
+
+uint8_t hop_channel(uint8_t offset) {
+	uint8_t channel = 11 + (offset + ieee154e_vars.asn) % 16;
+	if( NETSTACK_RADIO_set_channel(channel) ) {
+		return channel;
+	}
+	return 0;
+}
+
+enum slotframe_operations_enum {
+	ADD_SLOTFRAME = 0, DELETE_SLOTFRAME = 2, MODIFY_SLOTFRAME = 3,
+};
+
+enum link_operations_enum {
+	ADD_LINK = 0, DELETE_LINK = 1, MODIFY_LINK = 2,
+};
+
+enum link_options_enum {
+	LINK_OPTION_TX=1,
+	LINK_OPTION_RX=2,
+	LINK_OPTION_SHARED=4,
+	LINK_OPTION_TIME_KEEPING=8,
+};
+
+enum link_type_enum {
+	LINK_TYPE_NORMAL=0,
+	LINK_TYPE_ADVERTISING=1,
+};
+
+typedef struct {
+	/* Unique identifier (local to specified slotframe) for the link */
+	uint16_t link_handle;
+	/* Relative number of slot in slotframe */
+	//uint16_t timeslot;
+	/* maybe 0 to 15 */
+	uint8_t channel_offset;
+	/*b0 = Transmit, b1 = Receive, b2 = Shared, b3= Timekeeping, b4–b7 reserved.*/
+	uint8_t link_options;
+	/* Type of link. NORMAL = 0. ADVERTISING = 1, and indicates
+	the link may be used to send an Enhanced beacon. */
+	uint8_t link_type;
+	/* short address of neighbor */
+	uint16_t node_address;
+} cell_t;
+
+#define BROADCAST_CELL_ADDRESS ((uint16_t)(0xffff))
+
+const cell_t generic_shared_cell = {
+		BROADCAST_CELL_ADDRESS,
+		0,
+		LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
+		LINK_TYPE_NORMAL,
+		BROADCAST_CELL_ADDRESS
+};
+
+const cell_t generic_eb_cell = {
+		0,
+		0,
+		LINK_OPTION_TX,
+		LINK_TYPE_ADVERTISING,
+		BROADCAST_CELL_ADDRESS
+};
+
+typedef struct {
+	/* Unique identifier */
+	uint16_t slotframe_handle;
+	uint16_t length;
+	uint16_t on_size;
+	cell_t ** cells;
+} slotframe_t;
+
+const cell_t * minimum_cells[6] = {
+	&generic_eb_cell,
+	&generic_shared_cell,
+	&generic_shared_cell,
+	&generic_shared_cell,
+	&generic_shared_cell,
+	&generic_shared_cell,
+};
+
+const slotframe_t minimum_slotframe = {
+	0,
+	101,
+	6,
+	minimum_cells
+};
+
+static slotframe_t * current_slotframe;
+
+cell_t *
+get_cell(uint16_t timeslot) {
+	return (timeslot >= current_slotframe->on_size)	?
+			NULL :
+			current_slotframe->cells[timeslot];
+}
+
 int
-timeslot_tx(/*rtimer_clock_t start, */const void * payload, unsigned short payload_len)
+timeslot_tx(const void * payload, unsigned short payload_len)
 {
 	rtimer_clock_t start = RTIMER_NOW();
 	uint8_t is_broadcast =0, len, seqno;
+	uint16_t timeslot = ieee154e_vars.asn++ % current_slotframe->length;
+	cell_t * cell = get_cell(timeslot);
+	uint16_t ack_sfd_time = 0;
+	rtimer_clock_t ack_sfd_rtime = 0;
 
-	NETSTACK_RADIO_set_channel(11+ieee154e_vars.asn%16);
-	ieee154e_vars.asn++;
+	if(cell == NULL) {
+		//off cell
+		return MAC_TX_DEFERRED;
+	}
+
+	hop_channel(cell->channel_offset);
+
 	//XXX read seqno from payload not packetbuf!!
 	seqno = packetbuf_attr(PACKETBUF_ATTR_MAC_SEQNO);
 	ieee154e_vars.dsn=seqno;
@@ -446,11 +611,12 @@ timeslot_tx(/*rtimer_clock_t start, */const void * payload, unsigned short paylo
 												 NETSTACK_RADIO.pending_packet() ||
 												 NETSTACK_RADIO.channel_clear() == 0)) {
 			uint8_t ackbuf[ACK_LEN];
-			rtimer_clock_t wt = RTIMER_NOW();
-			while(RTIMER_CLOCK_LT(RTIMER_NOW(), wt + wdAckDuration)) { }
+			ack_sfd_rtime = RTIMER_NOW();
+			ack_sfd_time = get_sfd_start_time();
+			while(RTIMER_CLOCK_LT(RTIMER_NOW(), ack_sfd_rtime + wdAckDuration)) { }
 
 			len = NETSTACK_RADIO.read(ackbuf, ACK_LEN);
-			if(len == ACK_LEN && seqno == ackbuf[ACK_LEN - 1]) {
+			if(len == ACK_LEN && seqno == ackbuf[2]) {
 				success = RADIO_TX_OK;
 				break;
 			} else {
@@ -463,20 +629,31 @@ timeslot_tx(/*rtimer_clock_t start, */const void * payload, unsigned short paylo
 	if(success == RADIO_TX_NOACK) {
 		return MAC_TX_NOACK;
 	} else if(success == RADIO_TX_OK) {
+		//TODO synchronize using ack_sfd_rtime or ack_sfd_time
 		return MAC_TX_OK;
 	}
 	return MAC_TX_OK;
+}
+
+static char
+powercycle(struct rtimer *t, void *ptr) {
+/* if timeslot for tx, and we have a packet, call timeslot_tx
+ * else if timeslot for rx, call timeslot_rx
+ * otherwise, schedule next wakeup
+ */
 }
 /*---------------------------------------------------------------------------*/
 static void
 init(void)
 {
+	current_slotframe = &minimum_slotframe;
 	ieee154e_vars.asn=0;
 	ieee154e_vars.capturedTime=0;
 	ieee154e_vars.dsn=0;
 	ieee154e_vars.isSync=0;
 	ieee154e_vars.state = 0;
 	ieee154e_vars.syncTimeout = 0; //30sec/slotDuration - (asn-asn0)*slotDuration
+	//schedule next wakeup? or leave for higher layer to decide? i.e, scan, ...
   //on();
 }
 /*---------------------------------------------------------------------------*/
