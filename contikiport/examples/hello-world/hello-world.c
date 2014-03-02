@@ -1,117 +1,44 @@
+/*---------------------------------------------------------------------------*/
 /*
-
  * Copyright (c) 2006, Swedish Institute of Computer Science.
-
  * All rights reserved.
-
  *
-
  * Redistribution and use in source and binary forms, with or without
-
  * modification, are permitted provided that the following conditions
-
  * are met:
-
  * 1. Redistributions of source code must retain the above copyright
-
  *    notice, this list of conditions and the following disclaimer.
-
  * 2. Redistributions in binary form must reproduce the above copyright
-
  *    notice, this list of conditions and the following disclaimer in the
-
  *    documentation and/or other materials provided with the distribution.
-
  * 3. Neither the name of the Institute nor the names of its contributors
-
  *    may be used to endorse or promote products derived from this software
-
  *    without specific prior written permission.
-
  *
-
  * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
-
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-
  * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
-
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-
  * SUCH DAMAGE.
-
  *
-
  * This file is part of the Contiki operating system.
-
  *
-
  */
 
 /**
-
  * \file
-
  *         A very simple Contiki application showing how Contiki programs look
-
  * \author
-
  *         Adam Dunkels <adam@sics.se>
-
  */
 
-//#include "contiki.h"
-
-//
-
-//#include <stdio.h> /* For printf() */
-
-///*---------------------------------------------------------------------------*/
-
-//PROCESS(hello_world_process, "Hello world process");
-
-//AUTOSTART_PROCESSES(&hello_world_process);
-
-///*---------------------------------------------------------------------------*/
-
-//PROCESS_THREAD(hello_world_process, ev, data)
-
-//{
-
-//  PROCESS_BEGIN();
-
-//  static unsigned char leds=0;
-
-//  void leds_arch_set(unsigned char);
-
-//  while(1) {
-
-//  	printf("Hello, world\n");
-
-//  	leds_arch_set(leds ? 7:0 );
-
-//  	leds=!leds;
-
-//  }
-
-//
-
-//  PROCESS_END();
-
-//}
-
+#if RIME
 ///*---------------------------------------------------------------------------*/
 #include "contiki.h"
 #include "net/rime.h"
@@ -176,4 +103,106 @@ PROCESS_THREAD(example_unicast_process, ev, data)
 	PROCESS_END();
 
 }
+
+#else
+
+#include "contiki.h"
+
+#include <stdio.h> /* For printf() */
+#include <string.h>
+#include "dev/leds.h"
+#include "cooja-debug.h"
+#include "tsch.h"
+#include "net/rime.h"
+
+#define PRINTF COOJA_DEBUG_STR
+cell_t * get_cell(uint16_t timeslot);
+
+extern const cell_t generic_shared_cell;
+
+int
+timeslot_tx(cell_t * cell, const void * payload, unsigned short payload_len);
+
+void watchdog_periodic(void);
 /*---------------------------------------------------------------------------*/
+PROCESS(hello_world_process, "Hello world process");
+AUTOSTART_PROCESSES(&hello_world_process);
+/*---------------------------------------------------------------------------*/
+
+void* perpare_raw(rimeaddr_t addr, char* msg, uint8_t len) {
+  packetbuf_copyfrom(msg, len);
+  packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, &addr);
+  packetbuf_set_addr(PACKETBUF_ADDR_SENDER, &rimeaddr_node_addr);
+  packetbuf_set_attr(PACKETBUF_ATTR_RELIABLE, 1);
+  packetbuf_set_attr(PACKETBUF_ATTR_ERELIABLE, 1);
+  packetbuf_compact();
+  //set ack req in fcf
+  ((uint8_t*)packetbuf_dataptr())[0] |= (1 << 5)| 4; //4 == FRAME802154_DATAFRAME
+  return packetbuf_dataptr();
+}
+static char powercycle(struct rtimer *t, void *ptr);
+
+static void
+schedule_fixed(struct rtimer *t, rtimer_clock_t fixed_time)
+{
+  int r;
+	if(RTIMER_CLOCK_LT(fixed_time, RTIMER_NOW() + 1)) {
+		fixed_time = RTIMER_NOW() + 1;
+	}
+
+	r = rtimer_set(t, fixed_time, 1,
+								 (void (*)(struct rtimer *, void *))powercycle, NULL);
+	if(r != RTIMER_OK) {
+		PRINTF("schedule_powercycle: could not set rtimer\n");
+	}
+}
+
+#define MSG_LEN (127-2)
+static char msg[127];
+static struct pt pt;
+static struct rtimer t;
+static volatile rtimer_clock_t start;
+static char
+powercycle(struct rtimer *t, void *ptr)
+{
+  PT_BEGIN(&pt);
+  static uint16_t timeslot = 0;
+
+  start = RTIMER_NOW();
+
+  while(1) {
+  	start += TsSlotDuration;
+  	leds_on(LEDS_BLUE);
+  	watchdog_periodic();
+  	if(rimeaddr_node_addr.u8[0]%2==0) {
+  		timeslot_tx(get_cell(timeslot++), msg, MSG_LEN);
+  	} else {
+  		timeslot_rx(get_cell(timeslot++), msg, MSG_LEN);
+  	}
+  	timeslot %= 7;
+  	schedule_fixed(t, start + TsSlotDuration);
+  	leds_off(LEDS_BLUE);
+    PT_YIELD(&pt);
+  }
+  PT_END(&pt);
+}
+
+#include "net/packetbuf.h"
+PROCESS_THREAD(hello_world_process, ev, data)
+{
+  PROCESS_BEGIN();
+
+  sprintf(msg, "Hello, world\n");
+  static rtimer_clock_t start;
+	static rimeaddr_t addr;
+	addr.u8[0] = 1;
+	addr.u8[1] = 0;
+
+	memcpy(msg, perpare_raw(addr, msg, MSG_LEN), 127);
+	start = RTIMER_NOW();
+	schedule_fixed(&t, start + TsSlotDuration);
+
+  PROCESS_END();
+}
+/*---------------------------------------------------------------------------*/
+#endif /* RIME */

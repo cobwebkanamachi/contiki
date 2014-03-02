@@ -7,6 +7,9 @@
 //#undef UIP_CONF_LOGGING
 //#define UIP_CONF_LOGGING 1
 
+#undef CC2420_CONF_SFD_TIMESTAMPS
+#define CC2420_CONF_SFD_TIMESTAMPS 1
+
 #undef NETSTACK_CONF_MAC
 #define NETSTACK_CONF_MAC     nullmac_driver
 
