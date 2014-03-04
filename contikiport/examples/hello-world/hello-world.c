@@ -122,23 +122,26 @@ extern const cell_t generic_shared_cell;
 
 int
 timeslot_tx(cell_t * cell, const void * payload, unsigned short payload_len);
+timeslot_rx(cell_t * cell, const void * payload, unsigned short payload_len);
 
 void watchdog_periodic(void);
 /*---------------------------------------------------------------------------*/
 PROCESS(hello_world_process, "Hello world process");
 AUTOSTART_PROCESSES(&hello_world_process);
 /*---------------------------------------------------------------------------*/
-
+#include "net/mac/framer-802154.c"
+extern const struct framer framer_802154;
 void* perpare_raw(rimeaddr_t addr, char* msg, uint8_t len) {
   packetbuf_copyfrom(msg, len);
   packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, &addr);
   packetbuf_set_addr(PACKETBUF_ADDR_SENDER, &rimeaddr_node_addr);
   packetbuf_set_attr(PACKETBUF_ATTR_RELIABLE, 1);
   packetbuf_set_attr(PACKETBUF_ATTR_ERELIABLE, 1);
+  framer_802154.create();
   packetbuf_compact();
   //set ack req in fcf
-  ((uint8_t*)packetbuf_dataptr())[0] |= (1 << 5)| 4; //4 == FRAME802154_DATAFRAME
-  return packetbuf_dataptr();
+  //((uint8_t*)packetbuf_dataptr())[0] |= (1 << 5)| 4; //4 == FRAME802154_DATAFRAME
+  return packetbuf_hdrptr();
 }
 static char powercycle(struct rtimer *t, void *ptr);
 
@@ -157,7 +160,7 @@ schedule_fixed(struct rtimer *t, rtimer_clock_t fixed_time)
 	}
 }
 
-#define MSG_LEN (127-2)
+#define MSG_LEN (127-10)
 static char msg[127];
 static struct pt pt;
 static struct rtimer t;
@@ -172,8 +175,8 @@ powercycle(struct rtimer *t, void *ptr)
 
   while(1) {
   	start += TsSlotDuration;
-  	leds_on(LEDS_BLUE);
-  	watchdog_periodic();
+  	//leds_on(LEDS_GREEN);
+  	//watchdog_periodic();
   	if(rimeaddr_node_addr.u8[0]%2==0) {
   		timeslot_tx(get_cell(timeslot++), msg, MSG_LEN);
   	} else {
@@ -181,7 +184,7 @@ powercycle(struct rtimer *t, void *ptr)
   	}
   	timeslot %= 7;
   	schedule_fixed(t, start + TsSlotDuration);
-  	leds_off(LEDS_BLUE);
+  	//leds_off(LEDS_GREEN);
     PT_YIELD(&pt);
   }
   PT_END(&pt);
@@ -191,7 +194,7 @@ powercycle(struct rtimer *t, void *ptr)
 PROCESS_THREAD(hello_world_process, ev, data)
 {
   PROCESS_BEGIN();
-
+  COOJA_DEBUG_STR("COOJA_DEBUG_STR hello_world_process\n");
   sprintf(msg, "Hello, world\n");
   static rtimer_clock_t start;
 	static rimeaddr_t addr;

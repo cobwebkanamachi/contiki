@@ -458,53 +458,20 @@ int cc2420_set_channel(int c);
 
 /* to get last packet timing information */
 extern volatile uint16_t cc2420_sfd_start_time;
-uint16_t get_sfd_start_time(void) {
+
+static uint16_t
+get_sfd_start_time(void) {
 	return cc2420_sfd_start_time;
 }
 
-uint8_t hop_channel(uint8_t offset) {
+static uint8_t
+hop_channel(uint8_t offset) {
 	uint8_t channel = 11 + (offset + ieee154e_vars.asn) % 16;
 	if( NETSTACK_RADIO_set_channel(channel) ) {
 		return channel;
 	}
 	return 0;
 }
-
-enum slotframe_operations_enum {
-	ADD_SLOTFRAME = 0, DELETE_SLOTFRAME = 2, MODIFY_SLOTFRAME = 3,
-};
-
-enum link_operations_enum {
-	ADD_LINK = 0, DELETE_LINK = 1, MODIFY_LINK = 2,
-};
-
-enum link_options_enum {
-	LINK_OPTION_TX=1,
-	LINK_OPTION_RX=2,
-	LINK_OPTION_SHARED=4,
-	LINK_OPTION_TIME_KEEPING=8,
-};
-
-enum link_type_enum {
-	LINK_TYPE_NORMAL=0,
-	LINK_TYPE_ADVERTISING=1,
-};
-
-typedef struct {
-	/* Unique identifier (local to specified slotframe) for the link */
-	uint16_t link_handle;
-	/* Relative number of slot in slotframe */
-	//uint16_t timeslot;
-	/* maybe 0 to 15 */
-	uint8_t channel_offset;
-	/*b0 = Transmit, b1 = Receive, b2 = Shared, b3= Timekeeping, b4–b7 reserved.*/
-	uint8_t link_options;
-	/* Type of link. NORMAL = 0. ADVERTISING = 1, and indicates
-	the link may be used to send an Enhanced beacon. */
-	uint8_t link_type;
-	/* short address of neighbor */
-	uint16_t node_address;
-} cell_t;
 
 #define BROADCAST_CELL_ADDRESS ((uint16_t)(0xffff))
 
@@ -523,14 +490,6 @@ const cell_t generic_eb_cell = {
 		LINK_TYPE_ADVERTISING,
 		BROADCAST_CELL_ADDRESS
 };
-
-typedef struct {
-	/* Unique identifier */
-	uint16_t slotframe_handle;
-	uint16_t length;
-	uint16_t on_size;
-	cell_t ** cells;
-} slotframe_t;
 
 const cell_t * minimum_cells[6] = {
 	&generic_eb_cell,
@@ -557,21 +516,23 @@ get_cell(uint16_t timeslot) {
 			current_slotframe->cells[timeslot];
 }
 
+volatile unsigned char we_are_sending = 0;
+
 int
-timeslot_tx(const void * payload, unsigned short payload_len)
+timeslot_tx(cell_t * cell, const void * payload, unsigned short payload_len)
 {
+	//TODO There are small timing variations visible in cooja, which needs tuning
 	rtimer_clock_t start = RTIMER_NOW();
 	uint8_t is_broadcast =0, len, seqno;
-	uint16_t timeslot = ieee154e_vars.asn++ % current_slotframe->length;
-	cell_t * cell = get_cell(timeslot);
 	uint16_t ack_sfd_time = 0;
 	rtimer_clock_t ack_sfd_rtime = 0;
 
 	if(cell == NULL) {
 		//off cell
+		off(keep_radio_on);
 		return MAC_TX_DEFERRED;
 	}
-
+	we_are_sending=1;
 	hop_channel(cell->channel_offset);
 
 	//XXX read seqno from payload not packetbuf!!
@@ -591,7 +552,7 @@ timeslot_tx(const void * payload, unsigned short payload_len)
   }
 	//delay before TX
 	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset - delayTx));
-	on();
+	//on();
 	//send
 	success = NETSTACK_RADIO.transmit(payload_len);
 	rtimer_clock_t tx_end_time = RTIMER_NOW();
@@ -625,6 +586,7 @@ timeslot_tx(const void * payload, unsigned short payload_len)
 			}
 		}
   }
+	we_are_sending=0;
 	off(keep_radio_on);
 	if(success == RADIO_TX_NOACK) {
 		return MAC_TX_NOACK;
@@ -635,12 +597,76 @@ timeslot_tx(const void * payload, unsigned short payload_len)
 	return MAC_TX_OK;
 }
 
+//to initialize radio sfd counter and synchronize it with rtimer
+void cc2420_arch_sfd_sync(void);
+
+//extern volatile uint16_t expected_rx_time;
+#include "cooja-debug.h"
+
+int
+timeslot_rx(cell_t * cell, const void * payload, unsigned short payload_len)
+{
+	//TODO There are small timing variations visible in cooja, which needs tuning
+	rtimer_clock_t start = RTIMER_NOW();
+	uint8_t is_broadcast =0, len, seqno;
+	uint16_t ack_sfd_time = 0;
+	rtimer_clock_t ack_sfd_rtime = 0;
+
+	if(cell == NULL) {
+		//off cell
+		off(keep_radio_on);
+		return 0;
+	}
+	cc2420_arch_sfd_sync();
+
+	hop_channel(cell->channel_offset);
+	//wait before RX
+	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset - TsLongGT));
+	//Start radio for at least guard time
+	on();
+//	COOJA_DEBUG_STR("RX on -TsLongGT");
+//	uint8_t cca_status=0;
+//	//Check if receiving within guard time
+//	BUSYWAIT_UNTIL_ABS(
+//			(cca_status=(
+//					NETSTACK_RADIO.channel_clear()
+//					//|| NETSTACK_RADIO.pending_packet()
+//					|| NETSTACK_RADIO.receiving_packet())
+//				),
+//				start + TsTxOffset + TsLongGT);
+//	if(!cca_status) {
+//		COOJA_DEBUG_STR("RX no packet in air\n");
+//		off(keep_radio_on);
+//		//no packets on air
+//		return 0;
+//	}
+	//wait until rx finishes
+//	BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(), start + TsTxOffset + wdDataDuration);
+//	rtimer_clock_t rx_end_time = RTIMER_NOW();
+	//prepare ack
+	//XXX ... in interrupt?
+	//off();
+	//wait until ask time comes
+	//BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(), rx_end_time + TsTxAckDelay);
+	//send ack
+
+	//off
+	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset + wdDataDuration + TsTxAckDelay + wdAckDuration));
+	COOJA_DEBUG_STR("!RX TIME OUT");
+//	off(keep_radio_on);
+
+}
+
 static char
 powercycle(struct rtimer *t, void *ptr) {
 /* if timeslot for tx, and we have a packet, call timeslot_tx
  * else if timeslot for rx, call timeslot_rx
  * otherwise, schedule next wakeup
  */
+
+	uint16_t timeslot = ieee154e_vars.asn++ % current_slotframe->length;
+	cell_t * cell = get_cell(timeslot);
+
 }
 /*---------------------------------------------------------------------------*/
 static void

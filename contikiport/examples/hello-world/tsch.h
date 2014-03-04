@@ -40,68 +40,10 @@
 #ifndef __TSCH_H__
 #define __TSCH_H__
 #include "contiki-conf.h"
-
 #include "net/mac/rdc.h"
+#include "tsch-parameters.h"
 
-typedef uint32_t asn_t;
-
-typedef struct {
-	asn_t asn;                // current absolute slot number
-	uint8_t state;              // state of the FSM
-	uint8_t dsn;                // data sequence number
-	uint16_t capturedTime;       // last captures time
-	uint16_t syncTimeout;        // how many slots left before looses sync
-	uint8_t isSync;             // TRUE iff mote synchronized to network
-//   OpenQueueEntry_t*  dataToSend;         // pointer to the data to send
-//   OpenQueueEntry_t*  dataReceived;       // pointer to the data received
-//   OpenQueueEntry_t*  ackToSend;          // pointer to the ack to send
-//   OpenQueueEntry_t*  ackReceived;        // pointer to the ack received
-} ieee154e_vars_t;
-
-// Atomic durations
-// expressed in 32kHz ticks:
-//    - ticks = duration_in_seconds * 32768
-//    - duration_in_seconds = ticks / 32768
-
-//XXX check these numbers on real hw or cooja
-// 15000us
-#define PORT_TsSlotDuration (164*3)
-//   500us
-#define PORT_maxTxDataPrepare (16)
-//   500us
-#define PORT_maxRxAckPrepare (16)
-//   500us
-#define PORT_maxRxDataPrepare (16)
-
-#define PORT_maxTxAckPrepare (16)
-
-#define PORT_delayTx (16)
-
-#define PORT_delayRx (16)
-
-enum ieee154e_atomicdurations_enum {
-	// time-slot related
-	TsCCAOffset=100,										//>3000us
-	TsCCA=16,												//500us
-	TsRxTx=15,												//<500us
-	TsTxOffset = 131,                  //  4000us
-	TsLongGT = 43,                  //  1300us
-	TsTxAckDelay = 131,                  //  4000us
-	TsShortGT = 16,                  //   500us
-	TsSlotDuration = PORT_TsSlotDuration,  // 15000us
-	// execution speed related
-	maxTxDataPrepare = PORT_maxTxDataPrepare,
-	maxRxAckPrepare = PORT_maxRxAckPrepare,
-	maxRxDataPrepare = PORT_maxRxDataPrepare,
-	maxTxAckPrepare = PORT_maxTxAckPrepare,
-	// radio speed related
-	delayTx = PORT_delayTx,         // between GO signal and SFD
-	delayRx = PORT_delayRx,         // between GO signal and start listening
-	// radio watchdog
-	wdRadioTx = 33,                  //  1000us (needs to be >delayTx)
-	wdDataDuration = 164,            //  5000us (measured 4280us with max payload)
-	wdAckDuration = 98,                  //  3000us (measured 1000us)
-};
 extern const struct rdc_driver tschrdc_driver;
+
 
 #endif /* __TSCH_H__ */
