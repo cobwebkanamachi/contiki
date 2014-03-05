@@ -345,8 +345,8 @@ cc2420_init(void)
 //#endif /* CC2420_CONF_AUTOACK */
   //reg |= AUTOACK | ADR_DECODE;
   //reg &= ~(AUTOACK | ADR_DECODE);
-  reg |= ADR_DECODE;
-  //reg = (reg & ~AUTOACK) | ADR_DECODE;
+  //reg |= ADR_DECODE;
+  reg = (reg & ~AUTOACK) | ADR_DECODE;
   //reg &= ~(AUTOACK | ADR_DECODE);
   setreg(CC2420_MDMCTRL0, reg);
 
@@ -682,7 +682,7 @@ frame80254_parse_irq(uint8_t *data, uint8_t len)
 	/* decode the FCF */
 	uint8_t for_us = FOR_US;
 	uint8_t do_ack = (data[0] >> 5) & 1 == 1 ? DO_ACK : 0;
-	uint8_t is_data = data[0] & 7 == FRAME802154_DATAFRAME ? IS_DATA : 0;
+	uint8_t is_data = (data[0] & 7) == FRAME802154_DATAFRAME ? IS_DATA : 0;
 
 	return for_us | do_ack | is_data;
 }

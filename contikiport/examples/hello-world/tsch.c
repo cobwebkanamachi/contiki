@@ -651,8 +651,8 @@ timeslot_rx(cell_t * cell, const void * payload, unsigned short payload_len)
 	//send ack
 
 	//off
-	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset + wdDataDuration + TsTxAckDelay + wdAckDuration));
-	COOJA_DEBUG_STR("!RX TIME OUT");
+	//while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset + wdDataDuration + TsTxAckDelay + wdAckDuration));
+	//COOJA_DEBUG_STR("!RX TIME OUT");
 //	off(keep_radio_on);
 
 }

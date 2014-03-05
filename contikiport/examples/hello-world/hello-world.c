@@ -165,6 +165,8 @@ static char msg[127];
 static struct pt pt;
 static struct rtimer t;
 static volatile rtimer_clock_t start;
+#include "net/netstack.h"
+
 static char
 powercycle(struct rtimer *t, void *ptr)
 {
@@ -183,6 +185,9 @@ powercycle(struct rtimer *t, void *ptr)
   		timeslot_rx(get_cell(timeslot++), msg, MSG_LEN);
   	}
   	timeslot %= 7;
+  	schedule_fixed(t, start + TsTxOffset + wdDataDuration + TsTxAckDelay + wdAckDuration);
+  	COOJA_DEBUG_STR("!RX TIME OUT");
+  	//NETSTACK_RDC.off(0);
   	schedule_fixed(t, start + TsSlotDuration);
   	//leds_off(LEDS_GREEN);
     PT_YIELD(&pt);
