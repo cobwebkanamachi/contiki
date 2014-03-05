@@ -116,13 +116,6 @@ PROCESS_THREAD(example_unicast_process, ev, data)
 #include "net/rime.h"
 
 #define PRINTF COOJA_DEBUG_STR
-cell_t * get_cell(uint16_t timeslot);
-
-extern const cell_t generic_shared_cell;
-
-int
-timeslot_tx(cell_t * cell, const void * payload, unsigned short payload_len);
-timeslot_rx(cell_t * cell, const void * payload, unsigned short payload_len);
 
 void watchdog_periodic(void);
 /*---------------------------------------------------------------------------*/
@@ -143,22 +136,6 @@ void* perpare_raw(rimeaddr_t addr, char* msg, uint8_t len) {
   //((uint8_t*)packetbuf_dataptr())[0] |= (1 << 5)| 4; //4 == FRAME802154_DATAFRAME
   return packetbuf_hdrptr();
 }
-static char powercycle(struct rtimer *t, void *ptr);
-
-static void
-schedule_fixed(struct rtimer *t, rtimer_clock_t fixed_time)
-{
-  int r;
-	if(RTIMER_CLOCK_LT(fixed_time, RTIMER_NOW() + 1)) {
-		fixed_time = RTIMER_NOW() + 1;
-	}
-
-	r = rtimer_set(t, fixed_time, 1,
-								 (void (*)(struct rtimer *, void *))powercycle, NULL);
-	if(r != RTIMER_OK) {
-		PRINTF("schedule_powercycle: could not set rtimer\n");
-	}
-}
 
 #define MSG_LEN (127-10)
 static char msg[127];
@@ -166,34 +143,6 @@ static struct pt pt;
 static struct rtimer t;
 static volatile rtimer_clock_t start;
 #include "net/netstack.h"
-
-static char
-powercycle(struct rtimer *t, void *ptr)
-{
-  PT_BEGIN(&pt);
-  static uint16_t timeslot = 0;
-
-  start = RTIMER_NOW();
-
-  while(1) {
-  	start += TsSlotDuration;
-  	//leds_on(LEDS_GREEN);
-  	//watchdog_periodic();
-  	if(rimeaddr_node_addr.u8[0]%2==0) {
-  		timeslot_tx(get_cell(timeslot++), msg, MSG_LEN);
-  	} else {
-  		timeslot_rx(get_cell(timeslot++), msg, MSG_LEN);
-  	}
-  	timeslot %= 7;
-  	schedule_fixed(t, start + TsTxOffset + wdDataDuration + TsTxAckDelay + wdAckDuration);
-  	COOJA_DEBUG_STR("!RX TIME OUT");
-  	//NETSTACK_RDC.off(0);
-  	schedule_fixed(t, start + TsSlotDuration);
-  	//leds_off(LEDS_GREEN);
-    PT_YIELD(&pt);
-  }
-  PT_END(&pt);
-}
 
 #include "net/packetbuf.h"
 PROCESS_THREAD(hello_world_process, ev, data)
@@ -208,7 +157,6 @@ PROCESS_THREAD(hello_world_process, ev, data)
 
 	memcpy(msg, perpare_raw(addr, msg, MSG_LEN), 127);
 	start = RTIMER_NOW();
-	schedule_fixed(&t, start + TsSlotDuration);
 
   PROCESS_END();
 }

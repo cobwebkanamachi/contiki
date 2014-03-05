@@ -7,9 +7,9 @@ typedef struct {
 	asn_t asn;                // current absolute slot number
 	uint8_t state;              // state of the FSM
 	uint8_t dsn;                // data sequence number
-	uint16_t capturedTime;       // last captures time
-	uint16_t syncTimeout;        // how many slots left before looses sync
-	uint8_t isSync;             // TRUE iff mote synchronized to network
+	uint16_t captured_time;       // last captures time
+	uint16_t sync_timeout;        // how many slots left before looses sync
+	uint8_t is_sync;             // TRUE iff mote synchronized to network
 //   OpenQueueEntry_t*  dataToSend;         // pointer to the data to send
 //   OpenQueueEntry_t*  dataReceived;       // pointer to the data received
 //   OpenQueueEntry_t*  ackToSend;          // pointer to the ack to send
@@ -60,6 +60,10 @@ enum ieee154e_atomicdurations_enum {
 	wdRadioTx = 33,                  //  1000us (needs to be >delayTx)
 	wdDataDuration = 164,            //  5000us (measured 4280us with max payload)
 	wdAckDuration = 66,                  //  2000us (measured 1000us me: 440us)
+};
+
+enum ieee154e_states_enum {
+	TSCH_OFF = 0, TSCH_ASSOCIATED = 1,
 };
 
 enum slotframe_operations_enum {

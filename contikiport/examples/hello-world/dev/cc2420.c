@@ -64,9 +64,9 @@ volatile int need_flush=0;
 
 #define FOOTER_LEN 2
 //Timesync IE length with header = 4
-#ifndef EXTRA_ACK_LEN
+//#ifndef EXTRA_ACK_LEN
 #define EXTRA_ACK_LEN 4
-#endif
+//#endif
 #define ACK_LEN (3)
 
 #define FIFOP_THRESHOLD (9)

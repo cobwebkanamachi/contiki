@@ -36,6 +36,7 @@
  * \author
  *         Beshr Al Nahas <beshr@sics.se>
  */
+#include "contiki.h"
 
 #include "contiki-conf.h"
 #include "tsch.h"
@@ -47,6 +48,9 @@
 #include "sys/rtimer.h"
 
 static volatile ieee154e_vars_t ieee154e_vars;
+
+#define ACK_LEN 3
+#define EXTRA_ACK_LEN 4
 
 #define DEBUG 0
 #if DEBUG
@@ -103,8 +107,6 @@ static volatile ieee154e_vars_t ieee154e_vars;
 #if TSCH_SEND_802154_ACK
 #include "net/mac/frame802154.h"
 #endif /* TSCH_SEND_802154_ACK */
-
-#define ACK_LEN 3
 
 #if TSCH_802154_AUTOACK || TSCH_802154_AUTOACK_HW
 struct seqno {
@@ -380,73 +382,18 @@ channel_check_interval(void)
   return 0;
 }
 /*---------------------------------------------------------------------------*/
-/**
-MLME-SET-SLOTFRAME.request (
-	slotframeHandle,
-	operation,
-	size
-)
-
-MLME-SET-SLOTFRAME.confirm (
-	slotframeHandle,
-	status
-)
-*/
-
-
-/**
-MLME-SET-LINK.request (
-	operation,
-	linkHandle,
-	slotframeHandle,
-	timeslot,
-	channelOffset,
-	linkOptions,
-	linkType,
-	nodeAddr
-	)
-
-MLME-SET-LINK.confirm (
-	status,
-	linkHandle,
-	slotframeHandle
-)
-*/
-
-/**
-MLME-TSCH-MODE.request (
-	TSCHModeOnOff
-)
-
-MLME-TSCH-MODE.confirm (
-TSCHModeOnOff,
-status
-)
-*/
-
-/**
-MLME-KEEP-ALIVE.request (
-	dstAddr,
-	keepAlivePeriod
-)
-
-MLME-KEEP-ALIVE.confirm (
-	status
-)
- */
-
 #define BUSYWAIT_UNTIL(cond, max_time)                                  \
   do {                                                                  \
     rtimer_clock_t t0;                                                  \
     t0 = RTIMER_NOW();                                                  \
     while(!(cond) && RTIMER_CLOCK_LT(RTIMER_NOW(), t0 + (max_time)));   \
   } while(0)
-
+/*---------------------------------------------------------------------------*/
 #define BUSYWAIT_UNTIL_ABS(cond, t0)                              	    \
   do {                                                                  \
     while(!(cond) && RTIMER_CLOCK_LT(RTIMER_NOW(), t0));  							\
   } while(0)
-
+/*---------------------------------------------------------------------------*/
 static struct rtimer rt;
 
 #ifndef MIN
@@ -458,12 +405,12 @@ int cc2420_set_channel(int c);
 
 /* to get last packet timing information */
 extern volatile uint16_t cc2420_sfd_start_time;
-
+/*---------------------------------------------------------------------------*/
 static uint16_t
 get_sfd_start_time(void) {
 	return cc2420_sfd_start_time;
 }
-
+/*---------------------------------------------------------------------------*/
 static uint8_t
 hop_channel(uint8_t offset) {
 	uint8_t channel = 11 + (offset + ieee154e_vars.asn) % 16;
@@ -472,7 +419,7 @@ hop_channel(uint8_t offset) {
 	}
 	return 0;
 }
-
+/*---------------------------------------------------------------------------*/
 #define BROADCAST_CELL_ADDRESS ((uint16_t)(0xffff))
 
 const cell_t generic_shared_cell = {
@@ -507,166 +454,245 @@ const slotframe_t minimum_slotframe = {
 	minimum_cells
 };
 
-static slotframe_t * current_slotframe;
+//to initialize radio sfd counter and synchronize it with rtimer
+void cc2420_arch_sfd_sync(void);
 
-cell_t *
+//extern volatile uint16_t expected_rx_time;
+#include "cooja-debug.h"
+#include "dev/leds.h"
+
+static slotframe_t * current_slotframe;
+//remove msg[]
+#define MSG_LEN (127-10)
+static char msg[127];
+
+static volatile struct pt mpt;
+static volatile struct rtimer t;
+static volatile rtimer_clock_t start;
+#include "net/netstack.h"
+volatile unsigned char we_are_sending = 0;
+/*---------------------------------------------------------------------------*/
+static cell_t *
 get_cell(uint16_t timeslot) {
 	return (timeslot >= current_slotframe->on_size)	?
 			NULL :
 			current_slotframe->cells[timeslot];
 }
+/*---------------------------------------------------------------------------*/
+static uint16_t
+get_next_on_timeslot(uint16_t timeslot) {
+	return (timeslot >= current_slotframe->on_size)	?
+			0 :
+			timeslot+1;
+}
+/*---------------------------------------------------------------------------*/
+static char powercycle(struct rtimer *t, void *ptr);
+static void
+schedule_fixed(struct rtimer *t, rtimer_clock_t fixed_time)
+{
+  int r;
+	if(RTIMER_CLOCK_LT(fixed_time, RTIMER_NOW() + 1)) {
+		fixed_time = RTIMER_NOW() + 1;
+	}
 
-volatile unsigned char we_are_sending = 0;
-
+	r = rtimer_set(t, fixed_time, 1,
+								 (void (*)(struct rtimer *, void *))powercycle, NULL);
+	if(r != RTIMER_OK) {
+		PRINTF("schedule_powercycle: could not set rtimer\n");
+	}
+}
+/*---------------------------------------------------------------------------*/
 int
-timeslot_tx(cell_t * cell, const void * payload, unsigned short payload_len)
+timeslot_tx(struct rtimer *t, rtimer_clock_t start, const void * payload, unsigned short payload_len)
 {
 	//TODO There are small timing variations visible in cooja, which needs tuning
-	rtimer_clock_t start = RTIMER_NOW();
 	uint8_t is_broadcast =0, len, seqno;
 	uint16_t ack_sfd_time = 0;
 	rtimer_clock_t ack_sfd_rtime = 0;
 
-	if(cell == NULL) {
-		//off cell
-		off(keep_radio_on);
-		return MAC_TX_DEFERRED;
-	}
 	we_are_sending=1;
-	hop_channel(cell->channel_offset);
 
 	//XXX read seqno from payload not packetbuf!!
 	seqno = packetbuf_attr(PACKETBUF_ATTR_MAC_SEQNO);
+	if(!seqno) seqno++;
 	ieee154e_vars.dsn=seqno;
 	//prepare packet to send
 	uint8_t success = !NETSTACK_RADIO.prepare(payload, payload_len);
 	//delay before CCA
-	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsCCAOffset));
+	schedule_fixed(t, start +  TsCCAOffset);
+  PT_YIELD(&mpt);
+//	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsCCAOffset));
 	on();
 	//CCA
 	uint8_t cca_status=0;
 	BUSYWAIT_UNTIL_ABS(!(cca_status |= NETSTACK_RADIO.channel_clear()), start + TsCCAOffset + TsCCA);
 	off(keep_radio_on);
 	if(cca_status == 0) {
-		return MAC_TX_COLLISION;
-  }
-	//delay before TX
-	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset - delayTx));
-	//on();
-	//send
-	success = NETSTACK_RADIO.transmit(payload_len);
-	rtimer_clock_t tx_end_time = RTIMER_NOW();
-	off(keep_radio_on);
-	if(success != RADIO_TX_OK) {
-		//failed
+		success = RADIO_TX_COLLISION;
+  } else {
+		//delay before TX
+	//	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset - delayTx));
+		schedule_fixed(t, start +  TsTxOffset - delayTx);
+		PT_YIELD(&mpt);
+		//on();
+		//send
+		success = NETSTACK_RADIO.transmit(payload_len);
+		rtimer_clock_t tx_end_time = RTIMER_NOW();
+		off(keep_radio_on);
+		if(success == RADIO_TX_OK) {
+			//delay wait for ack: after tx
+		//	while(RTIMER_CLOCK_LT(RTIMER_NOW(), MIN(tx_end_time, start + TsTxOffset + wdDataDuration) + TsTxAckDelay - TsShortGT));
+			schedule_fixed(t, MIN(tx_end_time, start + TsTxOffset + wdDataDuration) + TsTxAckDelay - TsShortGT);
+			PT_YIELD(&mpt);
+			on();
+			//wait for detecting ACK
+			while(RTIMER_CLOCK_LT(RTIMER_NOW(), MIN(tx_end_time, start + TsTxOffset + wdDataDuration) + TsTxAckDelay + TsShortGT)) {
+				if(!is_broadcast && (NETSTACK_RADIO.receiving_packet() ||
+														 NETSTACK_RADIO.pending_packet() ||
+														 NETSTACK_RADIO.channel_clear() == 0)) {
+					uint8_t ackbuf[ACK_LEN];
+					ack_sfd_rtime = RTIMER_NOW();
+					ack_sfd_time = get_sfd_start_time();
+					while(RTIMER_CLOCK_LT(RTIMER_NOW(), ack_sfd_rtime + wdAckDuration)) { }
 
-		return MAC_TX_COLLISION;
-	}
-
-	//delay wait for ack: after tx
-	while(RTIMER_CLOCK_LT(RTIMER_NOW(), MIN(tx_end_time, start + TsTxOffset + wdDataDuration) + TsTxAckDelay - TsShortGT));
-	on();
-	//wait for detecting ACK
-	while(RTIMER_CLOCK_LT(RTIMER_NOW(), MIN(tx_end_time, start + TsTxOffset + wdDataDuration) + TsTxAckDelay + TsShortGT)) {
-		if(!is_broadcast && (NETSTACK_RADIO.receiving_packet() ||
-												 NETSTACK_RADIO.pending_packet() ||
-												 NETSTACK_RADIO.channel_clear() == 0)) {
-			uint8_t ackbuf[ACK_LEN];
-			ack_sfd_rtime = RTIMER_NOW();
-			ack_sfd_time = get_sfd_start_time();
-			while(RTIMER_CLOCK_LT(RTIMER_NOW(), ack_sfd_rtime + wdAckDuration)) { }
-
-			len = NETSTACK_RADIO.read(ackbuf, ACK_LEN);
-			if(len == ACK_LEN && seqno == ackbuf[2]) {
-				success = RADIO_TX_OK;
-				break;
-			} else {
-				success = RADIO_TX_NOACK;
-				break;
+					len = NETSTACK_RADIO.read(ackbuf, ACK_LEN);
+					if(len == ACK_LEN && seqno == ackbuf[2]) {
+						success = RADIO_TX_OK;
+						break;
+					} else {
+						success = RADIO_TX_NOACK;
+						break;
+					}
+				}
 			}
+			we_are_sending=0;
+			off(keep_radio_on);
 		}
   }
-	we_are_sending=0;
-	off(keep_radio_on);
+
 	if(success == RADIO_TX_NOACK) {
 		return MAC_TX_NOACK;
 	} else if(success == RADIO_TX_OK) {
 		//TODO synchronize using ack_sfd_rtime or ack_sfd_time
 		return MAC_TX_OK;
+	} else if(success == RADIO_TX_COLLISION ) {
+		return MAC_TX_COLLISION;
+	} else if( success == RADIO_TX_ERR ) {
+		return MAC_TX_ERR;
 	}
 	return MAC_TX_OK;
 }
-
-//to initialize radio sfd counter and synchronize it with rtimer
-void cc2420_arch_sfd_sync(void);
-
-//extern volatile uint16_t expected_rx_time;
-#include "cooja-debug.h"
-
+/*---------------------------------------------------------------------------*/
 int
-timeslot_rx(cell_t * cell, const void * payload, unsigned short payload_len)
+timeslot_rx(struct rtimer *t, rtimer_clock_t start, const void * payload, unsigned short payload_len)
 {
 	//TODO There are small timing variations visible in cooja, which needs tuning
-	rtimer_clock_t start = RTIMER_NOW();
 	uint8_t is_broadcast =0, len, seqno;
 	uint16_t ack_sfd_time = 0;
 	rtimer_clock_t ack_sfd_rtime = 0;
 
-	if(cell == NULL) {
-		//off cell
-		off(keep_radio_on);
-		return 0;
-	}
 	cc2420_arch_sfd_sync();
 
-	hop_channel(cell->channel_offset);
 	//wait before RX
-	while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset - TsLongGT));
+	schedule_fixed(t, start +  TsTxOffset - TsLongGT);
+  PT_YIELD(&mpt);
+  COOJA_DEBUG_STR("!RX on guard time");
+//while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset - TsLongGT));
 	//Start radio for at least guard time
 	on();
-//	COOJA_DEBUG_STR("RX on -TsLongGT");
-//	uint8_t cca_status=0;
-//	//Check if receiving within guard time
+	COOJA_DEBUG_STR("RX on -TsLongGT");
+	uint8_t cca_status=0;
+	//Check if receiving within guard time
+	schedule_fixed(t, start +  TsTxOffset + TsLongGT);
+  PT_YIELD(&mpt);
 //	BUSYWAIT_UNTIL_ABS(
 //			(cca_status=(
 //					NETSTACK_RADIO.channel_clear()
-//					//|| NETSTACK_RADIO.pending_packet()
+//					|| NETSTACK_RADIO.pending_packet()
 //					|| NETSTACK_RADIO.receiving_packet())
 //				),
 //				start + TsTxOffset + TsLongGT);
-//	if(!cca_status) {
-//		COOJA_DEBUG_STR("RX no packet in air\n");
-//		off(keep_radio_on);
-//		//no packets on air
-//		return 0;
-//	}
+	if(!(cca_status=(
+			NETSTACK_RADIO.channel_clear()
+			|| NETSTACK_RADIO.pending_packet()
+			|| NETSTACK_RADIO.receiving_packet()))) {
+		COOJA_DEBUG_STR("RX no packet in air\n");
+		off(keep_radio_on);
+		//no packets on air
+		return 0;
+	}
 	//wait until rx finishes
-//	BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(), start + TsTxOffset + wdDataDuration);
-//	rtimer_clock_t rx_end_time = RTIMER_NOW();
-	//prepare ack
-	//XXX ... in interrupt?
-	//off();
-	//wait until ask time comes
-	//BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(), rx_end_time + TsTxAckDelay);
-	//send ack
-
-	//off
-	//while(RTIMER_CLOCK_LT(RTIMER_NOW(), start + TsTxOffset + wdDataDuration + TsTxAckDelay + wdAckDuration));
-	//COOJA_DEBUG_STR("!RX TIME OUT");
-//	off(keep_radio_on);
-
+	schedule_fixed(t,
+			start + TsTxOffset + wdDataDuration + TsTxAckDelay + wdAckDuration);
+  PT_YIELD(&mpt);
+	COOJA_DEBUG_STR("!RX TIME OUT");
+	NETSTACK_RDC.off(keep_radio_on);
+	//XXX return length instead? or status? or something?
+	return 1;
 }
-
+/*---------------------------------------------------------------------------*/
 static char
-powercycle(struct rtimer *t, void *ptr) {
-/* if timeslot for tx, and we have a packet, call timeslot_tx
- * else if timeslot for rx, call timeslot_rx
- * otherwise, schedule next wakeup
- */
+powercycle(struct rtimer *t, void *ptr)
+{
+	/* if timeslot for tx, and we have a packet, call timeslot_tx
+	 * else if timeslot for rx, call timeslot_rx
+	 * otherwise, schedule next wakeup
+	 */
+  PT_BEGIN(&mpt);
+	static uint16_t timeslot = 0;
+	start = RTIMER_NOW();
+	//while MAC-RDC is not disabled, and while its synchronized
+	while (ieee154e_vars.is_sync && ieee154e_vars.state != TSCH_OFF) {
+		start += TsSlotDuration;
+		leds_on(LEDS_GREEN);
+		timeslot = ieee154e_vars.asn++ % current_slotframe->length;
+		cell_t * cell = get_cell(timeslot);
+		if(cell == NULL) {
+			//off cell
+			off(keep_radio_on);
+			//return MAC_TX_DEFERRED;
+		} else {
+			hop_channel(cell->channel_offset);
+			if(cell->link_options & LINK_OPTION_TX) {
+				timeslot_tx(t, start, msg, MSG_LEN);
+				if(cell->link_type == LINK_TYPE_ADVERTISING) {
 
-	uint16_t timeslot = ieee154e_vars.asn++ % current_slotframe->length;
-	cell_t * cell = get_cell(timeslot);
+				} else { //NORMAL unicast link
 
+				}
+			} else if(cell->link_options & LINK_OPTION_RX){
+				timeslot_rx(t, start, msg, MSG_LEN);
+				if(cell->link_options & LINK_OPTION_TIME_KEEPING) {
+
+				}
+			}
+		}
+		uint16_t next_timeslot = get_next_on_timeslot(timeslot);
+		if(next_timeslot) {
+			schedule_fixed(t, start + (next_timeslot-timeslot) * TsSlotDuration);
+		} else {
+			schedule_fixed(t, start + (current_slotframe->length-1) * TsSlotDuration);
+		}
+		leds_off(LEDS_GREEN);
+		PT_YIELD(&mpt);
+	}
+  PT_END(&mpt);
+}
+/*---------------------------------------------------------------------------*/
+static void
+associate(void)
+{
+	/* TODO Synchronize
+	 * If we are a master, start right away
+	 * otherwise, wait for EBs to associate with a master
+	 */
+
+	//for now assume we are in sync
+	ieee154e_vars.is_sync=1;
+	//something other than 0 for now
+	ieee154e_vars.state = TSCH_ASSOCIATED;
+	start = RTIMER_NOW();
+	schedule_fixed(&t, start + TsSlotDuration);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -674,13 +700,13 @@ init(void)
 {
 	current_slotframe = &minimum_slotframe;
 	ieee154e_vars.asn=0;
-	ieee154e_vars.capturedTime=0;
+	ieee154e_vars.captured_time=0;
 	ieee154e_vars.dsn=0;
-	ieee154e_vars.isSync=0;
+	ieee154e_vars.is_sync=0;
 	ieee154e_vars.state = 0;
-	ieee154e_vars.syncTimeout = 0; //30sec/slotDuration - (asn-asn0)*slotDuration
+	ieee154e_vars.sync_timeout = 0; //30sec/slotDuration - (asn-asn0)*slotDuration
 	//schedule next wakeup? or leave for higher layer to decide? i.e, scan, ...
-  //on();
+	associate();
 }
 /*---------------------------------------------------------------------------*/
 const struct rdc_driver tschrdc_driver = {
