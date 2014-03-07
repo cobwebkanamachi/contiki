@@ -22,10 +22,11 @@ typedef struct {
 //    - duration_in_seconds = ticks / 32768
 
 //XXX check these numbers on real hw or cooja
+//164*3 as PORT_TsSlotDuration causes 147.9448us drift every slotframe ==4.51 ticks
 // 15000us
-#define PORT_TsSlotDuration (131*4)
-//   500us
-#define PORT_maxTxDataPrepare (16)
+#define PORT_TsSlotDuration (164*3)
+//   600us
+#define PORT_maxTxDataPrepare (19)
 //   500us
 #define PORT_maxRxAckPrepare (16)
 //   500us
@@ -47,7 +48,7 @@ enum ieee154e_atomicdurations_enum {
 	TsLongGT = 43,                  //  1300us
 	TsTxAckDelay = 131,                  //  4000us
 	TsShortGT = 16,                  //   500us
-	TsSlotDuration = PORT_TsSlotDuration,  // 16000us
+	TsSlotDuration = PORT_TsSlotDuration,  // 15000us
 	// execution speed related
 	maxTxDataPrepare = PORT_maxTxDataPrepare,
 	maxRxAckPrepare = PORT_maxRxAckPrepare,
@@ -58,8 +59,8 @@ enum ieee154e_atomicdurations_enum {
 	delayRx = PORT_delayRx,         // between GO signal and start listening
 	// radio watchdog
 	wdRadioTx = 33,                  //  1000us (needs to be >delayTx)
-	wdDataDuration = 164,            //  5000us (measured 4280us with max payload)
-	wdAckDuration = 66,                  //  2000us (measured 1000us me: 440us)
+	wdDataDuration = 148,            //  4500us (measured 4280us with max payload)
+	wdAckDuration = 25,                  //  750us (measured 1000us me: 440us)
 };
 
 enum ieee154e_states_enum {

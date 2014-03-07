@@ -122,6 +122,7 @@ void watchdog_periodic(void);
 PROCESS(hello_world_process, "Hello world process");
 AUTOSTART_PROCESSES(&hello_world_process);
 /*---------------------------------------------------------------------------*/
+#include "net/packetbuf.h"
 #include "net/mac/framer-802154.c"
 extern const struct framer framer_802154;
 void* perpare_raw(rimeaddr_t addr, char* msg, uint8_t len) {
@@ -129,11 +130,13 @@ void* perpare_raw(rimeaddr_t addr, char* msg, uint8_t len) {
   packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, &addr);
   packetbuf_set_addr(PACKETBUF_ADDR_SENDER, &rimeaddr_node_addr);
   packetbuf_set_attr(PACKETBUF_ATTR_RELIABLE, 1);
-  packetbuf_set_attr(PACKETBUF_ATTR_ERELIABLE, 1);
+//  packetbuf_set_attr(PACKETBUF_ATTR_ERELIABLE, 1);
   framer_802154.create();
-  packetbuf_compact();
+//  packetbuf_compact();
   //set ack req in fcf
-  //((uint8_t*)packetbuf_dataptr())[0] |= (1 << 5)| 4; //4 == FRAME802154_DATAFRAME
+  ((uint8_t*)packetbuf_hdrptr())[0] |= (1 << 5) | 1; //4 == FRAME802154_DATAFRAME
+//  ((uint8_t*)packetbuf_dataptr())[0] = (1 << 5)| 4; //4 == FRAME802154_DATAFRAME
+
   return packetbuf_hdrptr();
 }
 
@@ -144,20 +147,21 @@ static struct rtimer t;
 static volatile rtimer_clock_t start;
 #include "net/netstack.h"
 
-#include "net/packetbuf.h"
 PROCESS_THREAD(hello_world_process, ev, data)
 {
   PROCESS_BEGIN();
   COOJA_DEBUG_STR("COOJA_DEBUG_STR hello_world_process\n");
   sprintf(msg, "Hello, world\n");
-  static rtimer_clock_t start;
 	static rimeaddr_t addr;
 	addr.u8[0] = 1;
 	addr.u8[1] = 0;
 
-	memcpy(msg, perpare_raw(addr, msg, MSG_LEN), 127);
-	start = RTIMER_NOW();
-
+	if(rimeaddr_node_addr.u8[0] %2 == 0) {
+		memcpy(msg, perpare_raw(addr, msg, MSG_LEN), 127);
+		NETSTACK_RDC.send(NULL, msg);
+	}
+	void tsch_associate(void);
+	tsch_associate();
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
