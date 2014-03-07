@@ -703,6 +703,7 @@ powercycle(struct rtimer *t, void *ptr)
 						current_slotframe->length - timeslot;
 		start += dt * TsSlotDuration;
 		COOJA_DEBUG_STR("Schedule next ON slot");
+		//XXX correct on timeslot boundaries
 		if(!next_timeslot) {
 			COOJA_DEBUG_STR("New slot frame");
 			start-=5;

@@ -868,7 +868,7 @@ PROCESS_THREAD(cc2420_process, ev, data)
 #endif /* CC2420_TIMETABLE_PROFILING */
     
     PRINTF("cc2420_process: calling receiver callback\n");
-  	COOJA_DEBUG_STR("cc2420_interrupt\n");
+  	COOJA_DEBUG_STR("cc2420_process: calling receiver callback\n");
 
     if(need_flush) {
       need_flush = 0;
