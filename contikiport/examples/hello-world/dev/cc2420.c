@@ -55,6 +55,7 @@
 #include "lib/list.h"
 
 #include "cooja-debug.h"
+#include "tsch-parameters.h"
 
 volatile int need_flush=0;
 
@@ -656,13 +657,6 @@ TIMETABLE(cc2420_timetable);
 TIMETABLE_AGGREGATE(aggregate_time, 10);
 #endif /* CC2420_TIMETABLE_PROFILING */
 
-struct received_frame_s {
-  struct received_frame_s *next;
-  uint8_t buf[CC2420_MAX_PACKET_LEN];
-  uint8_t len;
-  uint8_t acked;
-  uint8_t seqno;
-};
 MEMB(rf_memb, struct received_frame_s, 4);
 LIST(rf_list);
 
@@ -697,8 +691,8 @@ cc2420_arch_sfd_sync(void)
   TBR = cell_start_time;
 }
 /*---------------------------------------------------------------------------*/
-#include "tsch-parameters.h"
-struct received_frame_s *last_rf;
+volatile struct received_frame_s *last_rf;
+volatile rtimer_clock_t rx_end_time;
 int
 cc2420_interrupt(void)
 {
@@ -803,7 +797,9 @@ cc2420_interrupt(void)
   }
 	COOJA_DEBUG_STR("end CC2420_SFD_IS_1");
 
-  rtimer_clock_t rx_end_time = RTIMER_NOW();
+  rx_end_time = RTIMER_NOW();
+  off();
+
   int overflow = CC2420_FIFOP_IS_1 && !CC2420_FIFO_IS_1;
   CC2420_READ_RAM_BYTE(footer1, RXFIFO_ADDR(len + AUX_LEN));
 
@@ -814,12 +810,12 @@ cc2420_interrupt(void)
     	CC2420_READ_FIFO_BUF(rf->buf+ len_a, len_b);
     }
     if(do_ack) {
-    	COOJA_DEBUG_STR("wait for ack time");
-    	/* wait until ack time comes */
-    	while(RTIMER_CLOCK_LT(RTIMER_NOW(), rx_end_time + TsTxAckDelay-delayTx+1));
-    	COOJA_DEBUG_STR("Send ACK");
-    	strobe(CC2420_STXON); /* Send ACK */
-    	off();
+//    	COOJA_DEBUG_STR("wait for ack time");
+//    	/* wait until ack time comes */
+//    	while(RTIMER_CLOCK_LT(RTIMER_NOW(), rx_end_time + TsTxAckDelay-delayTx+1));
+//    	COOJA_DEBUG_STR("Send ACK");
+//    	strobe(CC2420_STXON); /* Send ACK */
+//    	off();
     	rf->acked = 1;
       //CC2420_STROBE(CC2420_SFLUSHTX); /* Flush Tx fifo */
     }
@@ -833,7 +829,6 @@ cc2420_interrupt(void)
     list_chop(rf_list);
     memb_free(&rf_memb, rf);
   }
-  off();
 
   if(frame_valid && do_ack) {
     last_acked = seqno;

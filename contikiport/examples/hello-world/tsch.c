@@ -669,12 +669,27 @@ powercycle(struct rtimer *t, void *ptr)
 					} else {
 						//wait until rx finishes
 						schedule_fixed(t,
-								start + TsTxOffset + wdDataDuration + TsTxAckDelay
-										+ TsShortGT + wdAckDuration);
+								start + TsTxOffset + wdDataDuration);
 						COOJA_DEBUG_STR("Wait until RX is done");
 						PT_YIELD(&mpt);
-						COOJA_DEBUG_STR("!RX TIME OUT");
-						NETSTACK_RDC.off(keep_radio_on);
+						//    	while(RTIMER_CLOCK_LT(RTIMER_NOW(), rx_end_time + TsTxAckDelay-delayTx+1));
+						//wait until ack time
+						extern volatile struct received_frame_s *last_rf;
+						extern volatile rtimer_clock_t rx_end_time;
+						if(last_rf!=NULL && last_rf->acked) {
+							schedule_fixed(t, rx_end_time + TsTxAckDelay-delayTx+1);
+							COOJA_DEBUG_STR("Wait until ack time (in tsch)");
+							PT_YIELD(&mpt);
+							void send_ack(void);
+							send_ack();
+						}
+//						schedule_fixed(t,
+//								start + TsTxOffset + wdDataDuration + TsTxAckDelay
+//										+ TsShortGT + wdAckDuration);
+//						COOJA_DEBUG_STR("Wait until ACK is done");
+//						PT_YIELD(&mpt);
+//						COOJA_DEBUG_STR("!RX TIME OUT");
+//						NETSTACK_RDC.off(keep_radio_on);
 						//XXX return length instead? or status? or something?
 						ret = 1;
 					}

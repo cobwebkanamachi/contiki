@@ -110,4 +110,12 @@ typedef struct {
 	uint16_t on_size;
 	cell_t ** cells;
 } slotframe_t;
+#define TSCH_MAX_PACKET_LEN 127
+struct received_frame_s {
+  struct received_frame_s *next;
+  uint8_t buf[TSCH_MAX_PACKET_LEN];
+  uint8_t len;
+  uint8_t acked;
+  uint8_t seqno;
+};
 #endif /* __TSCH_PARAMETERS_H__ */
