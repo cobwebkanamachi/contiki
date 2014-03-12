@@ -605,7 +605,7 @@ powercycle(struct rtimer *t, void *ptr)
 	while (ieee154e_vars.is_sync && ieee154e_vars.state != TSCH_OFF) {
 		COOJA_DEBUG_STR("Cell start\n");
 //		putchar('o');putchar('\n');
-//		leds_on(LEDS_GREEN);
+		leds_on(LEDS_GREEN);
 		cell = get_cell(timeslot);
 		if (cell == NULL || working_on_queue) {
 			COOJA_DEBUG_STR("Off cell\n");
@@ -614,10 +614,11 @@ powercycle(struct rtimer *t, void *ptr)
 			//return MAC_TX_DEFERRED;
 		} else {
 			hop_channel(cell->channel_offset);
+			struct TSCH_packet* p = NULL;
 			if (cell->link_options & LINK_OPTION_TX ) {
 
 				//is there a packet to send? if not check if it is RX too
-				struct TSCH_packet* p = NULL;
+
 				struct neighbor_queue *n = list_head(neighbor_list);
 
 				if (cell->link_type == LINK_TYPE_ADVERTISING) {
@@ -632,8 +633,9 @@ powercycle(struct rtimer *t, void *ptr)
 						n = list_item_next(n);
 					}
 				}
+			}
 				//Is there a packet to send?
-				if (p != NULL ) {
+				if (cell->link_options & LINK_OPTION_TX && p != NULL) {
 
 				//timeslot_tx(t, start, msg, MSG_LEN);
 				{
@@ -753,8 +755,7 @@ powercycle(struct rtimer *t, void *ptr)
 					//mac_call_sent_callback(p->sent, p->ptr, ret, p->transmissions);
 				}
 
-				}
-			} else if (cell->link_options & LINK_OPTION_RX) {
+				} else if (cell->link_options & LINK_OPTION_RX) {
 //				timeslot_rx(t, start, msg, MSG_LEN);
 //				timeslot_rx(struct rtimer *t, rtimer_clock_t start, const void * payload, unsigned short payload_len)
 				if (cell->link_options & LINK_OPTION_TIME_KEEPING) {
@@ -788,13 +789,11 @@ powercycle(struct rtimer *t, void *ptr)
 					schedule_fixed(t, start + TsTxOffset + TsLongGT, TsTxOffset + TsLongGT);
 					PT_YIELD(&mpt);
 					COOJA_DEBUG_STR("RX on +TsLongGT");
-					if(NETSTACK_RADIO.channel_clear()) {COOJA_DEBUG_STR("NETSTACK_RADIO.channel_clear()");}
-					if(NETSTACK_RADIO.pending_packet()) {COOJA_DEBUG_STR("NETSTACK_RADIO.pending_packet()");}
-					if(NETSTACK_RADIO.receiving_packet()) {COOJA_DEBUG_STR("NETSTACK_RADIO.receiving_packet()");}
 
-					if (!(cca_status |= (
-					!NETSTACK_RADIO.channel_clear() || NETSTACK_RADIO.pending_packet()
-							|| NETSTACK_RADIO.receiving_packet()))) {
+					if (!cca_status
+							|| NETSTACK_RADIO.pending_packet()
+							|| !NETSTACK_RADIO.channel_clear()
+							|| NETSTACK_RADIO.receiving_packet() ) {
 						COOJA_DEBUG_STR("RX no packet in air\n");
 						off(keep_radio_on);
 						//no packets on air
@@ -858,7 +857,7 @@ powercycle(struct rtimer *t, void *ptr)
 		timeslot = next_timeslot;
 		ieee154e_vars.asn += dt;
 		schedule_fixed(t, start, duration);
-//		leds_off(LEDS_GREEN);
+		leds_off(LEDS_GREEN);
 		PT_YIELD(&mpt);
 	}
 	COOJA_DEBUG_STR("TSCH is OFF!!");
