@@ -37,7 +37,6 @@
  *         Beshr Al Nahas <beshr@sics.se>
  */
 #include "contiki.h"
-
 #include "contiki-conf.h"
 #include "tsch.h"
 #include "net/packetbuf.h"
@@ -47,9 +46,10 @@
 #include <string.h>
 #include "sys/rtimer.h"
 #include "cooja-debug.h"
+#include "lib/list.h"
+#include "lib/memb.h"
 
-volatile ieee154e_vars_t ieee154e_vars;
-static volatile char* tx_msg = NULL;
+static volatile ieee154e_vars_t ieee154e_vars;
 
 #define ACK_LEN 3
 #define EXTRA_ACK_LEN 4
@@ -125,142 +125,227 @@ struct seqno {
 static struct seqno received_seqnos[MAX_SEQNOS];
 #endif /* TSCH_802154_AUTOACK || TSCH_802154_AUTOACK_HW */
 
+// variable to protect queue structure
+volatile uint8_t working_on_queue;
+
+#define MAX_NUM_PKT 8 // POWER OF 2
+#define MAX_NEIGHBOR 16
+#define macMinBE 3
+#define macMaxFrameRetries 4
+
+// TSCH PACKET STRUCTURE
+struct TSCH_packet
+{
+	struct queuebuf * pkt; // pointer to the packet to be sent
+	uint8_t transmissions; // #transmissions performed for this packet
+	mac_callback_t sent; // callback for this packet
+	void *ptr; //??
+};
+
+// NEIGHBOR QUEUE STRUCTURE
+struct neighbor_queue
+{
+	struct neighbor_queue *next; // pointer to next neighbor
+	rimeaddr_t addr; // neighbor address
+	uint8_t BE_value; // current value of backoff exponent for this neighbor
+	struct TSCH_packet buffer[MAX_NUM_PKT]; // circular buffer of packets for this neighbor
+	uint8_t put_ptr, get_ptr, mask; // data-structures for circular buffer
+};
+
+// DECLARATION OF THE LIST OF NEIGHBORS
+MEMB(neighbor_memb, struct neighbor_queue, MAX_NEIGHBOR);
+LIST(neighbor_list);
+
+// PROTOTYPES
+struct neighbor_queue *
+neighbor_queue_from_addr(const rimeaddr_t *addr);
+int
+add_queue(const rimeaddr_t *addr);
+int
+remove_queue(const rimeaddr_t *addr);
+int
+add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr);
+int
+remove_packet_from_queue(const rimeaddr_t *addr);
+struct TSCH_packet*
+read_packet_from_queue(const rimeaddr_t *addr);
+static void
+tsch_timer(void *ptr);
+
+// This function returns a pointer to the queue of neighbor whose address is equal to addr
+
+struct neighbor_queue *
+neighbor_queue_from_addr(const rimeaddr_t *addr)
+{
+	struct neighbor_queue *n = list_head(neighbor_list);
+	while (n != NULL) {
+		if (rimeaddr_cmp(&n->addr, addr)) {
+			return n;
+		}
+		n = list_item_next(n);
+	}
+	return NULL;
+}
+
+// This function adds one queue for neighbor whose address is equal to addr
+// uses working_on_queue to protect data-structures from race conditions
+// return 1 ok, 0 failed to allocate
+
+int
+add_queue(const rimeaddr_t *addr)
+{
+	working_on_queue = 1;
+	struct neighbor_queue *n;
+	int i;
+	n = memb_alloc(&neighbor_memb);
+	if (n != NULL) {
+		/* Init neighbor entry */
+		rimeaddr_copy(&n->addr, addr);
+		n->BE_value = macMinBE;
+		n->put_ptr = 0;
+		n->get_ptr = 0;
+		n->mask = MAX_NUM_PKT - 1;
+		for (i = 0; i < MAX_NUM_PKT; i++) {
+			n->buffer[i].pkt = 0;
+			n->buffer[i].transmissions = 0;
+		}
+		list_add(neighbor_list, n);
+		working_on_queue = 0;
+		//PRINTF("ADD QUEUE %d\n", addr);
+		return 1;
+	}
+	working_on_queue = 0;
+	return 0;
+}
+
+// This function remove the queue of neighbor whose address is equal to addr
+// uses working_on_queue to protect data-structures from race conditions
+// return 1 ok, 0 failed to find the queue
+
+int
+remove_queue(const rimeaddr_t *addr)
+{
+	working_on_queue = 1;
+	int i;
+	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
+	if (n != NULL) {
+		for (i = 0; i < MAX_NUM_PKT; i++) {      // free packets of neighbor
+			queuebuf_free(n->buffer[i].pkt);
+		}
+		list_remove(neighbor_list, n); // free queue of neighbor
+		memb_free(&neighbor_memb, n);
+		working_on_queue = 0;
+		return 1;
+	}
+	working_on_queue = 0;
+	return 0;
+}
+
+// This function adds one packet to the queue of neighbor whose address is addr
+// return 1 ok, 0 failed to allocate
+// the packet to be inserted is in packetbuf
+int
+add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
+{
+	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
+	if (n != NULL) {
+		if (((n->put_ptr - n->get_ptr) & n->mask) == n->mask) {
+			return 0;
+		}
+		n->buffer[n->put_ptr].pkt = queuebuf_new_from_packetbuf(); // create new packet from packetbuf
+		void *p = queuebuf_dataptr(n->buffer[n->put_ptr].pkt);
+
+		n->buffer[n->put_ptr].sent = sent;
+		n->buffer[n->put_ptr].ptr = ptr;
+		n->put_ptr = (n->put_ptr + 1) & n->mask;
+		return 1;
+	}
+	return 0;
+}
+
+// This function removes the head-packet of the queue of neighbor whose address is addr
+// return 1 ok, 0 failed
+// remove one packet from the queue
+int
+remove_packet_from_queue(const rimeaddr_t *addr)
+{
+//COOJA_DEBUG_STR("CHIAMATO RIMOSSO\n");
+	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
+	if (n != NULL) {
+		//COOJA_DEBUG_STR("ENTRATO \n");
+
+		if (((n->put_ptr - n->get_ptr) & n->mask) > 0) {
+			queuebuf_free(n->buffer[n->get_ptr].pkt);
+			n->get_ptr = (n->get_ptr + 1) & n->mask;
+			//COOJA_DEBUG_STR("RIMOSSO FRAME\n");
+			return 1;
+		} else {
+			//COOJA_DEBUG_STR("QUA1\n");
+			return 0;
+		}
+	}
+//COOJA_DEBUG_STR("QUA2\n");
+	return 0;
+}
+
+// This function returns the first packet in the queue of neighbor whose address is addr
+struct TSCH_packet*
+read_packet_from_queue(const rimeaddr_t *addr)
+{
+	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
+	if (n != NULL) {
+		if (((n->put_ptr - n->get_ptr) & n->mask) > 0) {
+			return &(n->buffer[n->get_ptr]);
+		} else {
+			return 0;
+		}
+	}
+	return 0;
+}
 /*---------------------------------------------------------------------------*/
+// Function send for TSCH-MAC, puts the packet in packetbuf in the MAC queue
 static int
 send_one_packet(mac_callback_t sent, void *ptr)
 {
-	int ret;
-	int last_sent_ok = 0;
+	//send_one_packet(sent, ptr);
+	//COOJA_DEBUG_STR("SEND TSCH\n");
+		struct neighbor_queue *n;
+		uint16_t seqno;
+		const rimeaddr_t *addr = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
+		/* PACKETBUF_ATTR_MAC_SEQNO cannot be zero, due to a pecuilarity
+		 in framer-802154.c. */
+		seqno =
+				(++ieee154e_vars.dsn) ? ieee154e_vars.dsn :
+						++ieee154e_vars.dsn;
 
-	packetbuf_set_addr(PACKETBUF_ADDR_SENDER, &rimeaddr_node_addr);
-#if TSCH_802154_AUTOACK || TSCH_802154_AUTOACK_HW
-	packetbuf_set_attr(PACKETBUF_ATTR_MAC_ACK, 1);
-#endif /* TSCH_802154_AUTOACK || TSCH_802154_AUTOACK_HW */
+		packetbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, seqno);
+		if (NETSTACK_FRAMER.create() < 0) {
+			return 0;
+		}
 
-	if (NETSTACK_FRAMER.create() < 0) {
-		/* Failed to allocate space for headers */
-		PRINTF("nullrdc: send failed, too large header\n");
-		ret = MAC_TX_ERR_FATAL;
-	} else {
-
-#ifdef NETSTACK_ENCRYPT
-		NETSTACK_ENCRYPT();
-#endif /* NETSTACK_ENCRYPT */
-
-#if TSCH_802154_AUTOACK
-		int is_broadcast;
-		uint8_t dsn;
-		dsn = ((uint8_t *)packetbuf_hdrptr())[2] & 0xff;
-
-		NETSTACK_RADIO.prepare(packetbuf_hdrptr(), packetbuf_totlen());
-
-		is_broadcast = rimeaddr_cmp(packetbuf_addr(PACKETBUF_ADDR_RECEIVER),
-				&rimeaddr_null);
-
-		if(NETSTACK_RADIO.receiving_packet() ||
-				(!is_broadcast && NETSTACK_RADIO.pending_packet())) {
-
-			/* Currently receiving a packet over air or the radio has
-			 already received a packet that needs to be read before
-			 sending with auto ack. */
-			ret = MAC_TX_COLLISION;
+		/* Look for the neighbor entry */
+		n = neighbor_queue_from_addr(addr);
+		if (n == NULL) {
+			//add new neighbor to list of neighbors
+			//COOJA_DEBUG_STR("AGGIUNTA CODA\n");
+			if (!add_queue(addr))
+				return 0;
+			//COOJA_DEBUG_STR("AGGIUNTA PACCHETTO\n");
+			//add new packet to neighbor list
+			if (!add_packet_to_queue(sent, ptr, addr))
+				return 0;
 		} else {
-			if(!is_broadcast) {
-				RIMESTATS_ADD(reliabletx);
-			}
-
-			switch(NETSTACK_RADIO.transmit(packetbuf_totlen())) {
-				case RADIO_TX_OK:
-				if(is_broadcast) {
-					ret = MAC_TX_OK;
-				} else {
-					rtimer_clock_t wt;
-
-					/* Check for ack */
-					wt = RTIMER_NOW();
-					watchdog_periodic();
-					while(RTIMER_CLOCK_LT(RTIMER_NOW(), wt + ACK_WAIT_TIME)) {
-#if CONTIKI_TARGET_COOJA
-						simProcessRunValue = 1;
-						cooja_mt_yield();
-#endif /* CONTIKI_TARGET_COOJA */
-					}
-
-					ret = MAC_TX_NOACK;
-					if(NETSTACK_RADIO.receiving_packet() ||
-							NETSTACK_RADIO.pending_packet() ||
-							NETSTACK_RADIO.channel_clear() == 0) {
-						int len;
-						uint8_t ackbuf[ACK_LEN];
-
-						if(AFTER_ACK_DETECTED_WAIT_TIME > 0) {
-							wt = RTIMER_NOW();
-							watchdog_periodic();
-							while(RTIMER_CLOCK_LT(RTIMER_NOW(),
-											wt + AFTER_ACK_DETECTED_WAIT_TIME)) {
-#if CONTIKI_TARGET_COOJA
-								simProcessRunValue = 1;
-								cooja_mt_yield();
-#endif /* CONTIKI_TARGET_COOJA */
-							}
-						}
-
-						if(NETSTACK_RADIO.pending_packet()) {
-							len = NETSTACK_RADIO.read(ackbuf, ACK_LEN);
-							if(len == ACK_LEN && ackbuf[2] == dsn) {
-								/* Ack received */
-								RIMESTATS_ADD(ackrx);
-								ret = MAC_TX_OK;
-							} else {
-								/* Not an ack or ack not for us: collision */
-								ret = MAC_TX_COLLISION;
-							}
-						}
-					} else {
-						PRINTF("nullrdc tx noack\n");
-					}
-				}
-				break;
-				case RADIO_TX_COLLISION:
-				ret = MAC_TX_COLLISION;
-				break;
-				default:
-				ret = MAC_TX_ERR;
-				break;
-			}
+			//add new packet to neighbor list
+			//COOJA_DEBUG_STR("AGGIUNTA PACCHETTO\n");
+			if (!add_packet_to_queue(sent, ptr, addr))
+				return 0;
 		}
-
-#else /* ! TSCH_802154_AUTOACK */
-
-		switch (NETSTACK_RADIO.send(packetbuf_hdrptr(), packetbuf_totlen())) {
-		case RADIO_TX_OK:
-			ret = MAC_TX_OK;
-			break;
-		case RADIO_TX_COLLISION:
-			ret = MAC_TX_COLLISION;
-			break;
-		case RADIO_TX_NOACK:
-			ret = MAC_TX_NOACK;
-			break;
-		default:
-			ret = MAC_TX_ERR;
-			break;
-		}
-
-#endif /* ! TSCH_802154_AUTOACK */
-	}
-	if (ret == MAC_TX_OK) {
-		last_sent_ok = 1;
-	}
-	mac_call_sent_callback(sent, ptr, ret, 1);
-	return last_sent_ok;
+		return 1;
 }
 /*---------------------------------------------------------------------------*/
 static void
-send_packet(mac_callback_t sent, void *ptr)
-{
-	tx_msg = ptr;
-	//send_one_packet(sent, ptr);
+send_packet(mac_callback_t sent, void *ptr) {
+	send_one_packet(sent, ptr);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -360,7 +445,7 @@ packet_input(void)
 		}
 #endif /* TSCH_SEND_ACK */
 		if (!duplicate) {
-			//NETSTACK_MAC.input();
+			NETSTACK_MAC.input();
 			COOJA_DEBUG_STR("tsch packet_input, Not duplicate\n");
 
 		}
@@ -430,7 +515,7 @@ hop_channel(uint8_t offset)
 	return 0;
 }
 /*---------------------------------------------------------------------------*/
-#define BROADCAST_CELL_ADDRESS ((uint16_t)(0xffff))
+#define BROADCAST_CELL_ADDRESS { { 0, 0 } }
 
 const cell_t generic_shared_cell = {
 BROADCAST_CELL_ADDRESS, 0, LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
@@ -454,9 +539,6 @@ cc2420_arch_sfd_sync(void);
 #include "dev/leds.h"
 
 static slotframe_t const * current_slotframe;
-//remove msg[]
-#define MSG_LEN (127-2)
-static char msg[127];
 
 static volatile struct pt mpt;
 static volatile struct rtimer t;
@@ -477,7 +559,7 @@ get_next_on_timeslot(uint16_t timeslot)
 	return (timeslot >= current_slotframe->on_size-1) ? 0 : timeslot + 1;
 }
 /*---------------------------------------------------------------------------*/
-static void
+static int
 powercycle(struct rtimer *t, void *ptr);
 static void
 schedule_fixed(struct rtimer *t, rtimer_clock_t fixed_time, rtimer_clock_t duration)
@@ -508,7 +590,7 @@ int tsch_resume_powercycle() {
 /*---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------*/
-static void
+static int
 powercycle(struct rtimer *t, void *ptr)
 {
 	/* if timeslot for tx, and we have a packet, call timeslot_tx
@@ -525,32 +607,51 @@ powercycle(struct rtimer *t, void *ptr)
 //		putchar('o');putchar('\n');
 //		leds_on(LEDS_GREEN);
 		cell = get_cell(timeslot);
-		if (cell == NULL) {
+		if (cell == NULL || working_on_queue) {
 			COOJA_DEBUG_STR("Off cell\n");
 			//off cell
 			off(keep_radio_on);
 			//return MAC_TX_DEFERRED;
 		} else {
 			hop_channel(cell->channel_offset);
-			if (cell->link_options & LINK_OPTION_TX && tx_msg != NULL) {
+			if (cell->link_options & LINK_OPTION_TX ) {
+
+				//is there a packet to send? if not check if it is RX too
+				struct TSCH_packet* p = NULL;
+				struct neighbor_queue *n = list_head(neighbor_list);
+
+				if (cell->link_type == LINK_TYPE_ADVERTISING) {
+				//TODO fetch adv packets
+				} else { //NORMAL unicast link
+				//TODO use neighbor table / map
+					while (n != NULL) {
+						if (rimeaddr_cmp(&n->addr, &cell->node_address)) {
+							p = read_packet_from_queue(&n->addr);
+							break;
+						}
+						n = list_item_next(n);
+					}
+				}
+				//Is there a packet to send?
+				if (p != NULL ) {
+
 				//timeslot_tx(t, start, msg, MSG_LEN);
 				{
-					const void * payload = tx_msg;
-					const unsigned short payload_len = MSG_LEN;
-
+					const void * payload = queuebuf_dataptr(p->pkt);
+					const unsigned short payload_len = queuebuf_datalen(p->pkt);
 					//TODO There are small timing variations visible in cooja, which needs tuning
 					static uint8_t is_broadcast = 0, len, seqno, ret;
 					uint16_t ack_sfd_time = 0;
 					rtimer_clock_t ack_sfd_rtime = 0;
-
+					is_broadcast = rimeaddr_cmp(&cell->node_address, &rimeaddr_null);
 					we_are_sending = 1;
 					char* payload_ptr = payload;
-					//0 is not allowed according to the old standard I think
-					seqno = (++ieee154e_vars.dsn) ? ieee154e_vars.dsn : ++ieee154e_vars.dsn;
-					payload_ptr[2] = seqno;
-					//XXX read seqno from payload not packetbuf!!
-//					seqno = packetbuf_attr(PACKETBUF_ATTR_MAC_SEQNO);
-//					ieee154e_vars.dsn = seqno;
+//					//0 is not allowed according to the old standard I think
+//					seqno = (++ieee154e_vars.dsn) ? ieee154e_vars.dsn : ++ieee154e_vars.dsn;
+//					payload_ptr[2] = seqno;
+					// read seqno from payload!
+					seqno = payload_ptr[2];
+
 					//prepare packet to send
 					COOJA_DEBUG_STR("prepare tx\n");
 					uint8_t success = !NETSTACK_RADIO.prepare(payload, payload_len);
@@ -578,39 +679,43 @@ powercycle(struct rtimer *t, void *ptr)
 						tx_time = (110*payload_len)/10; //110*payload_len/10=32768*337*payload_len/1000000; //sec
 
 						if (success == RADIO_TX_OK) {
-							//delay wait for ack: after tx
-							schedule_fixed(t,
-									start + TsTxOffset + MIN(tx_time, wdDataDuration)
-											+ TsTxAckDelay - TsShortGT, TsTxOffset + MIN(tx_time, wdDataDuration)
-											+ TsTxAckDelay - TsShortGT);
-							PT_YIELD(&mpt);
-							on();
-							//wait for detecting ACK
-							BUSYWAIT_UNTIL_ABS(
-									(cca_status = !is_broadcast && (NETSTACK_RADIO.receiving_packet() || NETSTACK_RADIO.pending_packet() || NETSTACK_RADIO.channel_clear() == 0)),
-									start + TsTxOffset + MIN(tx_time, wdDataDuration) + TsTxAckDelay + TsShortGT);
-							if (cca_status) {
-								COOJA_DEBUG_STR("ACK detected\n");
-								uint8_t ackbuf[ACK_LEN + EXTRA_ACK_LEN];
-								ack_sfd_rtime = RTIMER_NOW();
-								ack_sfd_time = get_sfd_start_time();
-
-								schedule_fixed(t, ack_sfd_rtime + wdAckDuration, wdAckDuration);
-								PT_YIELD(&mpt);
-
-								len = NETSTACK_RADIO.read(ackbuf, ACK_LEN + EXTRA_ACK_LEN);
-
-								if ((len == ACK_LEN + EXTRA_ACK_LEN) && seqno == ackbuf[2]) {
-									//TODO get timing information
-									success = RADIO_TX_OK;
-									COOJA_DEBUG_STR("ACK ok\n");
-								} else {
-									success = RADIO_TX_NOACK;
-									COOJA_DEBUG_STR("ACK not ok!\n");
-//									COOJA_DEBUG_PRINTF("%u: %x, %x, %x ?= %x, %x, %x, %x, %x\n", len, ackbuf[0], ackbuf[1],ackbuf[2],seqno,ackbuf[3],ackbuf[4],ackbuf[5],ackbuf[6]);
-								}
+							if(is_broadcast) {
+								remove_packet_from_queue(&cell->node_address);
 							} else {
-								COOJA_DEBUG_STR("No ack!\n");
+								//delay wait for ack: after tx
+								schedule_fixed(t,
+										start + TsTxOffset + MIN(tx_time, wdDataDuration)
+												+ TsTxAckDelay - TsShortGT, TsTxOffset + MIN(tx_time, wdDataDuration)
+												+ TsTxAckDelay - TsShortGT);
+								PT_YIELD(&mpt);
+								on();
+								//wait for detecting ACK
+								BUSYWAIT_UNTIL_ABS(
+										(cca_status = !is_broadcast && (NETSTACK_RADIO.receiving_packet() || NETSTACK_RADIO.pending_packet() || NETSTACK_RADIO.channel_clear() == 0)),
+										start + TsTxOffset + MIN(tx_time, wdDataDuration) + TsTxAckDelay + TsShortGT);
+								if (cca_status) {
+									COOJA_DEBUG_STR("ACK detected\n");
+									uint8_t ackbuf[ACK_LEN + EXTRA_ACK_LEN];
+									ack_sfd_rtime = RTIMER_NOW();
+									ack_sfd_time = get_sfd_start_time();
+
+									schedule_fixed(t, ack_sfd_rtime + wdAckDuration, wdAckDuration);
+									PT_YIELD(&mpt);
+
+									len = NETSTACK_RADIO.read(ackbuf, ACK_LEN + EXTRA_ACK_LEN);
+
+									if ((len == ACK_LEN + EXTRA_ACK_LEN) && seqno == ackbuf[2]) {
+										//TODO get timing information
+										success = RADIO_TX_OK;
+										COOJA_DEBUG_STR("ACK ok\n");
+									} else {
+										success = RADIO_TX_NOACK;
+										COOJA_DEBUG_STR("ACK not ok!\n");
+	//									COOJA_DEBUG_PRINTF("%u: %x, %x, %x ?= %x, %x, %x, %x, %x\n", len, ackbuf[0], ackbuf[1],ackbuf[2],seqno,ackbuf[3],ackbuf[4],ackbuf[5],ackbuf[6]);
+									}
+								} else {
+									COOJA_DEBUG_STR("No ack!\n");
+								}
 							}
 							we_are_sending = 0;
 							off(keep_radio_on);
@@ -619,21 +724,35 @@ powercycle(struct rtimer *t, void *ptr)
 					}
 
 					if (success == RADIO_TX_NOACK) {
+						p->transmissions++;
+						if (p->transmissions == macMaxFrameRetries) {
+							remove_packet_from_queue(&cell->node_address);
+						}
 						ret = MAC_TX_NOACK;
 					} else if (success == RADIO_TX_OK) {
 						//TODO synchronize using ack_sfd_rtime or ack_sfd_time
+						remove_packet_from_queue(&cell->node_address);
 						ret = MAC_TX_OK;
 					} else if (success == RADIO_TX_COLLISION) {
+						p->transmissions++;
+						if (p->transmissions == macMaxFrameRetries) {
+							remove_packet_from_queue(&cell->node_address);
+						}
 						ret = MAC_TX_COLLISION;
 					} else if (success == RADIO_TX_ERR) {
+						p->transmissions++;
+						if (p->transmissions == macMaxFrameRetries) {
+							remove_packet_from_queue(&cell->node_address);
+						}
 						ret = MAC_TX_ERR;
 					} else {
+						remove_packet_from_queue(&cell->node_address);
 						ret = MAC_TX_OK;
 					}
+					//XXX callback -- do we need to resotre packet to packetbuf?
+					//mac_call_sent_callback(p->sent, p->ptr, ret, p->transmissions);
 				}
-				if (cell->link_type == LINK_TYPE_ADVERTISING) {
-//TODO
-				} else { //NORMAL unicast link
+
 				}
 			} else if (cell->link_options & LINK_OPTION_RX) {
 //				timeslot_rx(t, start, msg, MSG_LEN);
@@ -643,13 +762,12 @@ powercycle(struct rtimer *t, void *ptr)
 				}
 
 				{
-					const void * payload = msg;
-					const unsigned short payload_len = MSG_LEN;
-
 					//TODO There are small timing variations visible in cooja, which needs tuning
 					uint8_t is_broadcast = 0, len, seqno, ret;
 					uint16_t ack_sfd_time = 0;
 					rtimer_clock_t ack_sfd_rtime = 0;
+
+					is_broadcast = rimeaddr_cmp(&cell->node_address, &rimeaddr_null);
 
 					COOJA_DEBUG_STR("cc2420_arch_sfd_sync");
 					cc2420_arch_sfd_sync();
@@ -695,7 +813,7 @@ powercycle(struct rtimer *t, void *ptr)
 						//    	while(RTIMER_CLOCK_LT(RTIMER_NOW(), rx_end_time + TsTxAckDelay-delayTx+1));
 						//wait until ack time
 						extern volatile struct received_frame_s *last_rf;
-						if (last_rf != NULL) {
+						if (last_rf != NULL && !is_broadcast) {
 							COOJA_DEBUG_STR("last_rf != NULL");
 							if (last_rf->acked) {
 								COOJA_DEBUG_STR("last_rf->acked");
@@ -767,18 +885,20 @@ schedule_fixed(&t, start + TsSlotDuration, TsSlotDuration);
 static void
 init(void)
 {
-current_slotframe = &minimum_slotframe;
-ieee154e_vars.asn = 0;
-ieee154e_vars.captured_time = 0;
-ieee154e_vars.dsn = 0;
-ieee154e_vars.is_sync = 0;
-ieee154e_vars.state = 0;
-ieee154e_vars.sync_timeout = 0; //30sec/slotDuration - (asn-asn0)*slotDuration
-waiting_for_radio_interrupt = 0;
-we_are_sending = 0;
-tx_msg = NULL;
-//schedule next wakeup? or leave for higher layer to decide? i.e, scan, ...
-//tsch_associate();
+	current_slotframe = &minimum_slotframe;
+	ieee154e_vars.asn = 0;
+	ieee154e_vars.captured_time = 0;
+	ieee154e_vars.dsn = 0;
+	ieee154e_vars.is_sync = 0;
+	ieee154e_vars.state = 0;
+	ieee154e_vars.sync_timeout = 0; //30sec/slotDuration - (asn-asn0)*slotDuration
+	waiting_for_radio_interrupt = 0;
+	we_are_sending = 0;
+	memb_init(&neighbor_memb);
+	working_on_queue = 0;
+
+	//schedule next wakeup? or leave for higher layer to decide? i.e, scan, ...
+	tsch_associate();
 }
 /*---------------------------------------------------------------------------*/
 const struct rdc_driver tschrdc_driver = { "tschrdc", init, send_packet,

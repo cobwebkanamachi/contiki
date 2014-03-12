@@ -1,5 +1,6 @@
 #ifndef __TSCH_PARAMETERS_H__
 #define __TSCH_PARAMETERS_H__
+#include "net/rime/rimeaddr.h"
 
 typedef uint32_t asn_t;
 
@@ -100,7 +101,7 @@ typedef struct {
 	the link may be used to send an Enhanced beacon. */
 	uint8_t link_type;
 	/* short address of neighbor */
-	uint16_t node_address;
+	rimeaddr_t node_address;
 } cell_t;
 
 typedef struct {
