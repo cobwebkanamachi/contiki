@@ -48,7 +48,7 @@
 #include "sys/rtimer.h"
 #include "cooja-debug.h"
 
-static volatile ieee154e_vars_t ieee154e_vars;
+volatile ieee154e_vars_t ieee154e_vars;
 static volatile char* tx_msg = NULL;
 
 #define ACK_LEN 3
@@ -477,7 +477,7 @@ get_next_on_timeslot(uint16_t timeslot)
 	return (timeslot >= current_slotframe->on_size-1) ? 0 : timeslot + 1;
 }
 /*---------------------------------------------------------------------------*/
-static char
+static void
 powercycle(struct rtimer *t, void *ptr);
 static void
 schedule_fixed(struct rtimer *t, rtimer_clock_t fixed_time, rtimer_clock_t duration)
@@ -487,11 +487,9 @@ schedule_fixed(struct rtimer *t, rtimer_clock_t fixed_time, rtimer_clock_t durat
 	if(fixed_time-now>duration) {
 		COOJA_DEBUG_PRINTF("Missed deadline or timer overflow deadline %x < now %x\n", fixed_time-now, duration);
 		fixed_time = RTIMER_NOW() + 1;
-		//COOJA_DEBUG_STR("Missed deadline or timer overflow\n");
 	}
 
-	r = rtimer_set(t, fixed_time, 1, (void
-	(*)(struct rtimer *, void *)) powercycle, NULL);
+	r = rtimer_set(t, fixed_time, 1, (void(*)(struct rtimer *, void *)) powercycle, NULL);
 	if (r != RTIMER_OK) {
 		COOJA_DEBUG_STR("schedule_powercycle: could not set rtimer\n");
 	}
@@ -510,7 +508,7 @@ int tsch_resume_powercycle() {
 /*---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------*/
-static char
+static void
 powercycle(struct rtimer *t, void *ptr)
 {
 	/* if timeslot for tx, and we have a packet, call timeslot_tx
@@ -519,12 +517,14 @@ powercycle(struct rtimer *t, void *ptr)
 	 */
 	PT_BEGIN(&mpt);
 	static uint16_t timeslot = 0;
+	static cell_t * cell = NULL;
 	start = RTIMER_NOW();
 	//while MAC-RDC is not disabled, and while its synchronized
 	while (ieee154e_vars.is_sync && ieee154e_vars.state != TSCH_OFF) {
 		COOJA_DEBUG_STR("Cell start\n");
-		leds_on(LEDS_GREEN);
-		cell_t * cell = get_cell(timeslot);
+//		putchar('o');putchar('\n');
+//		leds_on(LEDS_GREEN);
+		cell = get_cell(timeslot);
 		if (cell == NULL) {
 			COOJA_DEBUG_STR("Off cell\n");
 			//off cell
@@ -697,12 +697,10 @@ powercycle(struct rtimer *t, void *ptr)
 						extern volatile struct received_frame_s *last_rf;
 						if (last_rf != NULL) {
 							COOJA_DEBUG_STR("last_rf != NULL");
-
 							if (last_rf->acked) {
 								COOJA_DEBUG_STR("last_rf->acked");
 								schedule_fixed(t, rx_end_time + TsTxAckDelay - delayTx + 1, TsTxAckDelay - delayTx + 1);
 //								COOJA_DEBUG_PRINTF("Wait until ack time (in tsch) now 0x%x, deadline 0x%x", RTIMER_NOW(),rx_end_time + TsTxAckDelay - delayTx + 1);
-//								COOJA_DEBUG_INTH(rx_end_time + TsTxAckDelay - delayTx + 1);
 								PT_YIELD(&mpt);
 								COOJA_DEBUG_STR("send_ack()");
 								void send_ack(void);
@@ -710,13 +708,6 @@ powercycle(struct rtimer *t, void *ptr)
 								rx_end_time=0;
 							}
 						}
-//						schedule_fixed(t,
-//								start + TsTxOffset + wdDataDuration + TsTxAckDelay
-//										+ TsShortGT + wdAckDuration);
-//						COOJA_DEBUG_STR("Wait until ACK is done");
-//						PT_YIELD(&mpt);
-//						COOJA_DEBUG_STR("!RX TIME OUT");
-//						NETSTACK_RDC.off(keep_radio_on);
 						//XXX return length instead? or status? or something?
 						ret = 1;
 					}
@@ -749,7 +740,7 @@ powercycle(struct rtimer *t, void *ptr)
 		timeslot = next_timeslot;
 		ieee154e_vars.asn += dt;
 		schedule_fixed(t, start, duration);
-		leds_off(LEDS_GREEN);
+//		leds_off(LEDS_GREEN);
 		PT_YIELD(&mpt);
 	}
 	COOJA_DEBUG_STR("TSCH is OFF!!");

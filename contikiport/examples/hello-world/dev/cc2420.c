@@ -774,7 +774,7 @@ cc2420_interrupt(void)
   }
 
   /* Allocate space to store the received frame */
-  rf = memb_alloc(&rf_memb);
+  rf =memb_alloc(&rf_memb);
 
   if(rf == NULL) {
   	COOJA_DEBUG_STR("! rf == NULL");
@@ -835,6 +835,11 @@ cc2420_interrupt(void)
 		COOJA_DEBUG_STR("end CC2420_SFD_IS_1");
 
 		rx_end_time = RTIMER_NOW();
+		//XXX rx_end_time should not be 0
+		if(!rx_end_time) {
+			rx_end_time++;
+			COOJA_DEBUG_STR("end CC2420_SFD_IS_1 rx_end_time=0++");
+		}
 		off();
 
 		int overflow = CC2420_FIFOP_IS_1 && !CC2420_FIFO_IS_1;
