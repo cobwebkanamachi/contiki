@@ -65,7 +65,7 @@ static volatile char* tx_msg = NULL;
 #ifdef TSCH_CONF_ADDRESS_FILTER
 #define TSCH_ADDRESS_FILTER TSCH_CONF_ADDRESS_FILTER
 #else
-#define TSCH_ADDRESS_FILTER 1
+#define TSCH_ADDRESS_FILTER 0
 #endif /* TSCH_CONF_ADDRESS_FILTER */
 
 #ifndef TSCH_802154_AUTOACK
@@ -453,12 +453,12 @@ cc2420_arch_sfd_sync(void);
 //extern volatile uint16_t expected_rx_time;
 #include "dev/leds.h"
 
-static slotframe_t * current_slotframe;
+static slotframe_t const * current_slotframe;
 //remove msg[]
 #define MSG_LEN (127-2)
 static char msg[127];
 
-static volatile struct pt mpt, tx_pt, rx_pt;
+static volatile struct pt mpt;
 static volatile struct rtimer t;
 static volatile rtimer_clock_t start;
 #include "net/netstack.h"
@@ -474,27 +474,38 @@ get_cell(uint16_t timeslot)
 static uint16_t
 get_next_on_timeslot(uint16_t timeslot)
 {
-	return (timeslot >= current_slotframe->on_size) ? 0 : timeslot + 1;
+	return (timeslot >= current_slotframe->on_size-1) ? 0 : timeslot + 1;
 }
 /*---------------------------------------------------------------------------*/
 static char
 powercycle(struct rtimer *t, void *ptr);
 static void
-schedule_fixed(struct rtimer *t, rtimer_clock_t fixed_time)
+schedule_fixed(struct rtimer *t, rtimer_clock_t fixed_time, rtimer_clock_t duration)
 {
 	int r;
 	rtimer_clock_t now = RTIMER_NOW() + 1;
-	if(RTIMER_CLOCK_LT(fixed_time, now)) {
-		//fixed_time = RTIMER_NOW() + 1;
-		COOJA_DEBUG_STR("Missed deadline or timer overflow\n");
-		//COOJA_DEBUG_PRINTF("Missed deadline or timer overflow deadline %u < now %u\n", fixed_time, now);
+	if(fixed_time-now>duration) {
+		COOJA_DEBUG_PRINTF("Missed deadline or timer overflow deadline %x < now %x\n", fixed_time-now, duration);
+		fixed_time = RTIMER_NOW() + 1;
+		//COOJA_DEBUG_STR("Missed deadline or timer overflow\n");
 	}
 
 	r = rtimer_set(t, fixed_time, 1, (void
 	(*)(struct rtimer *, void *)) powercycle, NULL);
 	if (r != RTIMER_OK) {
-		PRINTF("schedule_powercycle: could not set rtimer\n");
+		COOJA_DEBUG_STR("schedule_powercycle: could not set rtimer\n");
 	}
+}
+
+static volatile uint8_t waiting_for_radio_interrupt = 0;
+extern volatile rtimer_clock_t rx_end_time;
+
+int tsch_resume_powercycle() {
+	if(waiting_for_radio_interrupt||rx_end_time!=0) {
+		waiting_for_radio_interrupt = 0;
+		schedule_fixed(&t, RTIMER_NOW()+5, 5);
+	}
+	return 1;
 }
 /*---------------------------------------------------------------------------*/
 
@@ -516,7 +527,6 @@ powercycle(struct rtimer *t, void *ptr)
 		cell_t * cell = get_cell(timeslot);
 		if (cell == NULL) {
 			COOJA_DEBUG_STR("Off cell\n");
-
 			//off cell
 			off(keep_radio_on);
 			//return MAC_TX_DEFERRED;
@@ -546,7 +556,7 @@ powercycle(struct rtimer *t, void *ptr)
 					uint8_t success = !NETSTACK_RADIO.prepare(payload, payload_len);
 					COOJA_DEBUG_STR("prepare tx done\n");
 					//delay before CCA
-					schedule_fixed(t, start + TsCCAOffset);
+					schedule_fixed(t, start + TsCCAOffset, TsCCAOffset);
 					PT_YIELD(&mpt);
 					on();
 					//CCA
@@ -558,7 +568,7 @@ powercycle(struct rtimer *t, void *ptr)
 						success = RADIO_TX_COLLISION;
 					} else {
 						//delay before TX
-						schedule_fixed(t, start + TsTxOffset - delayTx);
+						schedule_fixed(t, start + TsTxOffset - delayTx, TsTxOffset - delayTx);
 						PT_YIELD(&mpt);
 						//send
 						static rtimer_clock_t tx_time;
@@ -571,6 +581,7 @@ powercycle(struct rtimer *t, void *ptr)
 							//delay wait for ack: after tx
 							schedule_fixed(t,
 									start + TsTxOffset + MIN(tx_time, wdDataDuration)
+											+ TsTxAckDelay - TsShortGT, TsTxOffset + MIN(tx_time, wdDataDuration)
 											+ TsTxAckDelay - TsShortGT);
 							PT_YIELD(&mpt);
 							on();
@@ -584,7 +595,7 @@ powercycle(struct rtimer *t, void *ptr)
 								ack_sfd_rtime = RTIMER_NOW();
 								ack_sfd_time = get_sfd_start_time();
 
-								schedule_fixed(t, ack_sfd_rtime + wdAckDuration);
+								schedule_fixed(t, ack_sfd_rtime + wdAckDuration, wdAckDuration);
 								PT_YIELD(&mpt);
 
 								len = NETSTACK_RADIO.read(ackbuf, ACK_LEN + EXTRA_ACK_LEN);
@@ -645,7 +656,7 @@ powercycle(struct rtimer *t, void *ptr)
 					COOJA_DEBUG_STR("cc2420_arch_sfd_sync end");
 
 					//wait before RX
-					schedule_fixed(t, start + TsTxOffset - TsLongGT);
+					schedule_fixed(t, start + TsTxOffset - TsLongGT, TsTxOffset - TsLongGT);
 					COOJA_DEBUG_STR("schedule RX on guard time - TsLongGT" );
 					PT_YIELD(&mpt);
 					//Start radio for at least guard time
@@ -653,35 +664,51 @@ powercycle(struct rtimer *t, void *ptr)
 					COOJA_DEBUG_STR("RX on -TsLongGT");
 					uint8_t cca_status = 0;
 					cca_status = (
-										NETSTACK_RADIO.channel_clear() || NETSTACK_RADIO.pending_packet()
+										!NETSTACK_RADIO.channel_clear() || NETSTACK_RADIO.pending_packet()
 												|| NETSTACK_RADIO.receiving_packet());
 					//Check if receiving within guard time
-					schedule_fixed(t, start + TsTxOffset + TsLongGT);
+					schedule_fixed(t, start + TsTxOffset + TsLongGT, TsTxOffset + TsLongGT);
 					PT_YIELD(&mpt);
 					COOJA_DEBUG_STR("RX on +TsLongGT");
+					if(NETSTACK_RADIO.channel_clear()) {COOJA_DEBUG_STR("NETSTACK_RADIO.channel_clear()");}
+					if(NETSTACK_RADIO.pending_packet()) {COOJA_DEBUG_STR("NETSTACK_RADIO.pending_packet()");}
+					if(NETSTACK_RADIO.receiving_packet()) {COOJA_DEBUG_STR("NETSTACK_RADIO.receiving_packet()");}
+
 					if (!(cca_status |= (
-					NETSTACK_RADIO.channel_clear() || NETSTACK_RADIO.pending_packet()
+					!NETSTACK_RADIO.channel_clear() || NETSTACK_RADIO.pending_packet()
 							|| NETSTACK_RADIO.receiving_packet()))) {
 						COOJA_DEBUG_STR("RX no packet in air\n");
 						off(keep_radio_on);
 						//no packets on air
 						ret = 0;
 					} else {
+						if(rx_end_time==0 || !NETSTACK_RADIO.pending_packet()) {
 						//wait until rx finishes
 						schedule_fixed(t,
-								start + TsTxOffset + wdDataDuration);
-						COOJA_DEBUG_STR("Wait until RX is done");
-						PT_YIELD(&mpt);
+								start + TsTxOffset + wdDataDuration+1, TsTxOffset + wdDataDuration+1);
+							waiting_for_radio_interrupt = 1;
+							COOJA_DEBUG_STR("Wait until RX is done");
+							PT_YIELD(&mpt);
+						}
+						COOJA_DEBUG_STR("RX is finished");
+						off(keep_radio_on);
 						//    	while(RTIMER_CLOCK_LT(RTIMER_NOW(), rx_end_time + TsTxAckDelay-delayTx+1));
 						//wait until ack time
 						extern volatile struct received_frame_s *last_rf;
-						extern volatile rtimer_clock_t rx_end_time;
-						if(last_rf!=NULL && last_rf->acked) {
-							schedule_fixed(t, rx_end_time + TsTxAckDelay-delayTx+1);
-							COOJA_DEBUG_STR("Wait until ack time (in tsch)");
-							PT_YIELD(&mpt);
-							void send_ack(void);
-							send_ack();
+						if (last_rf != NULL) {
+							COOJA_DEBUG_STR("last_rf != NULL");
+
+							if (last_rf->acked) {
+								COOJA_DEBUG_STR("last_rf->acked");
+								schedule_fixed(t, rx_end_time + TsTxAckDelay - delayTx + 1, TsTxAckDelay - delayTx + 1);
+//								COOJA_DEBUG_PRINTF("Wait until ack time (in tsch) now 0x%x, deadline 0x%x", RTIMER_NOW(),rx_end_time + TsTxAckDelay - delayTx + 1);
+//								COOJA_DEBUG_INTH(rx_end_time + TsTxAckDelay - delayTx + 1);
+								PT_YIELD(&mpt);
+								COOJA_DEBUG_STR("send_ack()");
+								void send_ack(void);
+								send_ack();
+								rx_end_time=0;
+							}
 						}
 //						schedule_fixed(t,
 //								start + TsTxOffset + wdDataDuration + TsTxAckDelay
@@ -697,24 +724,35 @@ powercycle(struct rtimer *t, void *ptr)
 			}
 		}
 		//TODO incorporate ack time -sync- correction
-		uint16_t dt, next_timeslot = get_next_on_timeslot(timeslot);
-		dt =
-				next_timeslot ? next_timeslot - timeslot :
+		uint16_t dt, duration, next_timeslot;
+		next_timeslot = get_next_on_timeslot(timeslot);
+		dt = next_timeslot ? next_timeslot - timeslot :
 						current_slotframe->length - timeslot;
-		start += dt * TsSlotDuration;
-		COOJA_DEBUG_STR("Schedule next ON slot");
+		duration = dt * TsSlotDuration;
+		start += duration;
 		//XXX correct on timeslot boundaries
-		if(!next_timeslot) {
-			COOJA_DEBUG_STR("New slot frame");
-			start-=5;
+		static uint16_t correction = 5;
+		if (!next_timeslot) {
+			if (RTIMER_NOW() < start - correction + 1) {
+				COOJA_DEBUG_STR("New slot frame: no overflow");
+				start -= correction;
+				correction = 5;
+				duration -= correction;
+			} else {
+				correction += 5;
+				COOJA_DEBUG_STR("New slot frame: no correction!!");
+			}
 		}
 
-		schedule_fixed(t, start);
-		ieee154e_vars.asn += dt;
+//		COOJA_DEBUG_STR("Schedule next ON slot");
+//		COOJA_DEBUG_PRINTF("Schedule next ON slot now 0x%x, deadline 0x%x", RTIMER_NOW(),start);
 		timeslot = next_timeslot;
+		ieee154e_vars.asn += dt;
+		schedule_fixed(t, start, duration);
 		leds_off(LEDS_GREEN);
 		PT_YIELD(&mpt);
 	}
+	COOJA_DEBUG_STR("TSCH is OFF!!");
 PT_END(&mpt);
 }
 /*---------------------------------------------------------------------------*/
@@ -732,7 +770,7 @@ ieee154e_vars.is_sync = 1;
 //something other than 0 for now
 ieee154e_vars.state = TSCH_ASSOCIATED;
 start = RTIMER_NOW();
-schedule_fixed(&t, start + TsSlotDuration);
+schedule_fixed(&t, start + TsSlotDuration, TsSlotDuration);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -745,6 +783,9 @@ ieee154e_vars.dsn = 0;
 ieee154e_vars.is_sync = 0;
 ieee154e_vars.state = 0;
 ieee154e_vars.sync_timeout = 0; //30sec/slotDuration - (asn-asn0)*slotDuration
+waiting_for_radio_interrupt = 0;
+we_are_sending = 0;
+tx_msg = NULL;
 //schedule next wakeup? or leave for higher layer to decide? i.e, scan, ...
 //tsch_associate();
 }

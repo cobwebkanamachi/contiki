@@ -309,6 +309,10 @@ set_txpower(uint8_t power)
 #define FIFOP_THR(n) ((n) & 0x7f)
 #define RXBPF_LOCUR (1 << 13);
 /*---------------------------------------------------------------------------*/
+/* Data structure used as the internal RX buffer */
+MEMB(rf_memb, struct received_frame_s, 4);
+LIST(rf_list);
+/*---------------------------------------------------------------------------*/
 int
 cc2420_init(void)
 {
@@ -379,7 +383,8 @@ cc2420_init(void)
   cc2420_set_cca_threshold(CC2420_CONF_CCA_THRESH);
 
   flushrx();
-
+  memb_init(&rf_memb);
+  list_init(rf_list);
   process_start(&cc2420_process, NULL);
   return 1;
 }
@@ -657,9 +662,6 @@ TIMETABLE(cc2420_timetable);
 TIMETABLE_AGGREGATE(aggregate_time, 10);
 #endif /* CC2420_TIMETABLE_PROFILING */
 
-MEMB(rf_memb, struct received_frame_s, 4);
-LIST(rf_list);
-
 #define RXFIFO_START  0x080
 #define RXFIFO_END    0x0FF
 #define RXFIFO_SIZE   128
@@ -697,7 +699,7 @@ int
 cc2420_interrupt(void)
 {
 	COOJA_DEBUG_STR("cc2420_interrupt\n");
-
+	uint8_t send_nack = 0;
   uint8_t len, fcf, seqno, footer1, is_data, for_us;
   uint8_t len_a, len_b;
   int do_ack = 0;
@@ -723,8 +725,16 @@ cc2420_interrupt(void)
   if(locked || need_flush) {
   	COOJA_DEBUG_STR("! locked || need_flush");
     need_flush = 1;
+		last_packet_timestamp = cc2420_sfd_start_time;
+		if(last_packet_timestamp == cc2420_sfd_start_time) {
+			while(CC2420_SFD_IS_1);
+		}
+		COOJA_DEBUG_STR("end CC2420_SFD_IS_1");
+
+		rx_end_time = RTIMER_NOW();
+		off();
     CC2420_CLEAR_FIFOP_INT();
-    return 1;
+    return tsch_resume_powercycle();
   }
 
   GET_LOCK();
@@ -732,18 +742,35 @@ cc2420_interrupt(void)
   if(!CC2420_FIFO_IS_1) {
   	COOJA_DEBUG_STR("!CC2420_FIFO_IS_1");
     flushrx();
-    RELEASE_LOCK();
+		last_packet_timestamp = cc2420_sfd_start_time;
+		if(last_packet_timestamp == cc2420_sfd_start_time) {
+			while(CC2420_SFD_IS_1);
+		}
+		COOJA_DEBUG_STR("end CC2420_SFD_IS_1");
+
+		rx_end_time = RTIMER_NOW();
+		off();
     CC2420_CLEAR_FIFOP_INT();
-    return 1;
+    RELEASE_LOCK();
+    return tsch_resume_powercycle();
   }
 
   CC2420_READ_FIFO_BYTE(len);
   if(len > CC2420_MAX_PACKET_LEN || len <= AUX_LEN) {
   	COOJA_DEBUG_STR("! len > CC2420_MAX_PACKET_LEN || len <= AUX_LEN");
     flushrx();
-    RELEASE_LOCK();
     CC2420_CLEAR_FIFOP_INT();
-    return 1;
+		last_packet_timestamp = cc2420_sfd_start_time;
+		if(last_packet_timestamp == cc2420_sfd_start_time) {
+			while(CC2420_SFD_IS_1);
+		}
+		COOJA_DEBUG_STR("end CC2420_SFD_IS_1");
+
+		rx_end_time = RTIMER_NOW();
+		off();
+    RELEASE_LOCK();
+    COOJA_DEBUG_STR("cc2420_interrupt end\n");
+    return tsch_resume_powercycle();
   }
 
   /* Allocate space to store the received frame */
@@ -752,91 +779,108 @@ cc2420_interrupt(void)
   if(rf == NULL) {
   	COOJA_DEBUG_STR("! rf == NULL");
     flushrx();
-    RELEASE_LOCK();
-    CC2420_CLEAR_FIFOP_INT();
-    return 1;
-  }
-
-  last_packet_timestamp = cc2420_sfd_start_time;
-  len -= AUX_LEN;
-  len_a = len > FIFOP_THRESHOLD ? FIFOP_THRESHOLD : len;
-  len_b = len - len_a;
-  rf->len = len;
-  rf->acked = 0;
-  CC2420_READ_FIFO_BUF(rf->buf, len_a);
-
-  fcf = rf->buf[0];
-  seqno = rf->buf[2];
-  rf->seqno = seqno;
-  ret = frame80254_parse_irq(rf->buf, len_a);
-  is_data = ret & IS_DATA;
-  do_ack = ret & DO_ACK;
-
-  if(do_ack) {   /* Prepare ack */
-  	COOJA_DEBUG_STR("do_ack");
-  	//calculating sync
-		int16_t time_difference = (uint16_t)(cell_start_time + TsTxOffset) - cc2420_sfd_start_time;
-		time_difference = (time_difference * 3051)/100;
-		if(time_difference >=0) {
-			ack_status=time_difference & 0x07ff;
-		} else {
-			ack_status=(-time_difference) & 0x07ff + 0x0800;
+		last_packet_timestamp = cc2420_sfd_start_time;
+		if(last_packet_timestamp == cc2420_sfd_start_time) {
+			while(CC2420_SFD_IS_1);
 		}
-	  /* Append IE timesync */
-    ackbuf[3] = seqno;
-    ackbuf[6] = ack_status&0xff; ackbuf[7] = (ack_status>>8)&0xf;
-	  /* Write ack in fifo */
-    CC2420_STROBE(CC2420_SFLUSHTX); /* Flush Tx fifo */
-    CC2420_WRITE_FIFO_BUF(ackbuf, 1+ACK_LEN + EXTRA_ACK_LEN);
-  }
-  list_add(rf_list, rf);
+		COOJA_DEBUG_STR("end CC2420_SFD_IS_1");
 
-  /* Wait for end of reception */
-  if(last_packet_timestamp == cc2420_sfd_start_time) {
-    while(CC2420_SFD_IS_1);
-  }
-	COOJA_DEBUG_STR("end CC2420_SFD_IS_1");
-
-  rx_end_time = RTIMER_NOW();
-  off();
-
-  int overflow = CC2420_FIFOP_IS_1 && !CC2420_FIFO_IS_1;
-  CC2420_READ_RAM_BYTE(footer1, RXFIFO_ADDR(len + AUX_LEN));
-
-  if(!overflow && (footer1 & FOOTER1_CRC_OK)) { /* CRC is correct */
-    if(rf && len_b>0) { /* Get rest of the data.
-     No need to read the footer; we already checked it in place
-     before acking. */
-    	CC2420_READ_FIFO_BUF(rf->buf+ len_a, len_b);
-    }
-    if(do_ack) {
-//    	COOJA_DEBUG_STR("wait for ack time");
-//    	/* wait until ack time comes */
-//    	while(RTIMER_CLOCK_LT(RTIMER_NOW(), rx_end_time + TsTxAckDelay-delayTx+1));
-//    	COOJA_DEBUG_STR("Send ACK");
-//    	strobe(CC2420_STXON); /* Send ACK */
-//    	off();
-    	rf->acked = 1;
-      //CC2420_STROBE(CC2420_SFLUSHTX); /* Flush Tx fifo */
-    }
-    frame_valid = 1;
-  } else { /* CRC is wrong */
-  	COOJA_DEBUG_STR("! overflow || CRC is wrong ");
-    if(do_ack) {
-      CC2420_STROBE(CC2420_SFLUSHTX); /* Flush Tx fifo */
-//      off();
-    }
-    list_chop(rf_list);
-    memb_free(&rf_memb, rf);
-  }
-
-  if(frame_valid && do_ack) {
-    last_acked = seqno;
-    last_rf = rf;
+		rx_end_time = RTIMER_NOW();
+		off();
+    CC2420_CLEAR_FIFOP_INT();
+    RELEASE_LOCK();
+    COOJA_DEBUG_STR("cc2420_interrupt end\n");
+    return tsch_resume_powercycle();
+    //TODO send NACK!
   } else {
-    last_rf = NULL;
-  }
 
+		last_packet_timestamp = cc2420_sfd_start_time;
+		len -= AUX_LEN;
+		len_a = len > FIFOP_THRESHOLD ? FIFOP_THRESHOLD : len;
+		len_b = len - len_a;
+		rf->len = len;
+		rf->acked = 0;
+		CC2420_READ_FIFO_BUF(rf->buf, len_a);
+
+		fcf = rf->buf[0];
+		seqno = rf->buf[2];
+		rf->seqno = seqno;
+		ret = frame80254_parse_irq(rf->buf, len_a);
+		is_data = ret & IS_DATA;
+		do_ack = ret & DO_ACK;
+
+		if(do_ack) {   /* Prepare ack */
+			COOJA_DEBUG_STR("do_ack");
+			//calculating sync
+			int16_t time_difference = (uint16_t)(cell_start_time + TsTxOffset) - cc2420_sfd_start_time;
+			time_difference = (time_difference * 3051)/100;
+			if(time_difference >=0) {
+				ack_status=time_difference & 0x07ff;
+			} else {
+				ack_status=(-time_difference) & 0x07ff + 0x0800;
+			}
+			/* Append IE timesync */
+			ackbuf[3] = seqno;
+			ackbuf[6] = ack_status&0xff; ackbuf[7] = (ack_status>>8)&0xf;
+			/* Write ack in fifo */
+			CC2420_STROBE(CC2420_SFLUSHTX); /* Flush Tx fifo */
+			CC2420_WRITE_FIFO_BUF(ackbuf, 1+ACK_LEN + EXTRA_ACK_LEN);
+		}
+		list_add(rf_list, rf);
+
+		/* Wait for end of reception */
+		if(last_packet_timestamp == cc2420_sfd_start_time) {
+			while(CC2420_SFD_IS_1);
+		}
+		COOJA_DEBUG_STR("end CC2420_SFD_IS_1");
+
+		rx_end_time = RTIMER_NOW();
+		off();
+
+		int overflow = CC2420_FIFOP_IS_1 && !CC2420_FIFO_IS_1;
+		CC2420_READ_RAM_BYTE(footer1, RXFIFO_ADDR(len + AUX_LEN));
+
+		if(!overflow && (footer1 & FOOTER1_CRC_OK)) { /* CRC is correct */
+			if(rf && len_b>0) { /* Get rest of the data.
+			 No need to read the footer; we already checked it in place
+			 before acking. */
+				COOJA_DEBUG_STR("rf && len_b>0");
+				CC2420_READ_FIFO_BUF(rf->buf+ len_a, len_b);
+			}
+			if(do_ack) {
+	//    	COOJA_DEBUG_STR("wait for ack time");
+	//    	/* wait until ack time comes */
+	//    	while(RTIMER_CLOCK_LT(RTIMER_NOW(), rx_end_time + TsTxAckDelay-delayTx+1));
+	//    	COOJA_DEBUG_STR("Send ACK");
+	//    	strobe(CC2420_STXON); /* Send ACK */
+	//    	off();
+				rf->acked = 1;
+				//CC2420_STROBE(CC2420_SFLUSHTX); /* Flush Tx fifo */
+			} else {
+		    int frame_type = rf->buf[0] & 7;
+		    if(frame_type == FRAME802154_ACKFRAME) {
+		    	rf->len = 0;
+		    }
+			}
+			frame_valid = 1;
+		} else { /* CRC is wrong */
+			COOJA_DEBUG_STR("! overflow || CRC is wrong ");
+			if(do_ack) {
+				CC2420_STROBE(CC2420_SFLUSHTX); /* Flush Tx fifo */
+	//      off();
+			}
+			list_chop(rf_list);
+			memb_free(&rf_memb, rf);
+		}
+
+		if(frame_valid && do_ack) {
+			last_acked = seqno;
+			last_rf = rf;
+		} else {
+			last_rf = NULL;
+			rf =NULL;
+		}
+  }
   /* Flush rx fifo (because we're doing direct FIFO addressing and
    * we don't want to lose track of where we are in the FIFO) */
   flushrx();
@@ -845,13 +889,19 @@ cc2420_interrupt(void)
 
   RELEASE_LOCK();
   COOJA_DEBUG_STR("cc2420_interrupt end\n");
+  if(rf!=NULL) {
+  	if(rf->len!=0) return tsch_resume_powercycle();
+  } else {
+  	return tsch_resume_powercycle();
+  }
   return 1;
 }
 void send_ack(void) {
 	COOJA_DEBUG_STR("Send ACK");
 	strobe(CC2420_STXON); /* Send ACK */
   off();
-
+  last_rf = NULL;
+//  last_rf->acked = 0;
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(cc2420_process, ev, data)
@@ -875,6 +925,7 @@ PROCESS_THREAD(cc2420_process, ev, data)
       GET_LOCK();
       flushrx();
       RELEASE_LOCK();
+      COOJA_DEBUG_STR("cc2420_process: need_flush\n");
     }
 
     packetbuf_clear();
@@ -904,6 +955,8 @@ static int
 cc2420_read(void *buf, unsigned short bufsize)
 {
   GET_LOCK();
+  COOJA_DEBUG_STR("cc2420_read \n");
+
   struct received_frame_s *rf = list_pop(rf_list);
   if(rf == NULL) {
     RELEASE_LOCK();
@@ -911,6 +964,7 @@ cc2420_read(void *buf, unsigned short bufsize)
     return 0;
   } else {
     if(list_head(rf_list) != NULL) {
+      COOJA_DEBUG_STR("cc2420_read list_head(rf_list) != NULL\n");
       /* If there are other packets pending, poll */
       process_poll(&cc2420_process);
     }

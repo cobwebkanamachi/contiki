@@ -118,4 +118,6 @@ struct received_frame_s {
   uint8_t acked;
   uint8_t seqno;
 };
+int tsch_resume_powercycle(void);
+
 #endif /* __TSCH_PARAMETERS_H__ */
