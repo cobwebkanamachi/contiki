@@ -37,8 +37,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef UAODV_DEF_H_
-#define UAODV_DEF_H_
+#ifndef __UAODV_DEF_H__
+#define __UAODV_DEF_H__
 
 #include "net/uip.h"
 
@@ -142,4 +142,4 @@ struct uaodv_bad_hop_ext {
   uip_ipaddr_t addrs[1];
 };
 
-#endif /* UAODV_DEF_H_ */
+#endif /* __UAODV_DEF_H__ */

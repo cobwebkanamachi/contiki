@@ -31,9 +31,9 @@
  *
  *
  */
-#ifndef EMAIL_H_
-#define EMAIL_H_
+#ifndef __EMAIL_H__
+#define __EMAIL_H__
 
 PROCESS_NAME(email_process);
 
-#endif /* EMAIL_H_ */
+#endif /* __EMAIL_H__ */

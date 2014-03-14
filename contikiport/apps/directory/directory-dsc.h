@@ -31,11 +31,11 @@
  *
  *
  */
-#ifndef DIRECTORY_DSC_H_
-#define DIRECTORY_DSC_H_
+#ifndef __DIRECTORY_DSC_H__
+#define __DIRECTORY_DSC_H__
 
 #include "sys/dsc.h"
 
 DSC_HEADER(directory_dsc);
 
-#endif /* DIRECTORY_DSC_H_ */
+#endif /* __DIRECTORY_DSC_H__ */

@@ -65,8 +65,8 @@
  * Author: Adam Dunkels <adam@sics.se>, Nicolas Tsiftes <nvt@sics.se>
  *
  */
-#ifndef STIMER_H_
-#define STIMER_H_
+#ifndef __STIMER_H__
+#define __STIMER_H__
 
 #include "sys/clock.h"
 
@@ -91,7 +91,7 @@ unsigned long stimer_remaining(struct stimer *t);
 unsigned long stimer_elapsed(struct stimer *t);
 
 
-#endif /* STIMER_H_ */
+#endif /* __STIMER_H__ */
 
 /** @} */
 /** @} */

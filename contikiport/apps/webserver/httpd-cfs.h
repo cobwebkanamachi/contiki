@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef HTTPD_CFS_H_
-#define HTTPD_CFS_H_
+#ifndef __HTTPD_CFS_H__
+#define __HTTPD_CFS_H__
 
 #include "contiki-net.h"
 
@@ -58,4 +58,4 @@ struct httpd_state {
 void httpd_init(void);
 void httpd_appcall(void *state);
 
-#endif /* HTTPD_CFS_H_ */
+#endif /* __HTTPD_CFS_H__ */

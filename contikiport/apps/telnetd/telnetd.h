@@ -31,8 +31,8 @@
  *
  *
  */
-#ifndef TELNETD_H_
-#define TELNETD_H_
+#ifndef __TELNETD_H__
+#define __TELNETD_H__
 
 #include "contiki.h"
 
@@ -47,4 +47,4 @@ void telnetd_gui_output(const char *str1, int len1, const char *str2, int len2);
 void telnetd_gui_quit(void);
 void telnetd_quit(void);
 
-#endif /* TELNETD_H_ */
+#endif /* __TELNETD_H__ */

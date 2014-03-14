@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_TEXT_H_
-#define SHELL_TEXT_H_
+#ifndef __SHELL_TEXT_H__
+#define __SHELL_TEXT_H__
 
 #include "shell.h"
 
 void shell_text_init(void);
 
-#endif /* SHELL_TEXT_H_ */
+#endif /* __SHELL_TEXT_H__ */

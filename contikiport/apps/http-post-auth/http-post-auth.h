@@ -30,8 +30,8 @@
  *
  */
 
-#ifndef HTTP_POST_AUTH_H_
-#define HTTP_POST_AUTH_H_
+#ifndef __HTTP_POST_AUTH_H__
+#define __HTTP_POST_AUTH_H__
 
 #include "contiki-net.h"
 
@@ -39,4 +39,4 @@ PROCESS_NAME(http_post_auth_process);
 
 int http_post_auth(const uint8_t *username_password, const char *message);
 
-#endif /* HTTP_POST_AUTH_H_ */
+#endif /* __HTTP_POST_AUTH_H__ */

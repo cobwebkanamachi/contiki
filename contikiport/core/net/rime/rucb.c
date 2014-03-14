@@ -50,6 +50,8 @@
 #else
 #define PRINTF(...)
 #endif
+
+#include "sys/timetable.h"
 /*---------------------------------------------------------------------------*/
 static int
 read_data(struct rucb_conn *c)
@@ -82,6 +84,10 @@ acked(struct runicast_conn *ruc, const rimeaddr_t *to, uint8_t retransmissions)
     runicast_send(&c->c, &c->receiver, MAX_TRANSMISSIONS);
     c->last_size = len;
 
+    /*    {
+      extern struct timetable cc2420_timetable;
+      timetable_print(&cc2420_timetable);
+      }*/
   }
 }
 /*---------------------------------------------------------------------------*/

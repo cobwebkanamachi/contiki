@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_NETFILE_H_
-#define SHELL_NETFILE_H_
+#ifndef __SHELL_NETFILE_H__
+#define __SHELL_NETFILE_H__
 
 #include "shell.h"
 
 void shell_netfile_init(void);
 
-#endif /* SHELL_NETFILE_H_ */
+#endif /* __SHELL_NETFILE_H__ */

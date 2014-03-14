@@ -30,9 +30,9 @@
  *
  */
 
-#ifndef SHELL_RIME_SENDCMD_H_
-#define SHELL_RIME_SENDCMD_H_
+#ifndef __SHELL_RIME_SENDCMD_H__
+#define __SHELL_RIME_SENDCMD_H__
 
 void shell_rime_sendcmd_init(void);
 
-#endif /* SHELL_RIME_SENDCMD_H_ */
+#endif /* __SHELL_RIME_SENDCMD_H__ */

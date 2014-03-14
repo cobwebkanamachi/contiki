@@ -30,10 +30,10 @@
  *
  */
 
-#ifndef URLCONV_H_
-#define URLCONV_H_
+#ifndef __URLCONV_H__
+#define __URLCONV_H__
 
 void urlconv_init(void);
 void urlconv_tofilename(char *dest, char *source, unsigned char maxlen);
 
-#endif /* URLCONV_H_ */
+#endif /* __URLCONV_H__ */

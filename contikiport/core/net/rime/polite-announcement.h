@@ -56,13 +56,13 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef POLITE_ANNOUNCEMENT_H_
-#define POLITE_ANNOUNCEMENT_H_
+#ifndef __POLITE_ANNOUNCEMENT_H__
+#define __POLITE_ANNOUNCEMENT_H__
 
 void polite_announcement_init(uint16_t channel,
 			      clock_time_t min,
 			      clock_time_t max);
 
-#endif /* POLITE_ANNOUNCEMENT_H_ */
+#endif /* __POLITE_ANNOUNCEMENT_H__ */
 /** @} */
 /** @} */

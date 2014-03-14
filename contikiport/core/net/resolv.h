@@ -36,8 +36,8 @@
  *
  *
  */
-#ifndef RESOLV_H_
-#define RESOLV_H_
+#ifndef __RESOLV_H__
+#define __RESOLV_H__
 
 #include "contiki.h"
 #include "uip.h"
@@ -106,4 +106,4 @@ CCIF const char *resolv_get_hostname(void);
 
 PROCESS_NAME(resolv_process);
 
-#endif /* RESOLV_H_ */
+#endif /* __RESOLV_H__ */

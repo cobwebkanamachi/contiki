@@ -56,8 +56,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef RUDOLPH0_H_
-#define RUDOLPH0_H_
+#ifndef __RUDOLPH0_H__
+#define __RUDOLPH0_H__
 
 #include "net/rime/stbroadcast.h"
 #include "net/rime/polite.h"
@@ -116,7 +116,7 @@ void rudolph0_force_restart(struct rudolph0_conn *c);
 void rudolph0_set_version(struct rudolph0_conn *c, int version);
 int rudolph0_version(struct rudolph0_conn *c);
 
-#endif /* RUDOLPH0_H_ */
+#endif /* __RUDOLPH0_H__ */
 /** @} */
 /** @} */
     

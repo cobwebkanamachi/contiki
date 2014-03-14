@@ -37,12 +37,12 @@
  *         Nicolas Tsiftes <nvt@sics.se>
  */
 
-#ifndef UDPMAC_H_
-#define UDPMAC_H_
+#ifndef __UDPMAC_H__
+#define __UDPMAC_H__
 
 #include "net/mac/mac.h"
 #include "dev/radio.h"
 
 extern const struct mac_driver rime_udp_driver;
 
-#endif /* UDPMAC_H_ */
+#endif /* __UDPMAC_H__ */

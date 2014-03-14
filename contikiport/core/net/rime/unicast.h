@@ -59,8 +59,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef UNICAST_H_
-#define UNICAST_H_
+#ifndef __UNICAST_H__
+#define __UNICAST_H__
 
 #include "net/rime/broadcast.h"
 
@@ -85,6 +85,6 @@ void unicast_close(struct unicast_conn *c);
 
 int unicast_send(struct unicast_conn *c, const rimeaddr_t *receiver);
 
-#endif /* UNICAST_H_ */
+#endif /* __UNICAST_H__ */
 /** @} */
 /** @} */

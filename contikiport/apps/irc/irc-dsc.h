@@ -31,11 +31,11 @@
  *
  *
  */
-#ifndef IRC_DSC_H_
-#define IRC_DSC_H_
+#ifndef __IRC_DSC_H__
+#define __IRC_DSC_H__
 
 #include "sys/dsc.h"
 
 DSC_HEADER(irc_dsc);
 
-#endif /* IRC_DSC_H_ */
+#endif /* __IRC_DSC_H__ */

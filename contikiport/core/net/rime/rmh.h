@@ -62,8 +62,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef RMH_H_
-#define RMH_H_
+#ifndef __RMH_H__
+#define __RMH_H__
 
 #include "net/rime/runicast.h"
 #include "net/rime/rimeaddr.h"
@@ -97,6 +97,6 @@ void rmh_close(struct rmh_conn *c);
 int rmh_send(struct rmh_conn *c, rimeaddr_t *to, uint8_t num_rexmit,
 	     uint8_t max_hops);
 
-#endif /* RMH_H_ */
+#endif /* __RMH_H__ */
 /** @} */
 /** @} */

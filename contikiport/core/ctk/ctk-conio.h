@@ -32,8 +32,8 @@
  *
  */
 
-#ifndef CTK_CONIO_H_
-#define CTK_CONIO_H_
+#ifndef __CTK_CONIO_H__
+#define __CTK_CONIO_H__
 
 #include <conio.h>
 
@@ -62,4 +62,4 @@ typedef char ctk_arch_key_t;
 #define CH_CURS_LEFT 255
 #endif /* CH_CURS_LEFT */
 
-#endif /* CTK_CONIO_H_ */
+#endif /* __CTK_CONIO_H__ */

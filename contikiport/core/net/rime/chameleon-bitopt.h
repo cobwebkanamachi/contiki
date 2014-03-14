@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef CHAMELEON_BITOPT_H_
-#define CHAMELEON_BITOPT_H_
+#ifndef __CHAMELEON_BITOPT_H__
+#define __CHAMELEON_BITOPT_H__
 
 #include "sys/cc.h"
 
 extern CC_CONST_FUNCTION struct chameleon_module chameleon_bitopt;
 
-#endif /* CHAMELEON_BITOPT_H_ */
+#endif /* __CHAMELEON_BITOPT_H__ */

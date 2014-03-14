@@ -31,8 +31,8 @@
  *
  *
  */
-#ifndef WWW_H_
-#define WWW_H_
+#ifndef __WWW_H__
+#define __WWW_H__
 
 #ifndef WWW_CONF_WEBPAGE_WIDTH
 #define WWW_CONF_WEBPAGE_WIDTH 80
@@ -64,4 +64,4 @@
 
 PROCESS_NAME(www_process);
 
-#endif /* WWW_H_ */
+#endif /* __WWW_H__ */

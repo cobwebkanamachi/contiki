@@ -39,6 +39,7 @@
 
 #include <stdio.h>
 
+#include "net/hc.h"
 #include "net/uip-fw.h"
 #include "net/uip-over-mesh.h"
 #include "net/rime/route-discovery.h"
@@ -104,6 +105,7 @@ recv_data(struct unicast_conn *c, const rimeaddr_t *from)
     }
   }
 
+  /*  uip_len = hc_inflate(&uip_buf[UIP_LLH_LEN], uip_len);*/
 
   PRINTF("uip-over-mesh: %d.%d: recv_data with len %d\n",
 	 rimeaddr_node_addr.u8[0], rimeaddr_node_addr.u8[1], uip_len);
@@ -253,6 +255,7 @@ uip_over_mesh_send(void)
 	 receiver.u8[0], receiver.u8[1],
 	 uip_len);
   
+  /*  uip_len = hc_compress(&uip_buf[UIP_LLH_LEN], uip_len);*/
   
   packetbuf_copyfrom(&uip_buf[UIP_LLH_LEN], uip_len);
 

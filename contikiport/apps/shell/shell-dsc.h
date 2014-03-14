@@ -31,11 +31,11 @@
  *
  *
  */
-#ifndef SHELL_DSC_H_
-#define SHELL_DSC_H_
+#ifndef __SHELL_DSC_H__
+#define __SHELL_DSC_H__
 
 #include "sys/dsc.h"
 
 DSC_HEADER(shell_dsc);
 
-#endif /* SHELL_DSC_H_ */
+#endif /* __SHELL_DSC_H__ */

@@ -51,8 +51,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef CTIMER_H_
-#define CTIMER_H_
+#ifndef __CTIMER_H__
+#define __CTIMER_H__
 
 #include "sys/etimer.h"
 
@@ -143,6 +143,6 @@ int ctimer_expired(struct ctimer *c);
  */
 void ctimer_init(void);
 
-#endif /* CTIMER_H_ */
+#endif /* __CTIMER_H__ */
 /** @} */
 /** @} */

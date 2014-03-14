@@ -53,8 +53,8 @@
  * http://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
  */
 
-#ifndef LC_SWITCH_H_
-#define LC_SWITCH_H_
+#ifndef __LC_SWITCH_H__
+#define __LC_SWITCH_H__
 
 /* WARNING! lc implementation using switch() does not work if an
    LC_SET() is done within another switch() statement! */
@@ -70,6 +70,6 @@ typedef unsigned short lc_t;
 
 #define LC_END(s) }
 
-#endif /* LC_SWITCH_H_ */
+#endif /* __LC_SWITCH_H__ */
 
 /** @} */

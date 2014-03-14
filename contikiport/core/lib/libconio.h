@@ -32,8 +32,8 @@
  *
  */
 
-#ifndef LIBCONIO_H_
-#define LIBCONIO_H_
+#ifndef __LIBCONIO_H__
+#define __LIBCONIO_H__
 
 /* This function must be implemented specifically for the
    architecture: */
@@ -81,4 +81,4 @@ void textcolor(unsigned char c);
 
 
 
-#endif /* LIBCONIO_H_ */
+#endif /* __LIBCONIO_H__ */

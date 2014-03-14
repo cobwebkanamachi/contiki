@@ -31,10 +31,10 @@
  *
  *
  */
-#ifndef CTK_TEXTENTRY_MULTILINE_H_
-#define CTK_TEXTENTRY_MULTILINE_H_
+#ifndef __CTK_TEXTENTRY_MULTILINE_H__
+#define __CTK_TEXTENTRY_MULTILINE_H__
 
 unsigned char ctk_textentry_multiline_input(ctk_arch_key_t c,
 					    struct ctk_textentry *t);
 
-#endif /* CTK_TEXTENTRY_MULTILINE_H_ */
+#endif /* __CTK_TEXTENTRY_MULTILINE_H__ */

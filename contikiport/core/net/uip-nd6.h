@@ -42,8 +42,8 @@
  *
  */
 
-#ifndef UIP_ND6_H_
-#define UIP_ND6_H_
+#ifndef __UIP_ND6_H__
+#define __UIP_ND6_H__
 
 #include "net/uip.h"
 #include "sys/stimer.h"
@@ -562,6 +562,6 @@ uip_appserver_addr_get(uip_ipaddr_t *ipaddr);
  *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *
  */
-#endif /* UIP_ND6_H_ */
+#endif /* __UIP_ND6_H__ */
 
 /** @} */

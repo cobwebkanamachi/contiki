@@ -37,8 +37,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef AUTOSTART_H_
-#define AUTOSTART_H_
+#ifndef __AUTOSTART_H__
+#define __AUTOSTART_H__
 
 #include "sys/process.h"
 
@@ -59,4 +59,4 @@ CLIF extern struct process * const autostart_processes[];
 void autostart_start(struct process * const processes[]);
 void autostart_exit(struct process * const processes[]);
 
-#endif /* AUTOSTART_H_ */
+#endif /* __AUTOSTART_H__ */

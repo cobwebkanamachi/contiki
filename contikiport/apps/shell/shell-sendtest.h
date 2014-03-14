@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_SENDTEST_H_
-#define SHELL_SENDTEST_H_
+#ifndef __SHELL_SENDTEST_H__
+#define __SHELL_SENDTEST_H__
 
 #include "shell.h"
 
 void shell_sendtest_init(void);
 
-#endif /* SHELL_SENDTEST_H_ */
+#endif /* __SHELL_SENDTEST_H__ */

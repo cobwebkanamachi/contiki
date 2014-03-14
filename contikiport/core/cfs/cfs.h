@@ -55,8 +55,8 @@
  * Author: Adam Dunkels <adam@sics.se>
  *
  */
-#ifndef CFS_H_
-#define CFS_H_
+#ifndef __CFS_H__
+#define __CFS_H__
 
 #include "contiki.h"
 
@@ -276,7 +276,7 @@ CCIF int cfs_readdir(struct cfs_dir *dirp, struct cfs_dirent *dirent);
 CCIF void cfs_closedir(struct cfs_dir *dirp);
 #endif
 
-#endif /* CFS_H_ */
+#endif /* __CFS_H__ */
 
 /** @} */
 /** @} */

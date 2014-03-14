@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_PS_H_
-#define SHELL_PS_H_
+#ifndef __SHELL_PS_H__
+#define __SHELL_PS_H__
 
 #include "shell.h"
 
 void shell_ps_init(void);
 
-#endif /* SHELL_PS_H_ */
+#endif /* __SHELL_PS_H__ */

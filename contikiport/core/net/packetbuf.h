@@ -49,8 +49,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef PACKETBUF_H_
-#define PACKETBUF_H_
+#ifndef __PACKETBUF_H__
+#define __PACKETBUF_H__
 
 #include "contiki-conf.h"
 #include "net/rime/rimeaddr.h"
@@ -441,6 +441,6 @@ struct packetbuf_attrlist {
   uint8_t len;
 };
 
-#endif /* PACKETBUF_H_ */
+#endif /* __PACKETBUF_H__ */
 /** @} */
 /** @} */

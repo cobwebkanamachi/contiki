@@ -51,8 +51,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef RIMEADDR_H_
-#define RIMEADDR_H_
+#ifndef __RIMEADDR_H__
+#define __RIMEADDR_H__
 
 #include "contiki-conf.h"
 
@@ -126,6 +126,6 @@ extern rimeaddr_t rimeaddr_node_addr;
  */
 extern const rimeaddr_t rimeaddr_null;
 
-#endif /* RIMEADDR_H_ */
+#endif /* __RIMEADDR_H__ */
 /** @} */
 /** @} */

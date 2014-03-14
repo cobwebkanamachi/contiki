@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_TIME_H_
-#define SHELL_TIME_H_
+#ifndef __SHELL_TIME_H__
+#define __SHELL_TIME_H__
 
 #include "shell.h"
 
 void shell_time_init(void);
 
-#endif /* SHELL_TIME_H_ */
+#endif /* __SHELL_TIME_H__ */

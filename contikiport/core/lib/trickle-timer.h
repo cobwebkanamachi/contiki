@@ -68,8 +68,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef TRICKLE_TIMER_H_
-#define TRICKLE_TIMER_H_
+#ifndef __TRICKLE_TIMER_H__
+#define __TRICKLE_TIMER_H__
 
 #include "contiki-conf.h"
 #include "sys/ctimer.h"
@@ -509,6 +509,6 @@ void trickle_timer_inconsistency(struct trickle_timer *tt);
 
 /** @} */
 
-#endif /* TRICKLE_TIMER_H_ */
+#endif /* __TRICKLE_TIMER_H__ */
 /** @} */
 /** @} */

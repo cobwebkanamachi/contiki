@@ -54,8 +54,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef TRICKLE_H_
-#define TRICKLE_H_
+#ifndef __TRICKLE_H__
+#define __TRICKLE_H__
 
 #include "sys/ctimer.h"
 
@@ -89,6 +89,6 @@ void trickle_close(struct trickle_conn *c);
 
 void trickle_send(struct trickle_conn *c);
 
-#endif /* TRICKLE_H_ */
+#endif /* __TRICKLE_H__ */
 /** @} */
 /** @} */

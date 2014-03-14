@@ -45,8 +45,8 @@
  *
  */
 
-#ifndef PT_H_
-#define PT_H_
+#ifndef __PT_H__
+#define __PT_H__
 
 #include "sys/lc.h"
 
@@ -317,6 +317,6 @@ struct pt {
 
 /** @} */
 
-#endif /* PT_H_ */
+#endif /* __PT_H__ */
 
 /** @} */

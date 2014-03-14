@@ -56,8 +56,8 @@
  * 
  */
 
-#ifndef MMEM_H_
-#define MMEM_H_
+#ifndef __MMEM_H__
+#define __MMEM_H__
 
 /*---------------------------------------------------------------------------*/
 /**
@@ -87,7 +87,7 @@ int  mmem_alloc(struct mmem *m, unsigned int size);
 void mmem_free(struct mmem *);
 void mmem_init(void);
 
-#endif /* MMEM_H_ */
+#endif /* __MMEM_H__ */
 
 /** @} */
 /** @} */

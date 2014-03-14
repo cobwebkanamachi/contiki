@@ -51,8 +51,8 @@
  * This file is part of the Contiki operating system.
  *
  */
-#ifndef CRC16_H_
-#define CRC16_H_
+#ifndef __CRC16_H__
+#define __CRC16_H__
 
 /**
  * \brief      Update an accumulated CRC16 checksum with one byte.
@@ -89,7 +89,7 @@ unsigned short crc16_add(unsigned char b, unsigned short crc);
 unsigned short crc16_data(const unsigned char *data, int datalen,
 			  unsigned short acc);
 
-#endif /* CRC16_H_ */
+#endif /* __CRC16_H__ */
 
 /** @} */
 /** @} */

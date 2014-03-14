@@ -65,13 +65,6 @@
 #include "net/mac/frame802154.h"
 #include <string.h>
 
-#define DEBUG 1
-#if DEBUG
-#include <stdio.h>
-#define PRINTF(...) printf(__VA_ARGS__)
-#else
-#define PRINTF(...) do {} while (0)
-#endif
 /**
  *  \brief Structure that contains the lengths of the various addressing and security fields
  *  in the 802.15.4 header.  This structure is used in \ref frame802154_create()
@@ -352,7 +345,7 @@ frame802154_parse(uint8_t *data, int len, frame802154_t *pf)
   /* header length */
   c = p - data;
   /* payload length */
-  pf->payload_len = (len - c);
+  pf->payload_len = (uint8_t)(0xff & (len - c));
   /* payload */
   pf->payload = p;
 

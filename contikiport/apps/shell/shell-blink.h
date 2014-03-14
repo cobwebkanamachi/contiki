@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_BLINK_H_
-#define SHELL_BLINK_H_
+#ifndef __SHELL_BLINK_H__
+#define __SHELL_BLINK_H__
 
 #include "shell.h"
 
 void shell_blink_init(void);
 
-#endif /* SHELL_BLINK_H_ */
+#endif /* __SHELL_BLINK_H__ */

@@ -37,9 +37,9 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_POWER_H_
-#define SHELL_POWER_H_
+#ifndef __SHELL_POWER_H__
+#define __SHELL_POWER_H__
 
 void shell_power_init(void);
 
-#endif /* SHELL_POWER_H_ */
+#endif /* __SHELL_POWER_H__ */

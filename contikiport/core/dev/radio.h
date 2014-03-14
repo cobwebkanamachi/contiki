@@ -51,8 +51,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef RADIO_H_
-#define RADIO_H_
+#ifndef __RADIO_H__
+#define __RADIO_H__
 
 /**
  * The structure of a device driver for a radio in Contiki.
@@ -98,7 +98,7 @@ enum {
   RADIO_TX_NOACK,
 };
 
-#endif /* RADIO_H_ */
+#endif /* __RADIO_H__ */
 
 
 /** @} */

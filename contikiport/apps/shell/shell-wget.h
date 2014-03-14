@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_WGET_H_
-#define SHELL_WGET_H_
+#ifndef __SHELL_WGET_H__
+#define __SHELL_WGET_H__
 
 #include "shell.h"
 
 void shell_wget_init(void);
 
-#endif /* SHELL_WGET_H_ */
+#endif /* __SHELL_WGET_H__ */

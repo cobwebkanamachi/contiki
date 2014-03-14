@@ -71,8 +71,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef NETFLOOD_H_
-#define NETFLOOD_H_
+#ifndef __NETFLOOD_H__
+#define __NETFLOOD_H__
 
 #include "net/queuebuf.h"
 #include "net/rime/ipolite.h"
@@ -105,6 +105,6 @@ void netflood_close(struct netflood_conn *c);
 
 int netflood_send(struct netflood_conn *c, uint8_t seqno);
 
-#endif /* SIBC_H_ */
+#endif /* __SIBC_H__ */
 /** @} */
 /** @} */

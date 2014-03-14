@@ -31,8 +31,8 @@
  *
  *
  */
-#ifndef PROGRAM_HANDLER_H_
-#define PROGRAM_HANDLER_H_
+#ifndef __PROGRAM_HANDLER_H__
+#define __PROGRAM_HANDLER_H__
 
 #include "sys/dsc.h"
 
@@ -48,4 +48,4 @@ void program_handler_setscreensaver(char *name);
 void program_handler_add(struct dsc *dsc, char *menuname,
 			 unsigned char desktop);
 
-#endif /* PROGRAM_HANDLER_H_ */
+#endif /* __PROGRAM_HANDLER_H__ */

@@ -51,8 +51,8 @@
  */
 
 
-#ifndef EEPROM_H_
-#define EEPROM_H_
+#ifndef __EEPROM_H__
+#define __EEPROM_H__
 
 typedef unsigned short eeprom_addr_t;
 
@@ -111,7 +111,7 @@ void eeprom_read(eeprom_addr_t addr, unsigned char *buf, int size);
  
 void eeprom_init(void);
 
-#endif /* EEPROM_H_ */
+#endif /* __EEPROM_H__ */
 
 /** @} */
 /** @} */

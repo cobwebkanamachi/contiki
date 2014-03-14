@@ -1,110 +1,110 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <simconf>
-  <project EXPORT="discard">[APPS_DIR]/mrm</project>
-  <project EXPORT="discard">[APPS_DIR]/mspsim</project>
-  <project EXPORT="discard">[APPS_DIR]/avrora</project>
-  <project EXPORT="discard">[APPS_DIR]/serial_socket</project>
-  <project EXPORT="discard">[APPS_DIR]/collect-view</project>
-  <project EXPORT="discard">[APPS_DIR]/powertracker</project>
+  <project>../apps/mrm</project>
+  <project>../apps/mspsim</project>
+  <project>../apps/avrora</project>
+  <project>../apps/native_gateway</project>
   <simulation>
     <title>Deluge</title>
+    <delaytime>0</delaytime>
     <randomseed>generated</randomseed>
     <motedelay_us>1000000</motedelay_us>
     <radiomedium>
-      org.contikios.cooja.radiomediums.UDGM
+      se.sics.cooja.radiomediums.UDGM
       <transmitting_range>50.0</transmitting_range>
       <interference_range>100.0</interference_range>
       <success_ratio_tx>1.0</success_ratio_tx>
       <success_ratio_rx>1.0</success_ratio_rx>
     </radiomedium>
-    <events>
-      <logoutput>40000</logoutput>
-    </events>
     <motetype>
-      org.contikios.cooja.mspmote.SkyMoteType
+      se.sics.cooja.mspmote.SkyMoteType
       <identifier>sky1</identifier>
       <description>Sky Mote Type #1</description>
-      <source EXPORT="discard">[CONTIKI_DIR]/examples/sky/test-deluge.c</source>
-      <commands EXPORT="discard">make clean TARGET=sky
+      <source>[CONTIKI_DIR]/examples/sky/test-deluge.c</source>
+      <commands>make clean TARGET=sky
 make APPS=deluge test-deluge.sky TARGET=sky</commands>
-      <firmware EXPORT="copy">[CONTIKI_DIR]/examples/sky/test-deluge.sky</firmware>
-      <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.IPAddress</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.Mote2MoteRelations</moteinterface>
-      <moteinterface>org.contikios.cooja.mspmote.interfaces.MspClock</moteinterface>
-      <moteinterface>org.contikios.cooja.mspmote.interfaces.MspMoteID</moteinterface>
-      <moteinterface>org.contikios.cooja.mspmote.interfaces.SkyButton</moteinterface>
-      <moteinterface>org.contikios.cooja.mspmote.interfaces.SkyFlash</moteinterface>
-      <moteinterface>org.contikios.cooja.mspmote.interfaces.Msp802154Radio</moteinterface>
-      <moteinterface>org.contikios.cooja.mspmote.interfaces.MspSerial</moteinterface>
-      <moteinterface>org.contikios.cooja.mspmote.interfaces.SkyLED</moteinterface>
+      <firmware>[CONTIKI_DIR]/examples/sky/test-deluge.sky</firmware>
+      <moteinterface>se.sics.cooja.interfaces.Position</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.IPAddress</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.Mote2MoteRelations</moteinterface>
+      <moteinterface>se.sics.cooja.mspmote.interfaces.MspClock</moteinterface>
+      <moteinterface>se.sics.cooja.mspmote.interfaces.MspMoteID</moteinterface>
+      <moteinterface>se.sics.cooja.mspmote.interfaces.SkyButton</moteinterface>
+      <moteinterface>se.sics.cooja.mspmote.interfaces.SkyFlash</moteinterface>
+      <moteinterface>se.sics.cooja.mspmote.interfaces.SkyByteRadio</moteinterface>
+      <moteinterface>se.sics.cooja.mspmote.interfaces.SkySerial</moteinterface>
+      <moteinterface>se.sics.cooja.mspmote.interfaces.SkyLED</moteinterface>
     </motetype>
     <mote>
+      se.sics.cooja.mspmote.SkyMote
+      <motetype_identifier>sky1</motetype_identifier>
       <breakpoints />
       <interface_config>
-        org.contikios.cooja.interfaces.Position
+        se.sics.cooja.interfaces.Position
         <x>22.464792491653174</x>
         <y>11.3235347656354</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.mspmote.interfaces.MspMoteID
+        se.sics.cooja.mspmote.interfaces.MspMoteID
         <id>1</id>
       </interface_config>
-      <motetype_identifier>sky1</motetype_identifier>
     </mote>
     <mote>
+      se.sics.cooja.mspmote.SkyMote
+      <motetype_identifier>sky1</motetype_identifier>
       <breakpoints />
       <interface_config>
-        org.contikios.cooja.interfaces.Position
+        se.sics.cooja.interfaces.Position
         <x>16.167564578306468</x>
         <y>29.89745599030348</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.mspmote.interfaces.MspMoteID
+        se.sics.cooja.mspmote.interfaces.MspMoteID
         <id>3</id>
       </interface_config>
-      <motetype_identifier>sky1</motetype_identifier>
     </mote>
     <mote>
+      se.sics.cooja.mspmote.SkyMote
+      <motetype_identifier>sky1</motetype_identifier>
       <breakpoints />
       <interface_config>
-        org.contikios.cooja.interfaces.Position
+        se.sics.cooja.interfaces.Position
         <x>63.42409596590043</x>
         <y>12.470791515046386</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.mspmote.interfaces.MspMoteID
+        se.sics.cooja.mspmote.interfaces.MspMoteID
         <id>5</id>
       </interface_config>
-      <motetype_identifier>sky1</motetype_identifier>
     </mote>
   </simulation>
   <plugin>
-    org.contikios.cooja.plugins.SimControl
+    se.sics.cooja.plugins.SimControl
     <width>282</width>
     <z>4</z>
     <height>212</height>
     <location_x>0</location_x>
     <location_y>0</location_y>
+    <minimized>false</minimized>
   </plugin>
   <plugin>
-    org.contikios.cooja.plugins.Visualizer
+    se.sics.cooja.plugins.Visualizer
     <plugin_config>
-      <skin>org.contikios.cooja.plugins.skins.IDVisualizerSkin</skin>
-      <skin>org.contikios.cooja.plugins.skins.UDGMVisualizerSkin</skin>
-      <viewport>4.405003166995177 0.0 0.0 4.405003166995177 -40.3007583818182 -45.78929741329485</viewport>
+      <skin>Mote IDs</skin>
+      <skin>Radio environment (UDGM)</skin>
     </plugin_config>
     <width>283</width>
     <z>2</z>
     <height>144</height>
     <location_x>-1</location_x>
     <location_y>212</location_y>
+    <minimized>false</minimized>
   </plugin>
   <plugin>
-    org.contikios.cooja.plugins.ScriptRunner
+    se.sics.cooja.plugins.ScriptRunner
     <plugin_config>
       <script>TIMEOUT(100000, log.log("last msg: " + msg + "\n")); /* print last msg at timeout */
 
@@ -122,34 +122,36 @@ log.testOK(); /* Report test success and quit */</script>
     <height>357</height>
     <location_x>281</location_x>
     <location_y>1</location_y>
+    <minimized>false</minimized>
   </plugin>
   <plugin>
-    org.contikios.cooja.plugins.TimeLine
+    se.sics.cooja.plugins.TimeLine
     <plugin_config>
       <mote>0</mote>
       <mote>1</mote>
       <mote>2</mote>
       <showRadioRXTX />
-      <zoomfactor>500.0</zoomfactor>
+      <split>109</split>
+      <zoom>9</zoom>
     </plugin_config>
     <width>882</width>
     <z>3</z>
     <height>149</height>
     <location_x>-1</location_x>
     <location_y>357</location_y>
+    <minimized>false</minimized>
   </plugin>
   <plugin>
-    org.contikios.cooja.plugins.LogListener
+    se.sics.cooja.plugins.LogListener
     <plugin_config>
       <filter />
-      <formatted_time />
-      <coloring />
     </plugin_config>
     <width>882</width>
     <z>0</z>
     <height>195</height>
     <location_x>-1</location_x>
     <location_y>504</location_y>
+    <minimized>false</minimized>
   </plugin>
 </simconf>
 

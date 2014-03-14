@@ -29,8 +29,8 @@
  * This file is part of the Contiki operating system.
  */
 
-#ifndef JSONPARSE_H_
-#define JSONPARSE_H_
+#ifndef __JSONPARSE_H__
+#define __JSONPARSE_H__
 
 #include "contiki-conf.h"
 #include "json.h"
@@ -88,4 +88,4 @@ int jsonparse_get_type(struct jsonparse_state *state);
 /* compare the JSON value with the specified string */
 int jsonparse_strcmp_value(struct jsonparse_state *state, const char *str);
 
-#endif /* JSONPARSE_H_ */
+#endif /* __JSONPARSE_H__ */

@@ -31,11 +31,11 @@
  *
  *
  */
-#ifndef EMAIL_DSC_H_
-#define EMAIL_DSC_H_
+#ifndef __EMAIL_DSC_H__
+#define __EMAIL_DSC_H__
 
 #include "sys/dsc.h"
 
 DSC_HEADER(email_dsc);
 
-#endif /* EMAIL_DSC_H_ */
+#endif /* __EMAIL_DSC_H__ */

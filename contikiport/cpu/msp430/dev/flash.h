@@ -36,8 +36,8 @@
  *
  */
 
-#ifndef FLASH_H_
-#define FLASH_H_
+#ifndef __FLASH_H__
+#define __FLASH_H__
 
 /**
  * Setup function to be called before any of the flash programming functions.
@@ -74,4 +74,4 @@ void flash_write(unsigned short *addr, unsigned short word);
  */
 void flash_clear(unsigned short *addr);
 
-#endif /* FLASH_H_ */
+#endif /* __FLASH_H__ */

@@ -29,8 +29,8 @@
  * This file is part of the Contiki operating system.
  *
  */
-#ifndef HWCONF_H_
-#define HWCONF_H_
+#ifndef __HWCONF_H__
+#define __HWCONF_H__
 #include "contiki.h"
 #include "sys/cc.h"
 
@@ -53,4 +53,4 @@ static CC_INLINE void name##_IRQ_EDGE_SELECTU() {P##port##IES &= ~(1 << bit);}\
 static CC_INLINE int  name##_CHECK_IRQ() {return P##port##IFG & (1 << bit);} \
 static CC_INLINE int  name##_IRQ_PORT() {return port;}
 
-#endif /* HWCONF_H_ */
+#endif /* __HWCONF_H__ */

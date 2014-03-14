@@ -63,8 +63,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef ANNOUNCEMENT_H_
-#define ANNOUNCEMENT_H_
+#ifndef __ANNOUNCEMENT_H__
+#define __ANNOUNCEMENT_H__
 
 #include "net/rime/rimeaddr.h"
 
@@ -267,7 +267,7 @@ void announcement_register_observer_callback(announcement_observer observer);
  * @}
  */
 
-#endif /* ANNOUNCE_H_ */
+#endif /* __ANNOUNCE_H__ */
 
 /** @} */
 /** @} */

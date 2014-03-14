@@ -31,9 +31,9 @@
  *
  *
  */
-#ifndef FTP_H_
-#define FTP_H_
+#ifndef __FTP_H__
+#define __FTP_H__
 
 PROCESS_NAME(ftp_process);
 
-#endif /* FTP_H_ */
+#endif /* __FTP_H__ */

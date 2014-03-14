@@ -31,11 +31,11 @@
  *
  *
  */
-#ifndef NETCONF_DSC_H_
-#define NETCONF_DSC_H_
+#ifndef __NETCONF_DSC_H__
+#define __NETCONF_DSC_H__
 
 #include "sys/dsc.h"
 
 DSC_HEADER(netconf_dsc);
 
-#endif /* NETCONF_DSC_H_ */
+#endif /* __NETCONF_DSC_H__ */

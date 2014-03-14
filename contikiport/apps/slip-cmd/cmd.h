@@ -35,8 +35,8 @@
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#ifndef CMD_H_
-#define CMD_H_
+#ifndef __CMD_H__
+#define __CMD_H__
 
 #include "contiki.h"
 
@@ -50,4 +50,4 @@ const cmd_handler_t cmd_handlers[] = {__VA_ARGS__, NULL}
 void cmd_input(const uint8_t *data, int data_len);
 void cmd_send(const uint8_t *data, int data_len);
 
-#endif /* CMD_H_ */
+#endif /* __CMD_H__ */

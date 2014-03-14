@@ -36,11 +36,11 @@
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#ifndef FRAMER_802154_H_
-#define FRAMER_802154_H_
+#ifndef __FRAMER_802154_H__
+#define __FRAMER_802154_H__
 
 #include "net/mac/framer.h"
 
 extern const struct framer framer_802154;
 
-#endif /* FRAMER_802154_H_ */
+#endif /* __FRAMER_802154_H__ */

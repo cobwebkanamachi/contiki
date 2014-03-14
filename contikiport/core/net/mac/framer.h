@@ -38,8 +38,8 @@
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#ifndef FRAMER_H_
-#define FRAMER_H_
+#ifndef __FRAMER_H__
+#define __FRAMER_H__
 
 #define FRAMER_FAILED -1
 
@@ -50,4 +50,4 @@ struct framer {
 
 };
 
-#endif /* FRAMER_H_ */
+#endif /* __FRAMER_H__ */

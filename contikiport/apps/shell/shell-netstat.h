@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_NETSTAT_H_
-#define SHELL_NETSTAT_H_
+#ifndef __SHELL_NETSTAT_H__
+#define __SHELL_NETSTAT_H__
 
 #include "shell.h"
 
 void shell_netstat_init(void);
 
-#endif /* SHELL_NETSTAT_H_ */
+#endif /* __SHELL_NETSTAT_H__ */

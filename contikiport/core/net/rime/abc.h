@@ -54,8 +54,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef ABC_H_
-#define ABC_H_
+#ifndef __ABC_H__
+#define __ABC_H__
 
 #include "net/packetbuf.h"
 #include "net/rime/channel.h"
@@ -138,6 +138,6 @@ void abc_input(struct channel *channel);
 
 void abc_sent(struct channel *channel, int status, int num_tx);
 
-#endif /* ABC_H_ */
+#endif /* __ABC_H__ */
 /** @} */
 /** @} */

@@ -51,8 +51,8 @@
  *
  *
  */
-#ifndef LOADER_H_
-#define LOADER_H_
+#ifndef __LOADER_H__
+#define __LOADER_H__
 
 /* Errors that the LOADER_LOAD() function may return: */
 
@@ -125,7 +125,7 @@
 #define LOADER_UNLOAD_DSC(dsc)
 #endif /* LOADER_UNLOAD */
 
-#endif /* LOADER_H_ */
+#endif /* __LOADER_H__ */
 
 /** @} */
 /** @} */

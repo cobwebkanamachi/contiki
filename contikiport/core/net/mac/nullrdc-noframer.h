@@ -37,12 +37,12 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef NULLRDC_NOFRAMER_H_
-#define NULLRDC_NOFRAMER_H_
+#ifndef __NULLRDC_NOFRAMER_H__
+#define __NULLRDC_NOFRAMER_H__
 
 #include "net/mac/rdc.h"
 #include "dev/radio.h"
 
 extern const struct rdc_driver nullrdc_noframer_driver;
 
-#endif /* NULLRDC_NOFRAMER_H_ */
+#endif /* __NULLRDC_NOFRAMER_H__ */

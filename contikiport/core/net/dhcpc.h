@@ -29,8 +29,8 @@
  * This file is part of the Contiki operating system.
  *
  */
-#ifndef DHCPC_H_
-#define DHCPC_H_
+#ifndef __DHCPC_H__
+#define __DHCPC_H__
 
 struct dhcpc_state {
   struct pt pt;
@@ -59,4 +59,4 @@ void dhcpc_appcall(process_event_t ev, void *data);
 void dhcpc_configured(const struct dhcpc_state *s);
 void dhcpc_unconfigured(const struct dhcpc_state *s);
 
-#endif /* DHCPC_H_ */
+#endif /* __DHCPC_H__ */

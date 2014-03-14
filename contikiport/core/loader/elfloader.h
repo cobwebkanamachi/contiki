@@ -71,8 +71,8 @@
  * This file is part of the Contiki operating system.
  *
  */
-#ifndef ELFLOADER_H_
-#define ELFLOADER_H_
+#ifndef __ELFLOADER_H__
+#define __ELFLOADER_H__
 
 #include "cfs/cfs.h"
 
@@ -187,7 +187,7 @@ struct elf32_rela {
 };
 
 
-#endif /* ELFLOADER_H_ */
+#endif /* __ELFLOADER_H__ */
 
 /** @} */
 /** @} */

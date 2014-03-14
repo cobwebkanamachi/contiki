@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_MEMDEBUG_H_
-#define SHELL_MEMDEBUG_H_
+#ifndef __SHELL_MEMDEBUG_H__
+#define __SHELL_MEMDEBUG_H__
 
 #include "shell.h"
 
 void shell_memdebug_init(void);
 
-#endif /* SHELL_MEMDEBUG_H_ */
+#endif /* __SHELL_MEMDEBUG_H__ */

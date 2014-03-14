@@ -31,11 +31,11 @@
  *
  *
  */
-#ifndef CALC_DSC_H_
-#define CALC_DSC_H_
+#ifndef __CALC_DSC_H__
+#define __CALC_DSC_H__
 
 #include "sys/dsc.h"
 
 DSC_HEADER(calc_dsc);
 
-#endif /* CALC_DSC_H_ */
+#endif /* __CALC_DSC_H__ */

@@ -56,8 +56,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef NEIGHBOR_DISCOVERY_H_
-#define NEIGHBOR_DISCOVERY_H_
+#ifndef __NEIGHBOR_DISCOVERY_H__
+#define __NEIGHBOR_DISCOVERY_H__
 
 #include "net/rime/broadcast.h"
 #include "sys/ctimer.h"
@@ -90,6 +90,6 @@ void neighbor_discovery_set_val(struct neighbor_discovery_conn *c, uint16_t val)
 
 void neighbor_discovery_start(struct neighbor_discovery_conn *c, uint16_t val);
 
-#endif /* NEIGHBOR_DISCOVERY_H_ */
+#endif /* __NEIGHBOR_DISCOVERY_H__ */
 /** @} */
 /** @} */

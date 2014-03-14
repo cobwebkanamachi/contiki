@@ -31,9 +31,9 @@
  *
  *
  */
-#ifndef IRC_H_
-#define IRC_H_
+#ifndef __IRC_H__
+#define __IRC_H__
 
 PROCESS_NAME(irc_process);
 
-#endif /* IRC_H_ */
+#endif /* __IRC_H__ */

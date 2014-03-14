@@ -29,9 +29,9 @@
  * This file is part of the Contiki operating system.
  *
  */
-#ifndef SYMTAB_H_
-#define SYMTAB_H_
+#ifndef __SYMTAB_H__
+#define __SYMTAB_H__
 
 void *symtab_lookup(const char *name);
 
-#endif /* SYMTAB_H_ */
+#endif /* __SYMTAB_H__ */

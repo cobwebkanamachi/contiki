@@ -43,8 +43,8 @@
  */
 
 
-#ifndef ICMP6_H_
-#define ICMP6_H_
+#ifndef __ICMP6_H__
+#define __ICMP6_H__
 
 #include "net/uip.h"
 
@@ -135,6 +135,6 @@ uip_icmp6_send(uip_ipaddr_t *dest, int type, int code, int payload_len);
 
 /** @} */
 
-#endif /*ICMP6_H_*/
+#endif /*__ICMP6_H__*/
 /** @} */
 

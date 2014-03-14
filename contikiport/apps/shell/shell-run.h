@@ -30,11 +30,11 @@
  *
  */
 
-#ifndef SHELL_RUN_H_
-#define SHELL_RUN_H_
+#ifndef __SHELL_RUN_H__
+#define __SHELL_RUN_H__
 
 #include "shell.h"
 
 void shell_run_init(void);
 
-#endif /* SHELL_RUN_H_ */
+#endif /* __SHELL_RUN_H__ */

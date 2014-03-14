@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef HTTPD_H_
-#define HTTPD_H_
+#ifndef __HTTPD_H__
+#define __HTTPD_H__
 /*
  * The default number of simultaneous server connections is 4. Multiple connections can be triggered
  * by requests for embedded images, style sheets, icons, etc. and a TCP RESET is issued when no more
@@ -328,4 +328,4 @@ char TCPBUF[512];
 #endif
 
 
-#endif /* HTTPD_H_ */
+#endif /* __HTTPD_H__ */

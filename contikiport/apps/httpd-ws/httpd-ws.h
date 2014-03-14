@@ -38,8 +38,8 @@
  *         Joakim Eriksson <joakime@sics.se>
  */
 
-#ifndef HTTPD_WS_H_
-#define HTTPD_WS_H_
+#ifndef __HTTPD_WS_H__
+#define __HTTPD_WS_H__
 
 #include "contiki-net.h"
 
@@ -122,4 +122,4 @@ httpd_ws_script_t httpd_ws_get_script(struct httpd_ws_state *s);
 
 PROCESS_NAME(httpd_ws_process);
 
-#endif /* HTTPD_WS_H_ */
+#endif /* __HTTPD_WS_H__ */

@@ -46,8 +46,8 @@
  *
  */
 
-#ifndef CTK_H_
-#define CTK_H_
+#ifndef __CTK_H__
+#define __CTK_H__
 
 
 #include "contiki-conf.h"
@@ -986,4 +986,4 @@ CCIF extern process_event_t ctk_signal_button_activate,
 /** @} */
 /** @} */
 /** @} */
-#endif /* CTK_H_ */
+#endif /* __CTK_H__ */

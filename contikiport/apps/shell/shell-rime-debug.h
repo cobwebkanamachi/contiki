@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_RIME_DEBUG_H_
-#define SHELL_RIME_DEBUG_H_
+#ifndef __SHELL_RIME_DEBUG_H__
+#define __SHELL_RIME_DEBUG_H__
 
 #include "shell.h"
 
 void shell_rime_debug_init(void);
 
-#endif /* SHELL_RIME_DEBUG_H_ */
+#endif /* __SHELL_RIME_DEBUG_H__ */

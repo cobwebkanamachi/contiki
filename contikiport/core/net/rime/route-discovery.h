@@ -54,8 +54,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef ROUTE_DISCOVERY_H_
-#define ROUTE_DISCOVERY_H_
+#ifndef __ROUTE_DISCOVERY_H__
+#define __ROUTE_DISCOVERY_H__
 
 #include "net/rime/unicast.h"
 #include "net/rime/netflood.h"
@@ -88,6 +88,6 @@ int route_discovery_discover(struct route_discovery_conn *c, const rimeaddr_t *d
 
 void route_discovery_close(struct route_discovery_conn *c);
 
-#endif /* ROUTE_DISCOVERY_H_ */
+#endif /* __ROUTE_DISCOVERY_H__ */
 /** @} */
 /** @} */

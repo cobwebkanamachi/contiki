@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_COFFEE_H_
-#define SHELL_COFFEE_H_
+#ifndef __SHELL_COFFEE_H__
+#define __SHELL_COFFEE_H__
 
 #include "shell.h"
 
 void shell_coffee_init(void);
 
-#endif /* SHELL_COFFEE_H_ */
+#endif /* __SHELL_COFFEE_H__ */

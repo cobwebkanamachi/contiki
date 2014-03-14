@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_BASE64_H_
-#define SHELL_BASE64_H_
+#ifndef __SHELL_BASE64_H__
+#define __SHELL_BASE64_H__
 
 #include "shell.h"
 
 void shell_base64_init(void);
 
-#endif /* SHELL_BASE64_H_ */
+#endif /* __SHELL_BASE64_H__ */

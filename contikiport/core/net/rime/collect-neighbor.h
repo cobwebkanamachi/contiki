@@ -48,8 +48,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef COLLECT_NEIGHBOR_H_
-#define COLLECT_NEIGHBOR_H_
+#ifndef __COLLECT_NEIGHBOR_H__
+#define __COLLECT_NEIGHBOR_H__
 
 #include "net/rime/rimeaddr.h"
 #include "net/rime/collect-link-estimate.h"
@@ -100,6 +100,6 @@ uint16_t collect_neighbor_rtmetric_link_estimate(struct collect_neighbor *n);
 uint16_t collect_neighbor_rtmetric(struct collect_neighbor *n);
 
 
-#endif /* COLLECT_NEIGHBOR_H_ */
+#endif /* __COLLECT_NEIGHBOR_H__ */
 /** @} */
 /** @} */

@@ -57,8 +57,8 @@
  *
  */
 
-#ifndef UIP_ARCH_H_
-#define UIP_ARCH_H_
+#ifndef __UIP_ARCH_H__
+#define __UIP_ARCH_H__
 
 #include "net/uip.h"
 
@@ -134,4 +134,4 @@ uint16_t uip_udpchksum(void);
 /** @} */
 /** @} */
 
-#endif /* UIP_ARCH_H_ */
+#endif /* __UIP_ARCH_H__ */

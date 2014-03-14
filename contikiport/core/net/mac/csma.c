@@ -63,14 +63,6 @@
 #define PRINTF(...)
 #endif /* DEBUG */
 
-#ifndef CSMA_MAX_BACKOFF_EXPONENT
-#ifdef CSMA_CONF_MAX_BACKOFF_EXPONENT
-#define CSMA_MAX_BACKOFF_EXPONENT CSMA_CONF_MAX_BACKOFF_EXPONENT
-#else
-#define CSMA_MAX_BACKOFF_EXPONENT 3
-#endif /* CSMA_CONF_MAX_BACKOFF_EXPONENT */
-#endif /* CSMA_MAX_BACKOFF_EXPONENT */
-
 #ifndef CSMA_MAX_MAC_TRANSMISSIONS
 #ifdef CSMA_CONF_MAX_MAC_TRANSMISSIONS
 #define CSMA_MAX_MAC_TRANSMISSIONS CSMA_CONF_MAX_MAC_TRANSMISSIONS
@@ -202,7 +194,6 @@ packet_sent(void *ptr, int status, int num_transmissions)
   mac_callback_t sent;
   void *cptr;
   int num_tx;
-  int backoff_exponent;
   int backoff_transmissions;
 
   n = ptr;
@@ -258,21 +249,18 @@ packet_sent(void *ptr, int status, int num_transmissions)
            check interval of the underlying radio duty cycling layer. */
         time = default_timebase();
 
-        /* The retransmission time uses a truncated exponential backoff
-         * so that the interval between the transmissions increase with
-         * each retransmit. */
-        backoff_exponent = num_tx;
+        /* The retransmission time uses a linear backoff so that the
+           interval between the transmissions increase with each
+           retransmit. */
+        backoff_transmissions = n->transmissions + 1;
 
-        /* Truncate the exponent if needed. */
-        if(backoff_exponent > CSMA_MAX_BACKOFF_EXPONENT) {
-          backoff_exponent = CSMA_MAX_BACKOFF_EXPONENT;
+        /* Clamp the number of backoffs so that we don't get a too long
+           timeout here, since that will delay all packets in the
+           queue. */
+        if(backoff_transmissions > 3) {
+          backoff_transmissions = 3;
         }
 
-        /* Proceed to exponentiation. */
-        backoff_transmissions = 1 << backoff_exponent;
-
-        /* Pick a time for next transmission, within the interval:
-         * [time, time + 2^backoff_exponent * time[ */
         time = time + (random_rand() % (backoff_transmissions * time));
 
         if(n->transmissions < metadata->max_transmissions) {
@@ -306,15 +294,8 @@ send_packet(mac_callback_t sent, void *ptr)
 {
   struct rdc_buf_list *q;
   struct neighbor_queue *n;
-  static uint8_t initialized = 0;
   static uint16_t seqno;
   const rimeaddr_t *addr = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
-
-  if(!initialized) {
-    initialized = 1;
-    /* Initialize the sequence number to a random value as per 802.15.4. */
-    seqno = random_rand();
-  }
 
   if(seqno == 0) {
     /* PACKETBUF_ATTR_MAC_SEQNO cannot be zero, due to a pecuilarity

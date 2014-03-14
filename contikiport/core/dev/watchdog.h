@@ -29,8 +29,8 @@
  * This file is part of the Contiki operating system.
  *
  */
-#ifndef WATCHDOG_H_
-#define WATCHDOG_H_
+#ifndef __WATCHDOG_H__
+#define __WATCHDOG_H__
 
 void watchdog_init(void);
 void watchdog_start(void);
@@ -39,4 +39,4 @@ void watchdog_stop(void);
 
 void watchdog_reboot(void);
 
-#endif /* WATCHDOG_H_ */
+#endif /* __WATCHDOG_H__ */

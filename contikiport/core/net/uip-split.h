@@ -68,8 +68,8 @@
  *
  */
 
-#ifndef UIP_SPLIT_H_
-#define UIP_SPLIT_H_
+#ifndef __UIP_SPLIT_H__
+#define __UIP_SPLIT_H__
 
 /**
  * Handle outgoing packets.
@@ -89,7 +89,7 @@
  */
 void uip_split_output(void);
 
-#endif /* UIP_SPLIT_H_ */
+#endif /* __UIP_SPLIT_H__ */
 
 /** @} */
 /** @} */

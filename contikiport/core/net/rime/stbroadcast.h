@@ -57,8 +57,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef STBROADCAST_H_
-#define STBROADCAST_H_
+#ifndef __STBROADCAST_H__
+#define __STBROADCAST_H__
 
 #include "sys/ctimer.h"
 
@@ -147,7 +147,7 @@ void stbroadcast_cancel(struct stbroadcast_conn *c);
  */
 void stbroadcast_set_timer(struct stbroadcast_conn *c, clock_time_t t);
 
-#endif /* STBROADCAST_H_ */
+#endif /* __STBROADCAST_H__ */
 
 /** @} */
 /** @} */

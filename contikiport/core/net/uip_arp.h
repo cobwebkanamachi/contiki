@@ -48,8 +48,8 @@
  *
  */
 
-#ifndef UIP_ARP_H_
-#define UIP_ARP_H_
+#ifndef __UIP_ARP_H__
+#define __UIP_ARP_H__
 
 #include "net/uip.h"
 
@@ -139,5 +139,5 @@ void uip_arp_timer(void);
 /** @} */
 
 
-#endif /* UIP_ARP_H_ */
+#endif /* __UIP_ARP_H__ */
 /** @} */

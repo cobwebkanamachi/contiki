@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_EXEC_H_
-#define SHELL_EXEC_H_
+#ifndef __SHELL_EXEC_H__
+#define __SHELL_EXEC_H__
 
 #include "shell.h"
 
 void shell_exec_init(void);
 
-#endif /* SHELL_EXEC_H_ */
+#endif /* __SHELL_EXEC_H__ */

@@ -31,8 +31,8 @@
  * Author: Adam Dunkels <adam@sics.se>
  *
  */
-#ifndef CONTIKI_LIB_H_
-#define CONTIKI_LIB_H_
+#ifndef __CONTIKI_LIB_H__
+#define __CONTIKI_LIB_H__
 
 #include "contiki.h"
 #include "lib/list.h"
@@ -40,4 +40,4 @@
 #include "lib/mmem.h"
 #include "lib/random.h"
 
-#endif /* CONTIKI_LIB_H_ */
+#endif /* __CONTIKI_LIB_H__ */

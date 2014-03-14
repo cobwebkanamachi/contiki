@@ -58,8 +58,8 @@
  *
  *
  */
-#ifndef DSC_H_
-#define DSC_H_
+#ifndef __DSC_H__
+#define __DSC_H__
 
 #include "ctk/ctk.h"
 
@@ -137,4 +137,4 @@ struct dsc {
 
 /** @} */
 
-#endif /*DSC_H__ */
+#endif /* _DSC_H__ */

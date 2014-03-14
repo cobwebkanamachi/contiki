@@ -61,15 +61,15 @@
  *
  */
 
-#ifndef ME_H_
-#define ME_H_
+#ifndef __ME_H__
+#define __ME_H__
 
 unsigned char  me_valid(unsigned char m);
 unsigned short me_encode(unsigned char c);
 unsigned char  me_decode16(unsigned short m);
 unsigned char  me_decode8(unsigned char m);
 
-#endif /* ME_H_ */
+#endif /* __ME_H__ */
 
 /** @} */
 /** @} */

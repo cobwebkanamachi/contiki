@@ -138,9 +138,13 @@ list_tail(list_t list)
  * \sa list_push()
  *
  */
+#include "cooja-debug.h"
+
 void
 list_add(list_t list, void *item)
 {
+	COOJA_DEBUG_STR("list_add\n");
+
   struct list *l;
 
   /* Make sure not to add the same element twice */
@@ -155,6 +159,8 @@ list_add(list_t list, void *item)
   } else {
     l->next = item;
   }
+	COOJA_DEBUG_STR("list_add\n");
+
 }
 /*---------------------------------------------------------------------------*/
 /**

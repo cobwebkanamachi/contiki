@@ -31,8 +31,8 @@
  * Author: Adam Dunkels <adam@sics.se>
  *
  */
-#ifndef HTTPD_FSDATA_H_
-#define HTTPD_FSDATA_H_
+#ifndef __HTTPD_FSDATA_H__
+#define __HTTPD_FSDATA_H__
 
 #include "contiki-net.h"
 
@@ -60,4 +60,4 @@ struct httpd_fsdata_file_noconst {
 #endif /* HTTPD_FS_STATISTICS */
 };
 
-#endif /* HTTPD_FSDATA_H_ */
+#endif /* __HTTPD_FSDATA_H__ */

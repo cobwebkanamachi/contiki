@@ -50,8 +50,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef RINGBUF_H_
-#define RINGBUF_H_
+#ifndef __RINGBUF_H__
+#define __RINGBUF_H__
 
 #include "contiki-conf.h"
 
@@ -128,4 +128,4 @@ int     ringbuf_size(struct ringbuf *r);
  */
 int     ringbuf_elements(struct ringbuf *r);
 
-#endif /* RINGBUF_H_ */
+#endif /* __RINGBUF_H__ */

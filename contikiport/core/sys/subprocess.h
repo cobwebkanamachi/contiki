@@ -49,8 +49,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SUBPROCESS_H_
-#define SUBPROCESS_H_
+#ifndef __SUBPROCESS_H__
+#define __SUBPROCESS_H__
 
 #define SUBPROCESS_BEGIN(strname)					\
 {									\
@@ -66,4 +66,4 @@
   }						\
 }
 
-#endif /* SUBPROCESS_H_ */
+#endif /* __SUBPROCESS_H__ */

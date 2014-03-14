@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_SKY_H_
-#define SHELL_SKY_H_
+#ifndef __SHELL_SKY_H__
+#define __SHELL_SKY_H__
 
 #include "shell.h"
 
 void shell_sky_init(void);
 
-#endif /* SHELL_SKY_H_ */
+#endif /* __SHELL_SKY_H__ */

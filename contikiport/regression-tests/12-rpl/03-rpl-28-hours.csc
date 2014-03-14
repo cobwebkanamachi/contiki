@@ -11,7 +11,7 @@
     <randomseed>123456</randomseed>
     <motedelay_us>1000000</motedelay_us>
     <radiomedium>
-      org.contikios.cooja.radiomediums.UDGM
+      se.sics.cooja.radiomediums.UDGM
       <transmitting_range>50.0</transmitting_range>
       <interference_range>50.0</interference_range>
       <success_ratio_tx>1.0</success_ratio_tx>
@@ -21,168 +21,168 @@
       <logoutput>40000</logoutput>
     </events>
     <motetype>
-      org.contikios.cooja.contikimote.ContikiMoteType
-      <identifier>mtype110</identifier>
+      se.sics.cooja.contikimote.ContikiMoteType
+      <identifier>mtype391</identifier>
       <description>Sender</description>
-      <source>[CONTIKI_DIR]/regression-tests/12-rpl/code/sender-node.c</source>
+      <source>[CONFIG_DIR]/code/sender-node.c</source>
       <commands>make TARGET=cooja clean
 make sender-node.cooja TARGET=cooja</commands>
-      <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.Battery</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiVib</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiMoteID</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiRS232</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiBeeper</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.RimeAddress</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiIPAddress</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiRadio</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiButton</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiPIR</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiClock</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiLED</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiCFS</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.Mote2MoteRelations</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.MoteAttributes</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.Position</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.Battery</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiVib</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiMoteID</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiRS232</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiBeeper</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.RimeAddress</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiIPAddress</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiRadio</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiButton</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiPIR</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiClock</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiLED</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiCFS</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.Mote2MoteRelations</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.MoteAttributes</moteinterface>
       <symbols>false</symbols>
     </motetype>
     <motetype>
-      org.contikios.cooja.contikimote.ContikiMoteType
-      <identifier>mtype792</identifier>
+      se.sics.cooja.contikimote.ContikiMoteType
+      <identifier>mtype250</identifier>
       <description>RPL root</description>
-      <source>[CONTIKI_DIR]/regression-tests/12-rpl/code/root-node.c</source>
+      <source>[CONFIG_DIR]/code/root-node.c</source>
       <commands>make TARGET=cooja clean
 make root-node.cooja TARGET=cooja</commands>
-      <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.Battery</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiVib</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiMoteID</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiRS232</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiBeeper</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.RimeAddress</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiIPAddress</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiRadio</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiButton</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiPIR</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiClock</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiLED</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiCFS</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.Mote2MoteRelations</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.MoteAttributes</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.Position</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.Battery</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiVib</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiMoteID</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiRS232</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiBeeper</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.RimeAddress</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiIPAddress</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiRadio</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiButton</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiPIR</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiClock</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiLED</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiCFS</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.Mote2MoteRelations</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.MoteAttributes</moteinterface>
       <symbols>false</symbols>
     </motetype>
     <motetype>
-      org.contikios.cooja.contikimote.ContikiMoteType
-      <identifier>mtype964</identifier>
+      se.sics.cooja.contikimote.ContikiMoteType
+      <identifier>mtype822</identifier>
       <description>Receiver</description>
-      <source>[CONTIKI_DIR]/regression-tests/12-rpl/code/receiver-node.c</source>
+      <source>[CONFIG_DIR]/code/receiver-node.c</source>
       <commands>make TARGET=cooja clean
 make receiver-node.cooja TARGET=cooja</commands>
-      <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.Battery</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiVib</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiMoteID</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiRS232</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiBeeper</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.RimeAddress</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiIPAddress</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiRadio</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiButton</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiPIR</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiClock</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiLED</moteinterface>
-      <moteinterface>org.contikios.cooja.contikimote.interfaces.ContikiCFS</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.Mote2MoteRelations</moteinterface>
-      <moteinterface>org.contikios.cooja.interfaces.MoteAttributes</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.Position</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.Battery</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiVib</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiMoteID</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiRS232</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiBeeper</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.RimeAddress</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiIPAddress</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiRadio</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiButton</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiPIR</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiClock</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiLED</moteinterface>
+      <moteinterface>se.sics.cooja.contikimote.interfaces.ContikiCFS</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.Mote2MoteRelations</moteinterface>
+      <moteinterface>se.sics.cooja.interfaces.MoteAttributes</moteinterface>
       <symbols>false</symbols>
     </motetype>
     <mote>
       <interface_config>
-        org.contikios.cooja.interfaces.Position
+        se.sics.cooja.interfaces.Position
         <x>7.772906112657773</x>
         <y>86.396910401861</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.contikimote.interfaces.ContikiMoteID
+        se.sics.cooja.contikimote.interfaces.ContikiMoteID
         <id>1</id>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.contikimote.interfaces.ContikiRadio
+        se.sics.cooja.contikimote.interfaces.ContikiRadio
         <bitrate>250.0</bitrate>
       </interface_config>
-      <motetype_identifier>mtype964</motetype_identifier>
+      <motetype_identifier>mtype822</motetype_identifier>
     </mote>
     <mote>
       <interface_config>
-        org.contikios.cooja.interfaces.Position
+        se.sics.cooja.interfaces.Position
         <x>75.54361692539452</x>
         <y>14.292026223193414</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.contikimote.interfaces.ContikiMoteID
+        se.sics.cooja.contikimote.interfaces.ContikiMoteID
         <id>2</id>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.contikimote.interfaces.ContikiRadio
+        se.sics.cooja.contikimote.interfaces.ContikiRadio
         <bitrate>250.0</bitrate>
       </interface_config>
-      <motetype_identifier>mtype110</motetype_identifier>
+      <motetype_identifier>mtype391</motetype_identifier>
     </mote>
     <mote>
       <interface_config>
-        org.contikios.cooja.interfaces.Position
+        se.sics.cooja.interfaces.Position
         <x>47.962513687652844</x>
         <y>7.199742533488408</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.contikimote.interfaces.ContikiMoteID
+        se.sics.cooja.contikimote.interfaces.ContikiMoteID
         <id>6</id>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.contikimote.interfaces.ContikiRadio
+        se.sics.cooja.contikimote.interfaces.ContikiRadio
         <bitrate>250.0</bitrate>
       </interface_config>
-      <motetype_identifier>mtype964</motetype_identifier>
+      <motetype_identifier>mtype822</motetype_identifier>
     </mote>
     <mote>
       <interface_config>
-        org.contikios.cooja.interfaces.Position
+        se.sics.cooja.interfaces.Position
         <x>1.8626697045702818</x>
         <y>47.783365869022624</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.contikimote.interfaces.ContikiMoteID
+        se.sics.cooja.contikimote.interfaces.ContikiMoteID
         <id>8</id>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.contikimote.interfaces.ContikiRadio
+        se.sics.cooja.contikimote.interfaces.ContikiRadio
         <bitrate>250.0</bitrate>
       </interface_config>
-      <motetype_identifier>mtype964</motetype_identifier>
+      <motetype_identifier>mtype822</motetype_identifier>
     </mote>
     <mote>
       <interface_config>
-        org.contikios.cooja.interfaces.Position
+        se.sics.cooja.interfaces.Position
         <x>0.0</x>
         <y>0.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.contikimote.interfaces.ContikiMoteID
+        se.sics.cooja.contikimote.interfaces.ContikiMoteID
         <id>3</id>
       </interface_config>
       <interface_config>
-        org.contikios.cooja.contikimote.interfaces.ContikiRadio
+        se.sics.cooja.contikimote.interfaces.ContikiRadio
         <bitrate>250.0</bitrate>
       </interface_config>
-      <motetype_identifier>mtype792</motetype_identifier>
+      <motetype_identifier>mtype250</motetype_identifier>
     </mote>
   </simulation>
   <plugin>
-    org.contikios.cooja.plugins.SimControl
+    se.sics.cooja.plugins.SimControl
     <width>280</width>
     <z>0</z>
     <height>160</height>
@@ -190,12 +190,12 @@ make receiver-node.cooja TARGET=cooja</commands>
     <location_y>0</location_y>
   </plugin>
   <plugin>
-    org.contikios.cooja.plugins.Visualizer
+    se.sics.cooja.plugins.Visualizer
     <plugin_config>
-      <skin>org.contikios.cooja.plugins.skins.IDVisualizerSkin</skin>
-      <skin>org.contikios.cooja.plugins.skins.UDGMVisualizerSkin</skin>
-      <skin>org.contikios.cooja.plugins.skins.GridVisualizerSkin</skin>
-      <skin>org.contikios.cooja.plugins.skins.MoteTypeVisualizerSkin</skin>
+      <skin>se.sics.cooja.plugins.skins.IDVisualizerSkin</skin>
+      <skin>se.sics.cooja.plugins.skins.UDGMVisualizerSkin</skin>
+      <skin>se.sics.cooja.plugins.skins.GridVisualizerSkin</skin>
+      <skin>se.sics.cooja.plugins.skins.MoteTypeVisualizerSkin</skin>
       <viewport>2.5379695437350276 0.0 0.0 2.5379695437350276 78.27260101976275 40.72727272727276</viewport>
     </plugin_config>
     <width>400</width>
@@ -205,11 +205,10 @@ make receiver-node.cooja TARGET=cooja</commands>
     <location_y>1</location_y>
   </plugin>
   <plugin>
-    org.contikios.cooja.plugins.LogListener
+    se.sics.cooja.plugins.LogListener
     <plugin_config>
       <filter />
       <formatted_time />
-      <coloring />
     </plugin_config>
     <width>1184</width>
     <z>3</z>
@@ -218,7 +217,7 @@ make receiver-node.cooja TARGET=cooja</commands>
     <location_y>162</location_y>
   </plugin>
   <plugin>
-    org.contikios.cooja.plugins.Notes
+    se.sics.cooja.plugins.Notes
     <plugin_config>
       <notes>Enter notes here</notes>
       <decorations>true</decorations>
@@ -230,7 +229,7 @@ make receiver-node.cooja TARGET=cooja</commands>
     <location_y>0</location_y>
   </plugin>
   <plugin>
-    org.contikios.cooja.plugins.ScriptRunner
+    se.sics.cooja.plugins.ScriptRunner
     <plugin_config>
       <script>GENERATE_MSG(0000000, "add-sink");&#xD;
 //GENERATE_MSG(1000000, "remove-sink");&#xD;

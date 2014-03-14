@@ -31,11 +31,11 @@
  *
  *
  */
-#ifndef DHCP_DSC_H_
-#define DHCP_DSC_H_
+#ifndef __DHCP_DSC_H__
+#define __DHCP_DSC_H__
 
 #include "sys/dsc.h"
 
 DSC_HEADER(dhcp_dsc);
 
-#endif /* DHCP_DSC_H_ */
+#endif /* __DHCP_DSC_H__ */

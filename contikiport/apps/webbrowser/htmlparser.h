@@ -31,8 +31,8 @@
  *
  *
  */
-#ifndef HTMLPARSER_H_
-#define HTMLPARSER_H_
+#ifndef __HTMLPARSER_H__
+#define __HTMLPARSER_H__
 
 #include "contiki-net.h"
 
@@ -62,4 +62,4 @@ void htmlparser_init(void);
 void htmlparser_parse(char *data, uint16_t len);
 
 
-#endif /* HTMLPARSER_H_ */
+#endif /* __HTMLPARSER_H__ */

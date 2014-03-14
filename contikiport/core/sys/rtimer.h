@@ -49,8 +49,8 @@
  * This file is part of the Contiki operating system.
  *
  */
-#ifndef RTIMER_H_
-#define RTIMER_H_
+#ifndef __RTIMER_H__
+#define __RTIMER_H__
 
 #include "contiki-conf.h"
 
@@ -150,7 +150,7 @@ void rtimer_arch_schedule(rtimer_clock_t t);
 
 #define RTIMER_SECOND RTIMER_ARCH_SECOND
 
-#endif /* RTIMER_H_ */
+#endif /* __RTIMER_H__ */
 
 /** @} */
 /** @} */

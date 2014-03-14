@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_REBOOT_H_
-#define SHELL_REBOOT_H_
+#ifndef __SHELL_REBOOT_H__
+#define __SHELL_REBOOT_H__
 
 #include "shell.h"
 
 void shell_reboot_init(void);
 
-#endif /* SHELL_REBOOT_H_ */
+#endif /* __SHELL_REBOOT_H__ */

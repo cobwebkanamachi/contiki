@@ -36,8 +36,8 @@
  * Adam Dunkels
  *
  */
-#ifndef SERIAL_LINE_H_
-#define SERIAL_LINE_H_
+#ifndef __SERIAL_LINE_H__
+#define __SERIAL_LINE_H__
 
 #include "contiki.h"
 
@@ -73,4 +73,4 @@ void serial_line_init(void);
 
 PROCESS_NAME(serial_line_process);
 
-#endif /* SERIAL_LINE_H_ */
+#endif /* __SERIAL_LINE_H__ */

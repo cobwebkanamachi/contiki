@@ -56,8 +56,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef RUDOLPH1_H_
-#define RUDOLPH1_H_
+#ifndef __RUDOLPH1_H__
+#define __RUDOLPH1_H__
 
 #include "net/rime/trickle.h"
 #include "net/rime/ipolite.h"
@@ -96,6 +96,6 @@ void rudolph1_close(struct rudolph1_conn *c);
 void rudolph1_send(struct rudolph1_conn *c, clock_time_t send_interval);
 void rudolph1_stop(struct rudolph1_conn *c);
 
-#endif /* RUDOLPH1_H_ */
+#endif /* __RUDOLPH1_H__ */
 /** @} */
 /** @} */

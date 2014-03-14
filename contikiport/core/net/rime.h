@@ -42,8 +42,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef RIME_H_
-#define RIME_H_
+#ifndef __RIME_H__
+#define __RIME_H__
 
 #include "net/rime/announcement.h"
 #include "net/rime/collect.h"
@@ -109,7 +109,7 @@ enum {
   RIME_ERR_CONTENTION,
   RIME_ERR_NOACK,
 };
-#endif /* RIME_H_ */
+#endif /* __RIME_H__ */
 
 /** @} */
 /** @} */

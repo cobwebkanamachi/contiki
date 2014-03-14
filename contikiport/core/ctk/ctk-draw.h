@@ -48,8 +48,8 @@
  *
  */
 
-#ifndef CTK_DRAW_H_
-#define CTK_DRAW_H_
+#ifndef __CTK_DRAW_H__
+#define __CTK_DRAW_H__
 
 #include "ctk/ctk.h"
 #include "contiki-conf.h"
@@ -281,7 +281,7 @@ extern unsigned char ctk_draw_windowborder_width,
   ctk_draw_windowtitle_height;
 
 
-#endif /* CTK_DRAW_H_ */
+#endif /* __CTK_DRAW_H__ */
 
 
 /**

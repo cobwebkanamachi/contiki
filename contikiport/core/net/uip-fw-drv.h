@@ -31,12 +31,12 @@
  * Author: Adam Dunkels <adam@sics.se>
  *
  */
-#ifndef UIP_FW_DRV_H_
-#define UIP_FW_DRV_H_
+#ifndef __UIP_FW_DRV_H__
+#define __UIP_FW_DRV_H__
 
 #include "contiki.h"
 #include "net/uip-fw.h"
 
 PROCESS_NAME(uip_fw_process);
 
-#endif /* UIP_FW_DRV_H_ */
+#endif /* __UIP_FW_DRV_H__ */

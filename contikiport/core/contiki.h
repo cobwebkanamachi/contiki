@@ -31,8 +31,8 @@
  * Author: Adam Dunkels <adam@sics.se>
  *
  */
-#ifndef CONTIKI_H_
-#define CONTIKI_H_
+#ifndef __CONTIKI_H__
+#define __CONTIKI_H__
 
 #include "contiki-version.h"
 #include "contiki-conf.h"
@@ -55,4 +55,4 @@
 
 #include "sys/energest.h"
 
-#endif /* CONTIKI_H_ */
+#endif /* __CONTIKI_H__ */

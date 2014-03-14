@@ -29,8 +29,8 @@
  * This file is part of the Contiki operating system.
  *
  */
-#ifndef PROCINIT_H_
-#define PROCINIT_H_
+#ifndef __PROCINIT_H__
+#define __PROCINIT_H__
 
 #include "sys/process.h"
 
@@ -41,4 +41,4 @@ const struct process *procinit[] = {__VA_ARGS__, NULL}
 
 void procinit_init(void);
 
-#endif /* PROCINIT_H_ */
+#endif /* __PROCINIT_H__ */

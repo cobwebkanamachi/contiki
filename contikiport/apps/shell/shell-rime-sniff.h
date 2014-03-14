@@ -37,9 +37,9 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_RIME_SNIFF_H_
-#define SHELL_RIME_SNIFF_H_
+#ifndef __SHELL_RIME_SNIFF_H__
+#define __SHELL_RIME_SNIFF_H__
 
 void shell_rime_sniff_init(void);
 
-#endif /* SHELL_RIME_SNIFF_H_ */
+#endif /* __SHELL_RIME_SNIFF_H__ */

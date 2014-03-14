@@ -30,11 +30,11 @@
  *
  */
 
-#ifndef SHELL_DOWNLOAD_H_
-#define SHELL_DOWNLOAD_H_
+#ifndef __SHELL_DOWNLOAD_H__
+#define __SHELL_DOWNLOAD_H__
 
 #include "shell.h"
 
 void shell_download_init(void);
 
-#endif /* SHELL_DOWNLOAD_H_ */
+#endif /* __SHELL_DOWNLOAD_H__ */

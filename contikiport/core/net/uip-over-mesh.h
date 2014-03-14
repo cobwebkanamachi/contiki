@@ -37,8 +37,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef UIP_OVER_MESH_H_
-#define UIP_OVER_MESH_H_
+#ifndef __UIP_OVER_MESH_H__
+#define __UIP_OVER_MESH_H__
 
 #include "net/uip.h"
 #include "net/uip-fw.h"
@@ -53,4 +53,4 @@ void uip_over_mesh_set_net(uip_ipaddr_t *addr, uip_ipaddr_t *mask);
 
 void uip_over_mesh_make_announced_gateway(void);
 
-#endif /* UIP-OVER-MESH_H_ */
+#endif /* __UIP-OVER-MESH_H__ */

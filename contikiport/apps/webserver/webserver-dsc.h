@@ -31,11 +31,11 @@
  *
  *
  */
-#ifndef WEBSERVER_DSC_H_
-#define WEBSERVER_DSC_H_
+#ifndef __WEBSERVER_DSC_H__
+#define __WEBSERVER_DSC_H__
 
 #include "sys/dsc.h"
 
 DSC_HEADER(webserver_dsc);
 
-#endif /* WEBSERVER_DSC_H_ */
+#endif /* __WEBSERVER_DSC_H__ */

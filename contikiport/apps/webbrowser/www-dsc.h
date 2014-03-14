@@ -31,11 +31,11 @@
  *
  *
  */
-#ifndef WWW_DSC_H_
-#define WWW_DSC_H_
+#ifndef __WWW_DSC_H__
+#define __WWW_DSC_H__
 
 #include "sys/dsc.h"
 
 DSC_HEADER(www_dsc);
 
-#endif /* WWW_DSC_H_ */
+#endif /* __WWW_DSC_H__ */

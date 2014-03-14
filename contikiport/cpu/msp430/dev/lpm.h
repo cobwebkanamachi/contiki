@@ -29,8 +29,8 @@
  * This file is part of the Contiki operating system.
  *
  */
-#ifndef LPM_H_
-#define LPM_H_
+#ifndef __LPM_H__
+#define __LPM_H__
 
 #include "contiki-conf.h"
 
@@ -58,4 +58,4 @@ void lpm_off(void);
 #define LPM_STATUS_ON  1
 
 
-#endif /* LPM_H_ */
+#endif /* __LPM_H__ */

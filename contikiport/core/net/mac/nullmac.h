@@ -37,8 +37,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef NULLMAC_H_
-#define NULLMAC_H_
+#ifndef __NULLMAC_H__
+#define __NULLMAC_H__
 
 #include "net/mac/mac.h"
 #include "dev/radio.h"
@@ -46,4 +46,4 @@
 extern const struct mac_driver nullmac_driver;
 
 
-#endif /* NULLMAC_H_ */
+#endif /* __NULLMAC_H__ */

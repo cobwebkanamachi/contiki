@@ -37,11 +37,11 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_TCPSEND_H_
-#define SHELL_TCPSEND_H_
+#ifndef __SHELL_TCPSEND_H__
+#define __SHELL_TCPSEND_H__
 
 #include "shell.h"
 
 void shell_tcpsend_init(void);
 
-#endif /* SHELL_TCPSEND_H_ */
+#endif /* __SHELL_TCPSEND_H__ */

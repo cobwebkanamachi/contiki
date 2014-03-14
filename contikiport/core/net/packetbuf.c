@@ -58,11 +58,9 @@ static uint8_t hdrptr;
 /* The declarations below ensure that the packet buffer is aligned on
    an even 16-bit boundary. On some platforms (most notably the
    msp430), having apotentially misaligned packet buffer may lead to
-   problems when accessing 16-bit values.
-*/
-
-static uint16_t packetbuf_aligned[(PACKETBUF_SIZE + PACKETBUF_HDR_SIZE) / 4 + 1];
-static uint8_t *packetbuf = (uint8_t *)(&packetbuf_aligned);
+   problems when accessing 16-bit values. */
+static uint16_t packetbuf_aligned[(PACKETBUF_SIZE + PACKETBUF_HDR_SIZE) / 2 + 1];
+static uint8_t *packetbuf = (uint8_t *)packetbuf_aligned;
 
 static uint8_t *packetbufptr;
 
@@ -146,7 +144,7 @@ packetbuf_copyto(void *to)
     int i;
     char buffer[1000];
     char *bufferptr = buffer;
-
+    
     bufferptr[0] = 0;
     for(i = hdrptr; i < PACKETBUF_HDR_SIZE; ++i) {
       bufferptr += sprintf(bufferptr, "0x%02x, ", packetbuf[i]);

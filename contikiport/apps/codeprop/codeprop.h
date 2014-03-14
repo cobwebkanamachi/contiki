@@ -29,8 +29,8 @@
  * This file is part of the Contiki operating system.
  *
  */
-#ifndef CODEPROP_H_
-#define CODEPROP_H_
+#ifndef __CODEPROP_H__
+#define __CODEPROP_H__
 
 #include "contiki.h"
 
@@ -50,4 +50,4 @@ void codeprop_set_rate(clock_time_t time);
 void codeprop_start_broadcast(unsigned int len);
 void codeprop_start_program(void);
 
-#endif /* CODEPROP_H_ */
+#endif /* __CODEPROP_H__ */

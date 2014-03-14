@@ -32,12 +32,12 @@
  *
  */
 
-#ifndef NODE_ID_H_
-#define NODE_ID_H_
+#ifndef __NODE_ID_H__
+#define __NODE_ID_H__
 
 void node_id_restore(void);
 void node_id_burn(unsigned short node_id);
 
 extern unsigned short node_id;
 
-#endif /* NODE_ID_H_ */
+#endif /* __NODE_ID_H__ */

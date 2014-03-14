@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef SLIP_H_
-#define SLIP_H_
+#ifndef __SLIP_H__
+#define __SLIP_H__
 
 #include "contiki.h"
 
@@ -83,4 +83,4 @@ void slip_set_input_callback(void (*callback)(void));
 void slip_arch_init(unsigned long ubr);
 void slip_arch_writeb(unsigned char c);
 
-#endif /* SLIP_H_ */
+#endif /* __SLIP_H__ */

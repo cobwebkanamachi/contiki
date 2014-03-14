@@ -37,8 +37,8 @@
  *         Enric M. Calvo <ecalvo@zolertia.com>
  */
 
-#ifndef UART0_H_
-#define UART0_H_
+#ifndef __UART0_H__
+#define __UART0_H__
 
 #include "contiki.h"
 
@@ -49,4 +49,4 @@ void uart0_writeb(unsigned char c);
 void uart0_init(unsigned long ubr);
 uint8_t uart0_active(void);
 
-#endif /* UART0_H_ */
+#endif /* __UART0_H__ */

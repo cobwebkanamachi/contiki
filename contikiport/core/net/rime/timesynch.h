@@ -64,8 +64,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef TIMESYNCH_H_
-#define TIMESYNCH_H_
+#ifndef __TIMESYNCH_H__
+#define __TIMESYNCH_H__
 
 #include "net/mac/mac.h"
 #include "sys/rtimer.h"
@@ -144,7 +144,7 @@ int timesynch_authority_level(void);
  */
 void timesynch_set_authority_level(int level);
 
-#endif /* TIMESYNCH_H_ */
+#endif /* __TIMESYNCH_H__ */
 
 /** @} */
 /** @} */

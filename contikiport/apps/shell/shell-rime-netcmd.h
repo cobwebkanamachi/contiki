@@ -37,9 +37,9 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#ifndef SHELL_RIME_NETCMD_H_
-#define SHELL_RIME_NETCMD_H_
+#ifndef __SHELL_RIME_NETCMD_H__
+#define __SHELL_RIME_NETCMD_H__
 
 void shell_rime_netcmd_init(void);
 
-#endif /* SHELL_RIME_NETCMD_H_ */
+#endif /* __SHELL_RIME_NETCMD_H__ */

@@ -156,8 +156,8 @@ PT_THREAD(driver_thread(struct pt *pt))
  *
  */
 
-#ifndef PT_SEM_H_
-#define PT_SEM_H_
+#ifndef __PT_SEM_H__
+#define __PT_SEM_H__
 
 #include "sys/pt.h"
 
@@ -220,7 +220,7 @@ struct pt_sem {
  */
 #define PT_SEM_SIGNAL(pt, s) ++(s)->count
 
-#endif /* PT_SEM_H_ */
+#endif /* __PT_SEM_H__ */
 
 /** @} */
 /** @} */
