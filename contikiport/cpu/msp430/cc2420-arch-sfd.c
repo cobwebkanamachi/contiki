@@ -33,6 +33,7 @@
 #include "dev/cc2420.h"
 #include "isr_compat.h"
 
+#include "cooja-debug.h"
 extern volatile uint8_t cc2420_sfd_counter;
 extern volatile uint16_t cc2420_sfd_start_time;
 extern volatile uint16_t cc2420_sfd_end_time;
@@ -42,15 +43,19 @@ extern volatile uint16_t cc2420_sfd_end_time;
 ISR(TIMERB1, cc2420_timerb1_interrupt)
 {
   int tbiv;
+//  uint16_t tb = TBR;
+//  COOJA_DEBUG_STR("ISR CC2420_SFD");
   ENERGEST_ON(ENERGEST_TYPE_IRQ);
   /* always read TBIV to clear IFG */
   tbiv = TBIV;
   if(CC2420_SFD_IS_1) {
     cc2420_sfd_counter++;
     cc2420_sfd_start_time = TBCCR1;
+//  	COOJA_DEBUG_PRINTF("sfd%x TB%x\n", cc2420_sfd_start_time, tb);
   } else {
     cc2420_sfd_counter = 0;
     cc2420_sfd_end_time = TBCCR1;
+  	COOJA_DEBUG_STR("ISR CC2420_SFD_IS_0\n");
   }
   ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
