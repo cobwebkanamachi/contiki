@@ -45,12 +45,30 @@
 #include "dev/spi.h"
 #include "dev/radio.h"
 #include "dev/cc2420_const.h"
+#include "rimeaddr.h"
 
 int cc2420_init(void);
 //Timesync IE length with header = 4
+#if CC2420_CONF_CHECKSUM
+#include "lib/crc16.h"
+#define CHECKSUM_LEN 2
+#else
+#define CHECKSUM_LEN 0
+#endif /* CC2420_CONF_CHECKSUM */
+#define FOOTER_LEN 2
+#define AUX_LEN (CHECKSUM_LEN + FOOTER_LEN)
+
 #define ACK_LEN 3
 #define EXTRA_ACK_LEN 4
 #define CC2420_MAX_PACKET_LEN      127
+struct received_frame_s {
+  struct received_frame_s *next;
+  uint8_t buf[CC2420_MAX_PACKET_LEN];
+  uint8_t len;
+  uint8_t acked;
+  uint8_t seqno;
+  rimeaddr_t source_address;
+};
 
 int cc2420_set_channel(int channel);
 int cc2420_get_channel(void);
@@ -93,6 +111,12 @@ void cc2420_set_cca_threshold(int value);
 /************************************************************************/
 /* Additional low-level functions for the CC2420 */
 /************************************************************************/
+typedef void(softack_make_callback_f)(unsigned char *ackbuf, rtimer_clock_t last_packet_timestamp, uint8_t nack);
+typedef int(softack_interrupt_exit_callback_f)(uint8_t is_ack, uint8_t need_ack, struct received_frame_s * last_rf);
+
+/* Subscribe with two callbacks called from FIFOP interrupt */
+void cc2420_softack_subscribe(softack_make_callback_f *softack_make, softack_interrupt_exit_callback_f *interrupt_exit);
+rtimer_clock_t cc2420_get_rx_end_time(void);
 void cc2420_arch_init(void);
 void cc2420_send_ack(void);
 int cc2420_read_ack(void *buf, int);
