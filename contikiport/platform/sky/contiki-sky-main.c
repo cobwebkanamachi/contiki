@@ -190,12 +190,14 @@ set_gateway(void)
 uint16_t TOS_NODE_ID = 0x1234; /* non-zero */
 uint16_t TOS_LOCAL_ADDRESS = 0x1234; /* non-zero */
 #endif /* WITH_TINYOS_AUTO_IDS */
+#include "cooja-debug.h"
 int
 main(int argc, char **argv)
 {
   /*
    * Initalize hardware.
    */
+	COOJA_DEBUG_STR("POWER_ON!");
   msp430_cpu_init();
   clock_init();
   leds_init();

@@ -391,6 +391,7 @@ micromac_radio_read(void *buf, unsigned short bufsize)
 	micromac_packets_read++;
 	len = sizeof(tsMacFrame) - 32 * sizeof(uint32) + rx_frame_buffer_read_ptr->u8PayloadLength; //MICROMAC_HEADER_LEN
 	//should copy the whole thing or else something wrong happens probably because of alignment
+	//XXX check for possibility of overflow: rx_frame_buffer_read_ptr == rx_frame_buffer_write_ptr
 	memcpy(buf, rx_frame_buffer_read_ptr, sizeof(tsMacFrame));
 	printf(
 			"len: %u, u8PayloadLength %u, u16Unused %u\n",
