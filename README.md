@@ -17,3 +17,19 @@ and so on.
 For more information, see the Contiki website:
 
 [http://contiki-os.org](http://contiki-os.org)
+
+JN5168 Port - Beta
+==================
+
+It is important to note that this port (under 'platform/jn5168') provides
+only basic functionality, such as:
+-UART/printf
+-Radio
+-Leds
+-IPv6 stack 
+-Rime stack
+-Null mac / Null RDC
+
+In order to build an application for jn5168 you need to copy the file 
+'platform/jn5168/App_Stack_Size.ld' to your project directory and 
+modify it according to your project's stack needs.
