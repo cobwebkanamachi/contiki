@@ -743,7 +743,6 @@ cc2420_interrupt(void)
   TIMETABLE_TIMESTAMP(cc2420_timetable, "interrupt");
 #endif /* CC2420_TIMETABLE_PROFILING */
   cc2420_sfd_start_time = cc2420_read_sfd_timer();
-  last_packet_timestamp = cc2420_sfd_start_time;
   /* If the lock is taken, we cannot access the FIFO. */
   if(locked || need_flush || !CC2420_FIFO_IS_1) {
     need_flush = 1;
@@ -775,6 +774,7 @@ cc2420_interrupt(void)
   	}
   	return 0;
   }
+  last_packet_timestamp = cc2420_sfd_start_time;
 
 	len -= AUX_LEN;
 	/* Allocate space to store the received frame */
@@ -860,6 +860,9 @@ cc2420_interrupt(void)
 			memb_free(&rf_memb, rf);
 			rf = NULL;
 		}
+	}
+	if(last_rf) {
+		last_rf->sfd_timestamp = last_packet_timestamp;
 	}
 	last_rf = (frame_valid) ? rf : NULL;
 	need_ack = (frame_valid && do_ack) ? 1 + nack : 0;

@@ -3,22 +3,6 @@
 #include "net/rime/rimeaddr.h"
 
 #define NACK_FLAG 0x8000
-typedef uint32_t asn_t;
-
-typedef struct {
-	asn_t asn;                // current absolute slot number
-	uint8_t state;              // state of the FSM
-	uint8_t dsn;                // data sequence number
-	uint16_t captured_time;       // last captures time
-	uint16_t sync_timeout;        // how many slots left before looses sync
-	uint8_t is_sync;             // TRUE iff mote synchronized to network
-	uint8_t mac_ebsn;						//EB sequence number
-	uint8_t join_priority;			//inherit from RPL - for PAN coordinator: 0 -- lower is better
-//   OpenQueueEntry_t*  dataToSend;         // pointer to the data to send
-//   OpenQueueEntry_t*  dataReceived;       // pointer to the data received
-//   OpenQueueEntry_t*  ackToSend;          // pointer to the ack to send
-//   OpenQueueEntry_t*  ackReceived;        // pointer to the ack received
-} ieee154e_vars_t;
 
 // Atomic durations
 // expressed in 32kHz ticks:
@@ -123,5 +107,26 @@ typedef struct {
 	cell_t ** cells;
 } slotframe_t;
 #define TSCH_MAX_PACKET_LEN 127
+
+typedef struct {
+	uint8_t asn_msb;
+	uint32_t asn_4lsb;
+} asn_t;
+
+typedef struct {
+	asn_t asn;                // current absolute slot number
+	uint8_t state;              // state of the FSM
+	uint8_t dsn;                // data sequence number
+	uint16_t captured_time;       // last captures time
+	uint16_t sync_timeout;        // how many slots left before looses sync
+	uint8_t is_sync;             // TRUE iff mote synchronized to network
+	uint8_t mac_ebsn;						//EB sequence number
+	uint8_t join_priority;			//inherit from RPL - for PAN coordinator: 0 -- lower is better
+	slotframe_t * current_slotframe;
+	rtimer_clock_t start; //cell start time
+	uint8_t slot_template_id;
+	uint8_t hop_sequence_id;
+	uint8_t eb_buf[TSCH_MAX_PACKET_LEN]; /* a buffer for EB packets */
+} ieee154e_vars_t;
 
 #endif /* __TSCH_PARAMETERS_H__ */

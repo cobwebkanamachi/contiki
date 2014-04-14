@@ -50,8 +50,8 @@
 #include "lib/memb.h"
 #include "lib/random.h"
 #include "dev/cc2420-tsch.h"
-
-static volatile ieee154e_vars_t ieee154e_vars;
+#include "net/mac/frame802154.h"
+#include "dev/leds.h"
 
 #define DEBUG 0
 #if DEBUG
@@ -60,6 +60,12 @@ static volatile ieee154e_vars_t ieee154e_vars;
 #else
 #define PRINTF(...)
 #endif
+
+#if ( QUEUEBUF_CONF_NUM && !(QUEUEBUF_CONF_NUM & (QUEUEBUF_CONF_NUM-1)) ) /* is it non-zero and a power of two? */
+#define NBR_BUFFER_SIZE QUEUEBUF_CONF_NUM // POWER OF 2 -- queue size
+#else
+#define NBR_BUFFER_SIZE 8
+#endif /* !(QUEUEBUF_CONF_NUM & (QUEUEBUF_CONF_NUM-1)) */
 
 #ifdef TSCH_CONF_ADDRESS_FILTER
 #define TSCH_ADDRESS_FILTER TSCH_CONF_ADDRESS_FILTER
@@ -90,14 +96,8 @@ struct seqno {
 static struct seqno received_seqnos[MAX_SEQNOS];
 #endif /* TSCH_802154_DUPLICATE_DETECTION */
 
-// variable to protect queue structure
-volatile uint8_t working_on_queue;
-
-#if ( QUEUEBUF_CONF_NUM && !(QUEUEBUF_CONF_NUM & (QUEUEBUF_CONF_NUM-1)) ) /* is it a power of two? */
-#define NBR_BUFFER_SIZE QUEUEBUF_CONF_NUM // POWER OF 2 -- queue size
-#else
-#define NBR_BUFFER_SIZE 8
-#endif /* !(QUEUEBUF_CONF_NUM & (QUEUEBUF_CONF_NUM-1)) */
+static int
+powercycle(struct rtimer *t, void *ptr);
 #define macMinBE 1
 #define macMaxFrameRetries 4
 #define macMaxBE 4
@@ -120,7 +120,44 @@ struct neighbor_queue
 	struct TSCH_packet buffer[NBR_BUFFER_SIZE]; // circular buffer of packets. Its size should be a power of two
 	uint8_t put_ptr, get_ptr; // pointers for circular buffer implementation
 };
-
+/*---------------------------------------------------------------------------*/
+static const rimeaddr_t BROADCAST_CELL_ADDRESS = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
+static const rimeaddr_t CELL_ADDRESS1 = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } };
+static const rimeaddr_t CELL_ADDRESS2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
+static const rimeaddr_t CELL_ADDRESS3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
+static const cell_t generic_shared_cell = { 0xffff, 0, LINK_OPTION_TX | LINK_OPTION_RX
+		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &BROADCAST_CELL_ADDRESS };
+static const cell_t generic_eb_cell = { 0, 0, LINK_OPTION_TX, LINK_TYPE_ADVERTISING,
+		&BROADCAST_CELL_ADDRESS };
+static const cell_t cell_to_1 = { 1, 0, LINK_OPTION_TX | LINK_OPTION_RX
+		| LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING, LINK_TYPE_NORMAL,
+		&CELL_ADDRESS1 };
+static const cell_t cell_to_2 = { 2, 0, LINK_OPTION_TX | LINK_OPTION_RX
+		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
+static const cell_t cell_to_3 = { 3, 0, LINK_OPTION_TX | LINK_OPTION_RX
+		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &CELL_ADDRESS3 };
+static const cell_t cell_3_to_2 = { 4, 0, LINK_OPTION_TX | LINK_OPTION_RX
+		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
+#define TOTAL_LINKS 6
+#define TSCH_MIN_SIZE 6
+static const cell_t * minimum_cells[6] = {
+		&generic_eb_cell, &generic_shared_cell,	&generic_shared_cell,
+		&generic_shared_cell, &generic_shared_cell,	&generic_shared_cell	};
+static const cell_t * links_list[TOTAL_LINKS] = { &generic_eb_cell, &generic_shared_cell,
+		&cell_to_1, &cell_to_2, &cell_to_3, &cell_3_to_2 };
+static const slotframe_t minimum_slotframe = { 0, 101, 6, minimum_cells };
+/*---------------------------------------------------------------------------*/
+/* variable to protect queue structure */
+volatile uint8_t working_on_queue;
+static volatile ieee154e_vars_t ieee154e_vars;
+static volatile uint8_t waiting_for_radio_interrupt = 0;
+static volatile uint8_t need_ack;
+static volatile struct received_frame_s *last_rf;
+static volatile int16_t last_drift;
+static volatile struct pt mpt;
+static volatile struct rtimer t;
+volatile unsigned char we_are_sending = 0;
+/*---------------------------------------------------------------------------*/
 /* NBR_TABLE_CONF_MAX_NEIGHBORS specifies the size of the table */
 #include "net/nbr-table.h"
 NBR_TABLE(struct neighbor_queue, neighbor_list);
@@ -141,7 +178,7 @@ struct TSCH_packet*
 read_packet_from_queue(const rimeaddr_t *addr);
 static void
 tsch_timer(void *ptr);
-
+/*---------------------------------------------------------------------------*/
 /** This function takes the MSB of gcc generated random number
  * because the LSB alone has very bad random characteristics,
  * while the MSB appears more random.
@@ -150,7 +187,7 @@ tsch_timer(void *ptr);
 static uint8_t generate_random_byte(uint8_t window) {
 	return (random_rand() >> 8) & window;
 }
-
+/*---------------------------------------------------------------------------*/
 // This function returns a pointer to the queue of neighbor whose address is equal to addr
 inline struct neighbor_queue *
 neighbor_queue_from_addr(const rimeaddr_t *addr)
@@ -158,11 +195,10 @@ neighbor_queue_from_addr(const rimeaddr_t *addr)
 	struct neighbor_queue *n = nbr_table_get_from_lladdr(neighbor_list, addr);
 	return n;
 }
-
+/*---------------------------------------------------------------------------*/
 // This function adds one queue for neighbor whose address is equal to addr
 // uses working_on_queue to protect data-structures from race conditions
 // return 1 ok, 0 failed to allocate
-
 struct neighbor_queue *
 add_queue(const rimeaddr_t *addr)
 {
@@ -192,11 +228,10 @@ add_queue(const rimeaddr_t *addr)
 	working_on_queue = 0;
 	return n;
 }
-
+/*---------------------------------------------------------------------------*/
 // This function remove the queue of neighbor whose address is equal to addr
 // uses working_on_queue to protect data-structures from race conditions
 // return 1 ok, 0 failed to find the queue
-
 int
 remove_queue(const rimeaddr_t *addr)
 {
@@ -214,7 +249,7 @@ remove_queue(const rimeaddr_t *addr)
 	working_on_queue = 0;
 	return 0;
 }
-
+/*---------------------------------------------------------------------------*/
 // This function adds one packet to the queue of neighbor whose address is addr
 // return 1 ok, 0 failed to allocate
 // the packet to be inserted is in packetbuf
@@ -237,7 +272,7 @@ add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
 	}
 	return 0;
 }
-
+/*---------------------------------------------------------------------------*/
 // This function removes the head-packet of the queue of neighbor whose address is addr
 // return 1 ok, 0 failed
 // remove one packet from the queue
@@ -256,8 +291,8 @@ remove_packet_from_queue(const rimeaddr_t *addr)
 	}
 	return 0;
 }
-
-// This function returns the first packet in the queue of neighbor whose address is addr
+/*---------------------------------------------------------------------------*/
+/* returns the first packet in the queue of neighbor */
 struct TSCH_packet*
 read_packet_from_queue(const rimeaddr_t *addr)
 {
@@ -271,8 +306,8 @@ read_packet_from_queue(const rimeaddr_t *addr)
 	}
 	return 0;
 }
-
-// This function returns the first packet in the queue of neighbor whose address is addr
+/*---------------------------------------------------------------------------*/
+/* returns the first packet in the queue of a neighbor */
 struct TSCH_packet*
 read_packet_from_neighbor_queue(const struct neighbor_queue *n)
 {
@@ -285,8 +320,8 @@ read_packet_from_neighbor_queue(const struct neighbor_queue *n)
 	}
 	return 0;
 }
-
-//this function is used to get a packet to send in a shared slot
+/*---------------------------------------------------------------------------*/
+/* get a packet to send in a shared slot */
 static struct TSCH_packet *
 get_next_packet_for_shared_slot_tx(void) {
 	static struct neighbor_queue* last_neighbor_tx = NULL;
@@ -466,7 +501,7 @@ channel_check_interval(void)
 static uint8_t
 hop_channel(uint8_t offset)
 {
-	uint8_t channel = 11 + (offset + ieee154e_vars.asn) % 16;
+	uint8_t channel = 11 + (offset + ieee154e_vars.asn.asn_4lsb) % 16;
 	if ( NETSTACK_RADIO_set_channel(channel)) {
 		return channel;
 	}
@@ -475,64 +510,19 @@ hop_channel(uint8_t offset)
 /*---------------------------------------------------------------------------*/
 PROCESS(tsch_tx_callback_process, "tsch_tx_callback_process");
 /*---------------------------------------------------------------------------*/
-static const rimeaddr_t BROADCAST_CELL_ADDRESS = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const rimeaddr_t CELL_ADDRESS1 = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } };
-static const rimeaddr_t CELL_ADDRESS2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
-static const rimeaddr_t CELL_ADDRESS3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
-
-
-static const cell_t generic_shared_cell = { 0xffff, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &BROADCAST_CELL_ADDRESS };
-
-static const cell_t generic_eb_cell = { 0, 0, LINK_OPTION_TX, LINK_TYPE_ADVERTISING,
-		&BROADCAST_CELL_ADDRESS };
-
-static const cell_t cell_to_1 = { 1, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING, LINK_TYPE_NORMAL,
-		&CELL_ADDRESS1 };
-static const cell_t cell_to_2 = { 2, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
-static const cell_t cell_to_3 = { 3, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &CELL_ADDRESS3 };
-static const cell_t cell_3_to_2 = { 4, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
-
-#define TOTAL_LINKS 6
-#define TSCH_MIN_SIZE 6
-
-static const cell_t * minimum_cells[6] = {
-		&generic_eb_cell, &generic_shared_cell,	&generic_shared_cell,
-		&generic_shared_cell, &generic_shared_cell,	&generic_shared_cell,
-//		&cell_to_1, &cell_to_2, &cell_to_3, &cell_3_to_2
-		};
-static const cell_t * links_list[TOTAL_LINKS] = { &generic_eb_cell, &generic_shared_cell,
-		&cell_to_1, &cell_to_2, &cell_to_3, &cell_3_to_2 };
-
-static const slotframe_t minimum_slotframe = { 0, 101, 6, minimum_cells };
-
-#include "dev/leds.h"
-static slotframe_t const * current_slotframe;
-static volatile struct pt mpt;
-static volatile struct rtimer t;
-static volatile rtimer_clock_t start;
-#include "net/netstack.h"
-volatile unsigned char we_are_sending = 0;
-/*---------------------------------------------------------------------------*/
 static cell_t *
 get_cell(uint16_t timeslot)
 {
-	return (timeslot >= current_slotframe->on_size) ?
-	NULL : current_slotframe->cells[timeslot];
+	return (timeslot >= ieee154e_vars.current_slotframe->on_size) ?
+	NULL : ieee154e_vars.current_slotframe->cells[timeslot];
 }
 /*---------------------------------------------------------------------------*/
 static uint16_t
 get_next_on_timeslot(uint16_t timeslot)
 {
-	return (timeslot >= current_slotframe->on_size - 1) ? 0 : timeslot + 1;
+	return (timeslot >= ieee154e_vars.current_slotframe->on_size - 1) ? 0 : timeslot + 1;
 }
 /*---------------------------------------------------------------------------*/
-static int
-powercycle(struct rtimer *t, void *ptr);
 /* Schedule a wakeup from a reference time for a specific duration.
  * Provides basic protection against missed deadlines and timer overflows */
 static uint8_t
@@ -556,11 +546,6 @@ schedule_fixed(struct rtimer *t, rtimer_clock_t ref_time,
 	}
 	return ret;
 }
-/*---------------------------------------------------------------------------*/
-static volatile uint8_t waiting_for_radio_interrupt = 0;
-static volatile uint8_t need_ack;
-static volatile struct received_frame_s *last_rf;
-static volatile int16_t last_drift;
 /*---------------------------------------------------------------------------*/
 void
 tsch_resume_powercycle(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s * last_rf_irq)
@@ -590,7 +575,7 @@ powercycle(struct rtimer *t, void *ptr)
 	static cell_t * cell = NULL;
 	static struct TSCH_packet* p = NULL;
 	static struct neighbor_queue *n = NULL;
-	start = RTIMER_NOW();
+	ieee154e_vars.start = RTIMER_NOW();
 	//while MAC-RDC is not disabled, and while its synchronized
 	while (ieee154e_vars.is_sync && ieee154e_vars.state != TSCH_OFF) {
 		COOJA_DEBUG_STR("Cell start\n");
@@ -622,7 +607,9 @@ powercycle(struct rtimer *t, void *ptr)
 					if (n != NULL) {
 						p = read_packet_from_neighbor_queue(n);
 						//if there it is a shared broadcast slot and there were no broadcast packets, pick any unicast packet
-						if(p==NULL && rimeaddr_cmp(cell->node_address, &BROADCAST_CELL_ADDRESS) && (cell->link_options & LINK_OPTION_SHARED)) {
+						if(p==NULL
+								&& rimeaddr_cmp(cell->node_address, &BROADCAST_CELL_ADDRESS)
+								&& (cell->link_options & LINK_OPTION_SHARED)) {
 							p = get_next_packet_for_shared_slot_tx();
 						}
 					}
@@ -654,7 +641,7 @@ powercycle(struct rtimer *t, void *ptr)
 				off(keep_radio_on);
 			} else if (cell_decison == CELL_TX) {
 				COOJA_DEBUG_STR("CELL_TX");
-				//timeslot_tx(t, start, packet, packet_len);
+				//timeslot_tx(t, ieee154e_vars.start, packet, packet_len);
 				static void * payload = NULL;
 				static unsigned short payload_len = 0;
 				payload = queuebuf_dataptr(p->pkt);
@@ -673,12 +660,12 @@ powercycle(struct rtimer *t, void *ptr)
 				uint8_t cca_status = 1;
 #if CCA_ENABLED
 				//delay before CCA
-				schedule_fixed(t, start, TsCCAOffset);
+				schedule_fixed(t, ieee154e_vars.start, TsCCAOffset);
 				PT_YIELD(&mpt);
 				on();
 				//CCA
 				BUSYWAIT_UNTIL_ABS(!(cca_status |= NETSTACK_RADIO.channel_clear()),
-						start, TsCCAOffset + TsCCA);
+						ieee154e_vars.start, TsCCAOffset + TsCCA);
 				//there is not enough time to turn radio off
 				off(keep_radio_on);
 #endif /* CCA_ENABLED */
@@ -687,7 +674,7 @@ powercycle(struct rtimer *t, void *ptr)
 				} else {
 					//delay before TX
 					NETSTACK_RADIO_sfd_sync(0, 1);
-					schedule_fixed(t, start, TsTxOffset - delayTx);
+					schedule_fixed(t, ieee154e_vars.start, TsTxOffset - delayTx);
 					PT_YIELD(&mpt);
 					//to record the duration of packet tx
 					static rtimer_clock_t tx_time;
@@ -703,7 +690,7 @@ powercycle(struct rtimer *t, void *ptr)
 						if (!is_broadcast) {
 							//wait for ack: after tx
 							COOJA_DEBUG_STR("wait for ACK\n");
-							schedule_fixed(t, start,
+							schedule_fixed(t, ieee154e_vars.start,
 									TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayRx);
 							/* disable capturing sfd */
 							NETSTACK_RADIO_sfd_sync(0, 0);
@@ -715,7 +702,7 @@ powercycle(struct rtimer *t, void *ptr)
 									|| NETSTACK_RADIO.pending_packet()
 									|| !NETSTACK_RADIO.channel_clear();
 							if (!cca_status) {
-								schedule_fixed(t, start,
+								schedule_fixed(t, ieee154e_vars.start,
 										TsTxOffset + tx_time + TsTxAckDelay + TsShortGT);
 								PT_YIELD(&mpt);
 								cca_status |= NETSTACK_RADIO.receiving_packet()
@@ -727,7 +714,7 @@ powercycle(struct rtimer *t, void *ptr)
 								uint8_t ackbuf[ACK_LEN + EXTRA_ACK_LEN];
 								if (!NETSTACK_RADIO.pending_packet()) {
 									COOJA_DEBUG_STR("not pending_packet\n");
-									schedule_fixed(t, start,
+									schedule_fixed(t, ieee154e_vars.start,
 											TsTxOffset + tx_time + TsTxAckDelay + TsShortGT
 													+ wdAckDuration);
 									PT_YIELD(&mpt);
@@ -745,13 +732,10 @@ powercycle(struct rtimer *t, void *ptr)
 									uint16_t ack_status = 0;
 									if (ackbuf[1] & 2) { //IE-list present?
 										COOJA_DEBUG_STR("ACK IE-list present");
-
 										if (len == ACK_LEN + EXTRA_ACK_LEN) {
 											COOJA_DEBUG_STR("ACK_LEN + EXTRA_ACK_LEN");
-
 											if (ackbuf[3] == 0x02 && ackbuf[4] == 0x1e) {
 												COOJA_DEBUG_STR("ACK sync header");
-
 												ack_status = ackbuf[5];
 												ack_status |= ackbuf[6] << 8;
 												/* If the originator was a time source neighbor, the receiver adjusts its own clock by incorporating the
@@ -760,7 +744,6 @@ powercycle(struct rtimer *t, void *ptr)
 												 */
 												if (n->time_source) {
 													COOJA_DEBUG_STR("ACK from time_source");
-
 													/* extract time correction */
 													int16_t d=0;
 													//is it a negative correction?
@@ -777,7 +760,6 @@ powercycle(struct rtimer *t, void *ptr)
 													COOJA_DEBUG_STR("ACK NACK_FLAG\n");
 												}
 											}
-
 										}
 									}
 									COOJA_DEBUG_STR("ACK ok\n");
@@ -788,7 +770,6 @@ powercycle(struct rtimer *t, void *ptr)
 							} else {
 								COOJA_DEBUG_STR("No ack!\n");
 								success = RADIO_TX_NOACK;
-
 							}
 							waiting_for_radio_interrupt = 0;
 						}
@@ -797,7 +778,7 @@ powercycle(struct rtimer *t, void *ptr)
 						COOJA_DEBUG_STR("end tx slot\n");
 					}
 				}
-
+				/* post TX: Update CSMA control variables */
 				if (success == RADIO_TX_NOACK) {
 					p->transmissions++;
 					if (p->transmissions == macMaxFrameRetries) {
@@ -874,7 +855,7 @@ powercycle(struct rtimer *t, void *ptr)
 				p->ret=ret;
 				process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, p);
 			} else if (cell_decison == CELL_RX) {
-//				timeslot_rx(t, start, msg, MSG_LEN);
+//				timeslot_rx(t, ieee154e_vars.start, msg, MSG_LEN);
 				if (cell->link_options & LINK_OPTION_TIME_KEEPING) {
 					// TODO
 				}
@@ -883,11 +864,9 @@ powercycle(struct rtimer *t, void *ptr)
 					static uint8_t is_broadcast = 0, len, seqno, ret;
 					uint16_t ack_sfd_time = 0;
 					rtimer_clock_t ack_sfd_rtime = 0;
-
 					is_broadcast = rimeaddr_cmp(cell->node_address, &rimeaddr_null);
-
 					//wait before RX
-					schedule_fixed(t, start, TsTxOffset - TsLongGT);
+					schedule_fixed(t, ieee154e_vars.start, TsTxOffset - TsLongGT);
 					COOJA_DEBUG_STR("schedule RX on guard time - TsLongGT");
 					PT_YIELD(&mpt);
 					//Start radio for at least guard time
@@ -898,7 +877,7 @@ powercycle(struct rtimer *t, void *ptr)
 							|| NETSTACK_RADIO.pending_packet()
 							|| NETSTACK_RADIO.receiving_packet());
 					//Check if receiving within guard time
-					schedule_fixed(t, start, TsTxOffset + TsLongGT);
+					schedule_fixed(t, ieee154e_vars.start, TsTxOffset + TsLongGT);
 					PT_YIELD(&mpt);
 					COOJA_DEBUG_STR("RX on +TsLongGT");
 
@@ -910,18 +889,17 @@ powercycle(struct rtimer *t, void *ptr)
 						//no packets on air
 						ret = 0;
 					} else {
+						//This commented code is buggy as it waits unnecessarily for packets after guard time
 //						if (NETSTACK_RADIO_get_rx_end_time() == 0 && (!NETSTACK_RADIO.pending_packet())) {
 //							//wait until rx finishes
-//							schedule_fixed(t, start, TsTxOffset + wdDataDuration);
+//							schedule_fixed(t, ieee154e_vars.start, TsTxOffset + wdDataDuration);
 //							waiting_for_radio_interrupt = 1;
 //							COOJA_DEBUG_STR("Wait until RX is done");
 //							PT_YIELD(&mpt);
 //						}
-
-						uint16_t expected_rx = start + TsTxOffset;
-						uint16_t rx_duration = NETSTACK_RADIO_get_rx_end_time() - (start + TsTxOffset);
+						uint16_t expected_rx = ieee154e_vars.start + TsTxOffset;
+						uint16_t rx_duration = NETSTACK_RADIO_get_rx_end_time() - (ieee154e_vars.start + TsTxOffset);
 						off(keep_radio_on);
-
 						/* wait until ack time */
 						if (need_ack) {
 							schedule_fixed(t, NETSTACK_RADIO_get_rx_end_time(), TsTxAckDelay - delayTx);
@@ -955,10 +933,9 @@ powercycle(struct rtimer *t, void *ptr)
 		next_timeslot = get_next_on_timeslot(timeslot);
 		dt =
 				next_timeslot ? next_timeslot - timeslot :
-						current_slotframe->length - timeslot;
+						ieee154e_vars.current_slotframe->length - timeslot;
 		duration = dt * TsSlotDuration;
-
-		/* apply sync correction on the start of the new slotframe */
+		/* apply sync correction on the ieee154e_vars.start of the new slotframe */
 		if (!next_timeslot) {
 			if(drift_counter) {
 				/* convert from microseconds to rtimer ticks and take average */
@@ -975,31 +952,30 @@ powercycle(struct rtimer *t, void *ptr)
 			drift_counter=0;
 		}
 		timeslot = next_timeslot;
-		ieee154e_vars.asn += dt;
-		start += duration;
+		ieee154e_vars.asn.asn_4lsb += dt;
+		ieee154e_vars.start += duration;
 
 		/* check for missed deadline and skip slot accordingly in order not to corrupt the whole schedule */
-		if (start - RTIMER_NOW() > duration) {
+		if (ieee154e_vars.start - RTIMER_NOW() > duration) {
 			COOJA_DEBUG_STR("skipping slot because of missed deadline!\n");
 			//go for next slot then
 			next_timeslot = get_next_on_timeslot(timeslot);
 			dt =
 					next_timeslot ? next_timeslot - timeslot :
-							current_slotframe->length - timeslot;
+							ieee154e_vars.current_slotframe->length - timeslot;
 			uint16_t duration2 = dt * TsSlotDuration;
 			timeslot = next_timeslot;
-			ieee154e_vars.asn += dt;
-			schedule_fixed(t, start-duration, duration + duration2);
-			start += duration2;
+			ieee154e_vars.asn.asn_4lsb += dt;
+			schedule_fixed(t, ieee154e_vars.start-duration, duration + duration2);
+			ieee154e_vars.start += duration2;
 		} else {
-			schedule_fixed(t, start-duration, duration);
+			schedule_fixed(t, ieee154e_vars.start-duration, duration);
 		}
-
 		leds_off(LEDS_GREEN);
 		PT_YIELD(&mpt);
-}
-COOJA_DEBUG_STR("TSCH is OFF!!");
-PT_END(&mpt);
+	}
+	COOJA_DEBUG_STR("TSCH is OFF!!");
+	PT_END(&mpt);
 }
 /*---------------------------------------------------------------------------*/
 /* This function adds the Sync IE from the beginning of the buffer and returns the reported drift in microseconds */
@@ -1009,7 +985,8 @@ add_sync_IE(uint8_t* buf, int32_t time_difference_32, uint8_t nack) {
 	uint16_t ack_status = 0;
 	uint8_t len=4;
 	//do the math in 32bits to save precision
-	time_difference = time_difference_32 = (time_difference_32 * 3051)/100;
+	time_difference = (time_difference_32 * 3051)/100;
+	COOJA_DEBUG_PRINTF("ACK drift time_difference_32 %d, time_difference %d", time_difference_32, time_difference);
 	if(time_difference >=0) {
 		ack_status=time_difference & 0x07ff;
 	} else {
@@ -1025,51 +1002,115 @@ add_sync_IE(uint8_t* buf, int32_t time_difference_32, uint8_t nack) {
 	return time_difference;
 }
 /*---------------------------------------------------------------------------*/
-// TODO Create an EB packet and puts it in the EB queue
+/* Create an EB packet */
 static int
-send_eb(rimeaddr_t *addr, int16_t reported_drift, slotframe_t* slotframe, cell_t * links_list, uint8_t links_list_size)
+make_eb(uint8_t * buf, uint8_t buf_size)
 {
-	uint8_t* buf;
-	uint16_t seqno;
-	uint8_t nack = 0;
+	/* XXX make sure this function does not overflow buf */
+	uint16_t seqno, j=0;
+	uint8_t nack = 0, len, sub_id, type, i=0, k=0;
 
-	//send_one_packet(sent, ptr);
-	COOJA_DEBUG_STR("TSCH send_one_packet\n");
-	packetbuf_clear();
-	buf = (uint8_t*)packetbuf_dataptr();
-	//default is broadcast
-	//could be unicast if sent as a reply to a specific EB request
-	packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, &rimeaddr_null);
-//	const rimeaddr_t *addr = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
-	//Ask for ACK if we are sending anything otherthan broadcast
-	if (!rimeaddr_cmp(addr, &rimeaddr_null)) {
-		packetbuf_set_attr(PACKETBUF_ATTR_MAC_ACK, 1);
-	}
-	/* PACKETBUF_ATTR_MAC_SEQNO cannot be zero, due to a pecuilarity
-	 in framer-802154.c. */
-	seqno = (++ieee154e_vars.mac_ebsn) ? ieee154e_vars.mac_ebsn : ++ieee154e_vars.mac_ebsn;
-	packetbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, seqno);
-	if (NETSTACK_FRAMER.create() < 0) {
-		return 0;
-	}
-	//fcf
-	buf[0] = 0x02;
-	buf[1] = 0x22; //b9:IE-list-present=1 - b12-b13:frame version=2
-	buf[2] = ieee154e_vars.mac_ebsn;
-	/* Append IE timesync */
-	//Put IEs: sync, slotframe and link, timeslot and channel hopping sequence
-	if (reported_drift != 0) {
-		add_sync_IE(buf+3, reported_drift, nack);
-	}
+	COOJA_DEBUG_STR("TSCH make EB");
+	//fcf: 2Bytes
+	//b0-2: Frame type=0 - b3: security - b4: pending - b5: AR - b6: PAN ID compression - b7: reserved
+	buf[i++] = 0x00;
+	//b8: seqno suppression - b9:IE-list-present=1 - b10-11: destination address mode - b12-b13:frame version=2 - b14-15: src address mode=2
+	buf[i++] = 2 | 32 | 128;
+	buf[i++] = ieee154e_vars.mac_ebsn++;
 
-	if (slotframe != NULL) {
-		if (links_list_size && links_list != NULL) {
+	/* copy src PAN ID and long src address */
+  /* Source PAN ID */
+	buf[i++] = IEEE802154_PANID & 0xff;
+	buf[i++] = (IEEE802154_PANID >> 8) & 0xff;
 
+  /* Source address */
+  for(k = 8; k > 0; k--) {
+    buf[i++] = rimeaddr_node_addr.u8[k - 1];
+  }
+	/* XXX only in 6top: ignore ... EB length, group ID and type: leave 2 bytes for that */
+//	i+=2;
+//	buf[i++] = 0x00;
+//	buf[i++] = ((1 << 1)|1)<<3; //b0-2:: left for length MSB, b3-6: GroupID, b7: Type
+
+	/* Append TSCH sync IE */
+	len = 6;
+	sub_id = 0x1a;
+	type = 0; //short type
+	buf[i++] = len;
+	buf[i++] = (sub_id << 1) | (type & 0x01);
+	buf[i++] = ieee154e_vars.asn.asn_4lsb & 0xff;
+	buf[i++] = ieee154e_vars.asn.asn_4lsb >> 8;
+	buf[i++] = ieee154e_vars.asn.asn_4lsb >> 16;
+	buf[i++] = ieee154e_vars.asn.asn_4lsb >> 24;
+	buf[i++] = ieee154e_vars.asn.asn_msb;
+	buf[i++] = ieee154e_vars.join_priority;
+
+	/* Append timeslot template IE */
+	len = 1;
+	sub_id = 0x1c;
+	type = 0; //short type
+	buf[i++] = len;
+	buf[i++] = (sub_id << 1) | (type & 0x01);
+	buf[i++] = ieee154e_vars.slot_template_id;
+	/* Optional: include the full timeslot template */
+	//not today ...
+
+	/* Append channel hopping IE */
+	len = 1;
+	sub_id = 0x09;
+	type = 0; //short type
+	buf[i++] = len;
+	buf[i++] = (sub_id << 1) | (type & 0x01);
+	buf[i++] = ieee154e_vars.hop_sequence_id;
+	/* Optional: include the full hop sequence */
+	//not today ...
+
+	/* Append TSCH slotframe & link IE */
+	if (ieee154e_vars.current_slotframe != NULL) {
+			sub_id = 0x1b;
+			type = 0; //short type
+			len = i++; /* saving len index instead to calculate len at the end */
+			// buf[i++] = 4;
+			buf[i++] = (sub_id << 1) | (type & 0x01);
+			buf[i++] = 1; /* number of slotframes described in EB */
+			/* TSCH slotframe descriptor*/
+			buf[i++] = ieee154e_vars.current_slotframe->slotframe_handle;
+			buf[i++] = ieee154e_vars.current_slotframe->length;
+			buf[i++] = ieee154e_vars.current_slotframe->length >> 8;
+			//buf[i++] = ieee154e_vars.current_slotframe->on_size & 0xff; /* number of included cells */
+			k=i++; //index of the element containing the number of included cells
+			for(j=0; j < ieee154e_vars.current_slotframe->on_size && 0xff; j++) {
+				/* Include cells I am listening on only */
+				if(ieee154e_vars.current_slotframe->cells[j]->link_options & LINK_OPTION_RX) {
+					/* increase the number of included cells */
+					buf[k]++;
+					/* XXX slotnumber may not be its index in the general case */
+					buf[i++] = j;
+					buf[i++] = j >> 8;
+					/* XXX slotnumber end of comment */
+					buf[i++] = ieee154e_vars.current_slotframe->cells[j]->channel_offset;
+					buf[i++] = ieee154e_vars.current_slotframe->cells[j]->channel_offset >> 8;
+					buf[i++] = ieee154e_vars.current_slotframe->cells[j]->link_options;
+				}
+			buf[len] = 4 + 5 * buf[k];
 		}
 	}
+
+	/* Append time correction IE */
+	//Put IEs: sync, slotframe and link, timeslot and channel hopping sequence
+//	if (reported_drift != 0) {
+//		add_sync_IE(buf+i+3, reported_drift, nack);
+//		i+=4;
+//	}
+
+	/* XXX only in 6top -- ignore ... EB length, group ID and type: leave 2 bytes for that */
+//		buf[3] = i;
+//		buf[4] = ((i>>8)&0x7)|((1 << 1)|1)<<3; //b0-2:: left for length MSB, b3-6: GroupID, b7: Type
 	return 1;
 }
 /*---------------------------------------------------------------------------*/
+#include "net/rpl/rpl.h"
+
 void
 tsch_associate(void)
 {
@@ -1105,8 +1146,10 @@ tsch_associate(void)
 			}
 		}
 	}
-	start = RTIMER_NOW();
-	schedule_fixed(&t, start, TsSlotDuration);
+	/* Make EB packet, but do not forget to update mac_ebsn in it or when changing schedule*/
+	make_eb(ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN);
+	ieee154e_vars.start = RTIMER_NOW();
+	schedule_fixed(&t, ieee154e_vars.start, TsSlotDuration);
 }
 /*---------------------------------------------------------------------------*/
 volatile uint8_t ackbuf[1+ACK_LEN + EXTRA_ACK_LEN]={0};
@@ -1115,7 +1158,7 @@ void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet
 	COOJA_DEBUG_STR("tsch_make_sync_ack");
 	*buf=ackbuf;
 	/* calculating sync in rtimer ticks */
-	time_difference_32 = (int32_t)start + TsTxOffset - last_packet_timestamp;
+	time_difference_32 = (int32_t)ieee154e_vars.start + TsTxOffset - last_packet_timestamp;
 	last_drift = time_difference_32;
 	/* ackbuf[1+ACK_LEN + EXTRA_ACK_LEN] = {ACK_LEN + EXTRA_ACK_LEN + AUX_LEN, 0x02, 0x00, seqno, 0x02, 0x1e, ack_status_LSB, ack_status_MSB}; */
 	ackbuf[1] = 0x02; /* ACK frame */
@@ -1129,8 +1172,11 @@ void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet
 static void
 init(void)
 {
-	current_slotframe = &minimum_slotframe;
-	ieee154e_vars.asn = 0;
+	ieee154e_vars.current_slotframe = &minimum_slotframe;
+	ieee154e_vars.slot_template_id = 1;
+	ieee154e_vars.hop_sequence_id = 1;
+	ieee154e_vars.asn.asn_4lsb = 0;
+	ieee154e_vars.asn.asn_msb = 0;
 	ieee154e_vars.captured_time = 0;
 	ieee154e_vars.dsn = 0;
 	ieee154e_vars.is_sync = 0;

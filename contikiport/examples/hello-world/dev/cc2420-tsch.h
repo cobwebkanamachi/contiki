@@ -66,6 +66,7 @@ struct received_frame_s {
   uint8_t buf[CC2420_MAX_PACKET_LEN];
   uint8_t len;
   rimeaddr_t source_address;
+  rtimer_clock_t sfd_timestamp;
 };
 
 int cc2420_set_channel(int channel);
