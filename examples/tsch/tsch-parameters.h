@@ -52,7 +52,7 @@ enum ieee154e_atomicdurations_enum {
 };
 
 enum ieee154e_states_enum {
-	TSCH_OFF = 0, TSCH_ASSOCIATED = 1,
+	TSCH_OFF = 0, TSCH_ASSOCIATED = 1, TSCH_SEARCHING = 2, TSCH_TIMEOUT,
 };
 
 enum slotframe_operations_enum {

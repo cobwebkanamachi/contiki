@@ -109,7 +109,7 @@ print_local_addresses(void)
       PRINTF("\n");
       /* hack to make address "final" */
       if (state == ADDR_TENTATIVE) {
-	uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
+      	uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
       }
     }
   }
@@ -145,6 +145,10 @@ set_global_address(void)
 /* Mode 3 - derived from server link-local (MAC) address */
   uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
 #endif
+
+	#include "tsch.h"
+  tsch_associate(NULL, 0xffff);
+
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(udp_client_process, ev, data)

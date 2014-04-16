@@ -122,6 +122,8 @@ struct neighbor_queue
 };
 /*---------------------------------------------------------------------------*/
 static const rimeaddr_t BROADCAST_CELL_ADDRESS = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
+static const rimeaddr_t EB_CELL_ADDRESS = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff} };
+
 static const rimeaddr_t CELL_ADDRESS1 = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } };
 static const rimeaddr_t CELL_ADDRESS2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
 static const rimeaddr_t CELL_ADDRESS3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
@@ -154,7 +156,7 @@ static volatile uint8_t waiting_for_radio_interrupt = 0;
 static volatile uint8_t need_ack;
 static volatile struct received_frame_s *last_rf;
 static volatile int16_t last_drift;
-static volatile struct pt mpt;
+static volatile struct pt mpt, enhanced_beacon_pt;
 static volatile struct rtimer t;
 volatile unsigned char we_are_sending = 0;
 /*---------------------------------------------------------------------------*/
@@ -269,6 +271,11 @@ add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
 		n->buffer[n->put_ptr].transmissions = 0;
 		n->put_ptr = (n->put_ptr + 1) & (NBR_BUFFER_SIZE - 1);
 		return 1;
+	} else {
+		n= add_queue(addr);
+		if(n != NULL) {
+			return add_packet_to_queue(sent, ptr, addr);
+		}
 	}
 	return 0;
 }
@@ -601,6 +608,10 @@ powercycle(struct rtimer *t, void *ptr)
 				//is it for ADV/EB?
 				if (cell->link_type == LINK_TYPE_ADVERTISING) {
 					//TODO fetch adv/EB packets
+					n = neighbor_queue_from_addr(&EB_CELL_ADDRESS);
+					if (n != NULL) {
+						p = read_packet_from_neighbor_queue(n);
+					}
 				} else { //NORMAL link
 					//pick a packet from the neighbors queue who is associated with this cell
 					n = neighbor_queue_from_addr(cell->node_address);
@@ -952,7 +963,11 @@ powercycle(struct rtimer *t, void *ptr)
 			drift_counter=0;
 		}
 		timeslot = next_timeslot;
+		//increase asn
 		ieee154e_vars.asn.asn_4lsb += dt;
+		if(!ieee154e_vars.asn.asn_4lsb) {
+			ieee154e_vars.asn.asn_msb++;
+		}
 		ieee154e_vars.start += duration;
 
 		/* check for missed deadline and skip slot accordingly in order not to corrupt the whole schedule */
@@ -965,12 +980,17 @@ powercycle(struct rtimer *t, void *ptr)
 							ieee154e_vars.current_slotframe->length - timeslot;
 			uint16_t duration2 = dt * TsSlotDuration;
 			timeslot = next_timeslot;
+			//increase asn
 			ieee154e_vars.asn.asn_4lsb += dt;
+			if(!ieee154e_vars.asn.asn_4lsb) {
+				ieee154e_vars.asn.asn_msb++;
+			}
 			schedule_fixed(t, ieee154e_vars.start-duration, duration + duration2);
 			ieee154e_vars.start += duration2;
 		} else {
 			schedule_fixed(t, ieee154e_vars.start-duration, duration);
 		}
+
 		leds_off(LEDS_GREEN);
 		PT_YIELD(&mpt);
 	}
@@ -1109,22 +1129,108 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 	return 1;
 }
 /*---------------------------------------------------------------------------*/
-#include "net/rpl/rpl.h"
-
 void
-tsch_associate(void)
+tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s * last_rf_irq)
 {
+	need_ack = need_ack_irq;
+	last_rf = last_rf_irq;
+	if (waiting_for_radio_interrupt || NETSTACK_RADIO_get_rx_end_time() != 0) {
+		waiting_for_radio_interrupt = 0;
+		rtimer_set(&t, RTIMER_NOW() + 5, 1, (void
+		(*)(struct rtimer *, void *)) tsch_associate, NULL);
+	}
+	leds_off(LEDS_RED);
+}
+/*---------------------------------------------------------------------------*/
+void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack);
+int
+tsch_associate(struct rtimer * timer, uint16_t rpl_rank)
+{
+	PT_BEGIN( &enhanced_beacon_pt );
 	/* TODO Synchronize
 	 * If we are a master, start right away
 	 * otherwise, wait for EBs to associate with a master
 	 */
 	COOJA_DEBUG_STR("tsch_associate\n");
+
+	ieee154e_vars.join_priority = rpl_rank > 0xff ? 0xff : rpl_rank;
+	if(rpl_rank < 0xffff) {
+		//for now assume we are in sync
+		ieee154e_vars.is_sync = 1;
+		//something other than 0 for now
+		ieee154e_vars.state = TSCH_ASSOCIATED;
+	} else {
+		//we need to sync
+		ieee154e_vars.is_sync = 0;
+		//look for a root to sync with
+		ieee154e_vars.state = TSCH_SEARCHING;
+	}
+	//	rpl_dag_t * my_rpl_dag = NULL;
+	//	my_rpl_dag = rpl_get_any_dag();
+	softack_interrupt_exit_callback_f *interrupt_exit = tsch_wait_for_eb;
+	softack_make_callback_f *softack_make = NULL;
+	NETSTACK_RADIO_softack_subscribe(softack_make, interrupt_exit);
+
+	ieee154e_vars.start = RTIMER_NOW();
+	uint8_t cca_status = 0;
+	while (ieee154e_vars.state == TSCH_SEARCHING) {
+		waiting_for_radio_interrupt = 1;
+		on();
+		while (!cca_status) {
+			cca_status = (!NETSTACK_RADIO.channel_clear()
+							|| NETSTACK_RADIO.pending_packet() || NETSTACK_RADIO.receiving_packet());
+			//if signal is detected on radio, yield to give radio interrupt a chance to receive it
+			if(!cca_status) {
+				PT_YIELD(&enhanced_beacon_pt);
+			}
+			//XXX hop channel after timeout
+		}
+
+		//is there an EB pending?
+		if (last_rf && NETSTACK_RADIO.pending_packet()) {
+			COOJA_DEBUG_STR("EB Read:\n");
+			//NETSTACK_RADIO.read(ieee154e_vars.eb_buf, last_rf->len);
+		} else if (NETSTACK_RADIO_pending_irq()) {
+			//we have received something in radio FIFO but radio interrupt has not fired because we are inside rtimer code
+			COOJA_DEBUG_STR("EB Read later:\n");
+			PT_YIELD(&enhanced_beacon_pt);
+		}
+		if (0 == last_rf->buf[0] && (last_rf->buf[1] & (2 | 32 | 128))) {
+			COOJA_DEBUG_STR("EB IE-list present");
+			if (last_rf->buf[2 + 11] & 0xfe == (0x1a << 1)) { //sync IE?
+				COOJA_DEBUG_STR("EB sync header");
+				ieee154e_vars.asn.asn_4lsb = last_rf->buf[14] + (last_rf->buf[15] << 8)
+						+ (last_rf->buf[16] << 16) + (last_rf->buf[17] << 24);
+				ieee154e_vars.asn.asn_msb = last_rf->buf[18];
+				ieee154e_vars.join_priority = last_rf->buf[19];
+
+				//sync for next slot
+				ieee154e_vars.start = last_rf->sfd_timestamp - TsTxOffset;
+				//increase ASN
+				if(!++ieee154e_vars.asn.asn_4lsb) {
+					ieee154e_vars.asn.asn_msb++;
+				}
+				/* XXX HACK should be set in sent schedule --Set parent as timesource */
+				struct neighbor_queue *n = neighbor_queue_from_addr(&last_rf->source_address);
+				if (n == NULL) {
+					//add new neighbor to list of neighbors
+					n=add_queue(&last_rf->source_address);
+				}
+				if( n!= NULL ) {
+					n->time_source = 1;
+				}
+				//we are in sync
+				ieee154e_vars.is_sync = 1;
+				ieee154e_vars.state = TSCH_ASSOCIATED;
+			}
+		}
+	}
+	softack_make = tsch_make_sync_ack;
+	interrupt_exit = tsch_resume_powercycle;
+	NETSTACK_RADIO_softack_subscribe(softack_make, interrupt_exit);
+
 	waiting_for_radio_interrupt = 0;
 	we_are_sending = 0;
-	//for now assume we are in sync
-	ieee154e_vars.is_sync = 1;
-	//something other than 0 for now
-	ieee154e_vars.state = TSCH_ASSOCIATED;
 	//process the schedule, to create queues and find time-sources (time-keeping)
 	if(!working_on_queue) {
 		struct neighbor_queue *n;
@@ -1146,10 +1252,11 @@ tsch_associate(void)
 			}
 		}
 	}
+
 	/* Make EB packet, but do not forget to update mac_ebsn in it or when changing schedule*/
 	make_eb(ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN);
-	ieee154e_vars.start = RTIMER_NOW();
 	schedule_fixed(&t, ieee154e_vars.start, TsSlotDuration);
+	PT_END( &enhanced_beacon_pt );
 }
 /*---------------------------------------------------------------------------*/
 volatile uint8_t ackbuf[1+ACK_LEN + EXTRA_ACK_LEN]={0};
@@ -1186,12 +1293,8 @@ init(void)
 	ieee154e_vars.join_priority = 0xff; /* inherit from RPL - PAN coordinator: 0 -- lower is better */
 	nbr_table_register(neighbor_list, NULL);
 	working_on_queue = 0;
-	softack_make_callback_f *softack_make = tsch_make_sync_ack;
-	softack_interrupt_exit_callback_f *interrupt_exit = tsch_resume_powercycle;
-	NETSTACK_RADIO_softack_subscribe(softack_make, interrupt_exit);
-
 	//schedule next wakeup? or leave for higher layer to decide? i.e, scan, ...
-	tsch_associate();
+	//tsch_associate();
 }
 /*---------------------------------------------------------------------------*/
 /* a polled-process to invoke the MAC tx callback asynchronously */
@@ -1212,6 +1315,37 @@ PROCESS_THREAD(tsch_tx_callback_process, ev, data)
 		}
 	}
 	PROCESS_END();
+}
+/*---------------------------------------------------------------------------*/
+PROCESS(eb_process, "EB process");
+AUTOSTART_PROCESSES(&eb_process);
+#define EB_SEND_INTERVAL 8
+/*---------------------------------------------------------------------------*/
+PROCESS_THREAD(eb_process, ev, data)
+{
+  static struct etimer periodic;
+  static uint8_t timeout = 0;
+  PROCESS_BEGIN();
+//  PROCESS_PAUSE();
+  etimer_set(&periodic, TsSlotDuration*ieee154e_vars.current_slotframe->length);
+  while(1) {
+    PROCESS_YIELD();
+    if(etimer_expired(&periodic)) {
+      etimer_reset(&periodic);
+      timeout++;
+			if(timeout%EB_SEND_INTERVAL == 0)
+				hop_channel(timeout);
+
+      /* send EB only half of the time, randomly */
+      if(generate_random_byte(8) >= 8/EB_SEND_INTERVAL) {
+				if(ieee154e_vars.eb_buf[2]) { //is EB packet ready
+					ieee154e_vars.eb_buf[2] = ieee154e_vars.mac_ebsn++;
+					add_packet_to_queue(NULL, ieee154e_vars.eb_buf, &EB_CELL_ADDRESS);
+				}
+      }
+    }
+  }
+  PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
 const struct rdc_driver tschrdc_driver = {
