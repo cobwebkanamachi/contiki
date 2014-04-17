@@ -25,5 +25,7 @@ endif
 ifeq ($(TARGET),econotag)
   PROJECT_SOURCEFILES += slip-radio-mc1322x.c
 endif
-
+ifeq ($(TARGET),jn5168)
+  PROJECT_SOURCEFILES += slip-radio-jn5168.c
+endif
 include $(CONTIKI)/Makefile.include

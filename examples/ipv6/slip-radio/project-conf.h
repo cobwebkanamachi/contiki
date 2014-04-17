@@ -53,6 +53,8 @@
 #define CMD_CONF_HANDLERS slip_radio_cmd_handler,cmd_handler_rf230
 #elif CONTIKI_TARGET_ECONOTAG
 #define CMD_CONF_HANDLERS slip_radio_cmd_handler,cmd_handler_mc1322x
+#elif CONTIKI_TARGET_JN5168
+#define CMD_CONF_HANDLERS slip_radio_cmd_handler,cmd_handler_jn5168
 #else
 #define CMD_CONF_HANDLERS slip_radio_cmd_handler
 #endif
@@ -63,8 +65,8 @@
 #define NETSTACK_CONF_MAC     nullmac_driver
 
 #undef NETSTACK_CONF_RDC
-/* #define NETSTACK_CONF_RDC     nullrdc_noframer_driver */
-#define NETSTACK_CONF_RDC     contikimac_driver
+#define NETSTACK_CONF_RDC     nullrdc_noframer_driver
+//#define NETSTACK_CONF_RDC     contikimac_driver
 
 #undef NETSTACK_CONF_NETWORK
 #define NETSTACK_CONF_NETWORK slipnet_driver
@@ -74,6 +76,9 @@
 
 #undef CC2420_CONF_AUTOACK
 #define CC2420_CONF_AUTOACK              1
+
+#undef MMAC_CONF_AUTOACK
+#define MMAC_CONF_AUTOACK              1
 
 #undef UART1_CONF_RX_WITH_DMA
 #define UART1_CONF_RX_WITH_DMA           1

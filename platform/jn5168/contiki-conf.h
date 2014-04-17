@@ -104,9 +104,9 @@ typedef uint32_t rtimer_clock_t;
 #define NETSTACK_CONF_FRAMER  framer_802154
 #endif /* NETSTACK_CONF_FRAMER */
 
-//#ifndef CC2420_CONF_AUTOACK
-//#define CC2420_CONF_AUTOACK              1
-//#endif /* CC2420_CONF_AUTOACK */
+#ifndef MMAC_CONF_AUTOACK
+#define MMAC_CONF_AUTOACK              1
+#endif /* MMAC_CONF_AUTOACK */
 
 /* Specify whether the RDC layer should enable
    per-packet power profiling. */

@@ -21,6 +21,12 @@
 #include <MMAC.h>
 #include "micromac-radio.h"
 
+#if MMAC_CONF_AUTOACK
+#define MMAC_AUTOACK_CONF E_MMAC_RX_USE_AUTO_ACK
+#else
+#define MMAC_AUTOACK_CONF 0
+#endif /* MMAC_CONF_AUTOACK */
+
 #ifndef IEEE802154_PANID
 #	ifdef IEEE802154_CONF_PANID
 #		define IEEE802154_PANID           IEEE802154_CONF_PANID
@@ -130,7 +136,7 @@ static void
 on(void)
 {
 	vMMAC_StartMacReceive(rx_frame_buffer_write_ptr, E_MMAC_RX_START_NOW
-			| E_MMAC_RX_USE_AUTO_ACK | E_MMAC_RX_NO_MALFORMED
+			| MMAC_AUTOACK_CONF | E_MMAC_RX_NO_MALFORMED
 			| E_MMAC_RX_NO_FCS_ERROR | E_MMAC_RX_ADDRESS_MATCH);
 }
 /*---------------------------------------------------------------------------*/

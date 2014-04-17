@@ -41,13 +41,17 @@
 #include "net/uip.h"
 #include "net/uip-ds6.h"
 #include "dev/slip.h"
-#include "dev/uart1.h"
+#include "dev/uart0.h"
 #include <string.h>
 
 #define UIP_IP_BUF        ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
 
 #define DEBUG DEBUG_PRINT
 #include "net/uip-debug.h"
+
+#ifndef BAUD2UBR
+#define BAUD2UBR(X) (X)
+#endif
 
 void set_prefix_64(uip_ipaddr_t *);
 
@@ -83,7 +87,7 @@ slip_input_callback(void)
       }
       uip_len = 18;
       slip_send();
-      
+
     }
     uip_len = 0;
   }
