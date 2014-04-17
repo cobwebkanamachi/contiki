@@ -60,7 +60,7 @@ static void
 vUartISR(uint32 u32DeviceId, uint32 u32ItemBitmap)
 {
 	static uint8 u8UartL;
-	static uint32 u32Bytes;
+//	static uint32 u32Bytes;
 
 	switch(u32DeviceId){
 	case E_AHI_DEVICE_UART0:
@@ -79,14 +79,14 @@ vUartISR(uint32 u32DeviceId, uint32 u32ItemBitmap)
 		else
 			u8AHI_UartReadData(u8UartL);
 	} else if (u32ItemBitmap == E_AHI_UART_INT_TX) {
-		u32Bytes = 0;
+//		u32Bytes = 0;
 		/*
 		 * if there is data in buffer waiting for tx and we've not filled the
 		 * hardware fifo up
 		 */
-		transmitting = 1;
-		while (u32Bytes++<TXBUFSIZE && ringbuf_elements(&txbuf)) {
-//		if(ringbuf_elements(&txbuf)) {
+//		while (u32Bytes++<TXBUFSIZE && ringbuf_elements(&txbuf)) {
+		if(ringbuf_elements(&txbuf)) {
+			transmitting = 1;
 			vAHI_UartWriteData(u8Uart, ringbuf_get(&txbuf)); /* write one byte to the UART */
 		}
 		transmitting = 0;

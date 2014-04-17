@@ -190,9 +190,10 @@ int puts(const char *s)
   return strlen(s);
 }
 
-#undef putchar
+#ifndef putchar
 int putchar(int c)
 {
   uart0_writeb(c);
   return 1;
 }
+#endif

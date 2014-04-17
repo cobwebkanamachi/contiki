@@ -60,7 +60,7 @@
 #define PRINTF(...)
 #endif
 
-static volatile unsigned long seconds;
+static volatile unsigned long seconds = 0;
 static volatile uint8_t ticking = FALSE;
 static volatile clock_time_t clock_ticks = 0;
 /* last_tar is used for calculating clock_fine */
@@ -91,15 +91,14 @@ clockTimerISR(uint32 u32Device, uint32 u32ItemBitmap)
 		++seconds;
 		energest_flush();
 	}
-
 	if (etimer_pending() && (etimer_next_expiration_time() - clock_ticks - 1) > MAX_TICKS) {
 		etimer_request_poll();
 		//LPM4_EXIT;
 	}
 
-	/*  if(process_nevents() >= 0) {
-	 LPM4_EXIT;
-	 }*/
+	if(process_nevents() >= 0) {
+	 //LPM4_EXIT;
+	}
 
 	watchdog_stop();
 

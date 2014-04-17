@@ -50,6 +50,7 @@ slip_arch_writeb(unsigned char c)
  */
 /*---------------------------------------------------------------------------*/
 #if WITH_UIP
+#undef putchar
 int
 putchar(int c)
 {

@@ -48,7 +48,7 @@
 #include "net/uip.h"
 #include "dev/leds.h"
 
-#include "dev/button-sensor.h"
+//#include "dev/button-sensor.h"
 //#include "dev/pir-sensor.h"
 //#include "dev/vib-sensor.h"
 
@@ -65,7 +65,7 @@
 #endif
 
 /*&pir_sensor, &vib_sensor*/
-SENSORS(&button_sensor);
+//SENSORS(&button_sensor);
 
 /*---------------------------------------------------------------------------*/
 #include "MMAC.h"
@@ -227,15 +227,12 @@ main(void)
   while(1) {
 
     //etimer_request_poll();
-//    int r;
-//    do {
-//      /* Reset watchdog. */
-//       //   vAHI_WatchdogRestart();
-//      r = process_run();
-//    } while(r > 0);
-  	watchdog_periodic();
-  	process_run();
-    etimer_request_poll();
+    int r;
+    do {
+      /* Reset watchdog. */
+    	watchdog_periodic();
+      r = process_run();
+    } while(r > 0);
     /*
      * Idle processing.
      */
