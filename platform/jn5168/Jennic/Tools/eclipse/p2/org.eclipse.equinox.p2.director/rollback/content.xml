@@ -1,0 +1,371 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?metadataRepository class='org.eclipse.equinox.internal.p2.metadata.repository.LocalMetadataRepository' version='1.0.0'?>
+<repository name='Agent rollback repository' type='org.eclipse.equinox.internal.p2.metadata.repository.LocalMetadataRepository' version='1.0.0'>
+  <properties size='2'>
+    <property name='p2.system' value='true'/>
+    <property name='p2.timestamp' value='1397654025048'/>
+  </properties>
+  <units size='3'>
+    <unit id='PlatformProfile' version='0.0.0.1234398131471' singleton='false'>
+      <properties size='7'>
+        <property name='org.eclipse.equinox.p2.type.profile' value='true'/>
+        <property name='org.eclipse.equinox.p2.cache' value='/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse'/>
+        <property name='org.eclipse.equinox.p2.flavor' value='tooling'/>
+        <property name='org.eclipse.equinox.p2.roaming' value='true'/>
+        <property name='org.eclipse.update.install.features' value='true'/>
+        <property name='org.eclipse.equinox.p2.environments' value='osgi.ws=win32,osgi.os=win32,osgi.arch=x86'/>
+        <property name='org.eclipse.equinox.p2.installFolder' value='/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse'/>
+      </properties>
+      <touchpoint id='null' version='0.0.0'/>
+    </unit>
+    <unit id='PlatformProfile' version='0.0.0.1397654024081' singleton='false'>
+      <properties size='11'>
+        <property name='org.eclipse.equinox.p2.type.profile' value='true'/>
+        <property name='org.eclipse.equinox.p2.cache' value='C:\Jennic\Tools\eclipse'/>
+        <property name='org.eclipse.equinox.p2.flavor' value='tooling'/>
+        <property name='org.eclipse.equinox.p2.roaming' value='true'/>
+        <property name='org.eclipse.update.install.features' value='true'/>
+        <property name='org.eclipse.equinox.p2.environments' value='osgi.ws=win32,osgi.os=win32,osgi.arch=x86'/>
+        <property name='org.eclipse.equinox.p2.installFolder' value='C:\Jennic\Tools\eclipse'/>
+        <property name='eclipse.touchpoint.launcherName' value='eclipse.exe'/>
+        <property name='---IUPROPERTY---org.eclipse.platform.ide---IUPROPERTYKEY---org.eclipse.equinox.p2.type.root' value='true'/>
+        <property name='---IUPROPERTY---org.eclipse.platform.ide---IUPROPERTYKEY---org.eclipse.equinox.p2.internal.inclusion.rules' value='STRICT'/>
+        <property name='---IUPROPERTY---org.eclipse.platform.ide.launcher.win32.win32.x86---IUPROPERTYKEY---unzipped|@artifact|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse' value='/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/notice.html|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/configuration/config.ini|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/configuration/.settings/org.eclipse.equinox.p2.metadata.repository.prefs|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/configuration/.settings/org.eclipse.equinox.p2.artifact.repository.prefs|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/readme/readme_eclipse.html|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/eclipse.exe|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/eclipsec.exe|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/.eclipseproduct|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/eclipse.ini|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/epl-v10.html|'/>
+      </properties>
+      <requires size='156'>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.jsp.jasper' range='[1.0.100.v20080427-0830,1.0.100.v20080427-0830]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.osgi.util' range='[3.1.300.v20080303,3.1.300.v20080303]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingorg.eclipse.equinox.simpleconfigurator' range='[1.0.0.v20080604,1.0.0.v20080604]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='tooling.org.eclipse.update.feature.default' range='[1.0.0,1.0.0]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.runtime' range='[3.4.0.v20080512,3.4.0.v20080512]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.jsp.jasper.registry' range='[1.0.0.v20080427-0830,1.0.0.v20080427-0830]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.net' range='[1.1.0.I20080604,1.1.0.I20080604]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ltk.core.refactoring' range='[3.4.2.r342_v20081028-0800,3.4.2.r342_v20081028-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.simpleconfigurator' range='[1.0.0.v20080604,1.0.0.v20080604]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.rcp.feature.jar' range='[3.4.200.R342_v20090122-989JESTEbig-SVaL8UJHcYBr4A63,3.4.200.R342_v20090122-989JESTEbig-SVaL8UJHcYBr4A63]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.update.core.win32' range='[3.2.100.v20080107,3.2.100.v20080107]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.databinding' range='[1.1.1.M20080827-0800b,1.1.1.M20080827-0800b]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.filesystem.win32.x86' range='[1.1.0.v20080604-1400,1.1.0.v20080604-1400]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.filesystem' range='[1.2.0.v20080604-1400,1.2.0.v20080604-1400]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.console' range='[1.0.0.v20080514-1900,1.0.0.v20080514-1900]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.user.ui.feature.group' range='[1.0.2.r34x_v20090120-7d-7tEQcCaaYSBeNOClOn02267,1.0.2.r34x_v20090120-7d-7tEQcCaaYSBeNOClOn02267]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.sat4j.core' range='[2.0.3.v20081021,2.0.3.v20081021]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help.base' range='[3.3.103.v20090128_34x,3.3.103.v20090128_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingwin32.win32.x86org.eclipse.update.configurator' range='[3.2.201.R34x_v20080819,3.2.201.R34x_v20080819]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.security' range='[1.0.1.R34x_v20080721,1.0.1.R34x_v20080721]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.databinding.beans' range='[1.1.1.M20080827-0800a,1.1.1.M20080827-0800a]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.user.ui.feature.jar' range='[1.0.2.r34x_v20090120-7d-7tEQcCaaYSBeNOClOn02267,1.0.2.r34x_v20090120-7d-7tEQcCaaYSBeNOClOn02267]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.workbench.compatibility' range='[3.2.0.I20080509-2000,3.2.0.I20080509-2000]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.runtime.compatibility' range='[3.2.0.v20071008,3.2.0.v20071008]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='tooling.osgi.bundle.default' range='[1.0.0,1.0.0]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingwin32.win32.x86org.eclipse.equinox.common' range='[3.4.0.v20080421-2006,3.4.0.v20080421-2006]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.director' range='[1.0.4.v20081112-1019,1.0.4.v20081112-1019]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.swt' range='[3.4.2.v3452b,3.4.2.v3452b]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingorg.eclipse.equinox.launcher' range='[1.0.101.R34x_v20081125,1.0.101.R34x_v20081125]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ecf.provider.filetransfer.ssl' range='[1.0.0.v20080611-1715,1.0.0.v20080611-1715]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.simpleconfigurator.manipulator' range='[1.0.4.v20080930,1.0.4.v20080930]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.director.app' range='[1.0.1.R34x_v20080729,1.0.1.R34x_v20080729]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.views.properties.tabbed' range='[3.4.2.M20090127-1700,3.4.2.M20090127-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.apache.lucene.analysis' range='[1.9.1.v20080530-1600,1.9.1.v20080530-1600]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.security.ui' range='[1.0.0.v20080603-1810,1.0.0.v20080603-1810]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.touchpoint.eclipse' range='[1.0.2.v20081119-1055,1.0.2.v20081119-1055]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.forms' range='[3.3.103.v20081027_34x,3.3.103.v20081027_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.externaltools' range='[3.2.0.v20080514-1542,3.2.0.v20080514-1542]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.mortbay.jetty' range='[5.1.14.v200806031611,5.1.14.v200806031611]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ecf.filetransfer' range='[2.0.0.v20080611-1715,2.0.0.v20080611-1715]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.editors' range='[3.4.0.v20080603-2000,3.4.0.v20080603-2000]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.core' range='[1.0.4.v20081112-1019,1.0.4.v20081112-1019]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform.ide.launcher.win32.win32.x86.eclipse.exe' range='[3.4.2.M20090211-1700,3.4.2.M20090211-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.metadata.generator' range='[1.0.4.v20081217,1.0.4.v20081217]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.osgi.services' range='[3.1.200.v20071203,3.1.200.v20071203]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.jarprocessor' range='[1.0.0.v20080514-1900,1.0.0.v20080514-1900]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.contenttype' range='[3.3.0.v20080604-1400,3.3.0.v20080604-1400]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.updatesite' range='[1.0.1.R34x_v20080808-1156,1.0.1.R34x_v20080808-1156]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.runtime.compatibility.auth' range='[3.2.100.v20070502,3.2.100.v20070502]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform.feature.group' range='[3.4.2.R342_v20090122-9I96EiWElHi8lheoJKJIvhM3JfVsYbRrgVIWL,3.4.2.R342_v20090122-9I96EiWElHi8lheoJKJIvhM3JfVsYbRrgVIWL]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.launcher.win32.win32.x86' range='[1.0.101.R34x_v20080731,1.0.101.R34x_v20080731]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.update.ui' range='[3.2.101.R34x_v20081128,3.2.101.R34x_v20081128]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.rcp.feature.group' range='[3.4.200.R342_v20090122-989JESTEbig-SVaL8UJHcYBr4A63,3.4.200.R342_v20090122-989JESTEbig-SVaL8UJHcYBr4A63]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform.ide' range='[3.4.2.M20090211-1700,3.4.2.M20090211-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingorg.eclipse.platform.ide.config.win32.win32.x86' range='[3.4.2.M20090211-1700,3.4.2.M20090211-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.reconciler.dropins' range='[1.0.4.v20081027-2115,1.0.4.v20081027-2115]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.frameworkadmin.equinox' range='[1.0.4.v20080930,1.0.4.v20080930]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.debug.ui' range='[3.4.2.v20090110_r342,3.4.2.v20090110_r342]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.sat4j.pb' range='[2.0.3.v20081021,2.0.3.v20081021]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.updatechecker' range='[1.0.0.v20080427-2136,1.0.0.v20080427-2136]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.apache.lucene' range='[1.9.1.v20080530-1600,1.9.1.v20080530-1600]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help.ui' range='[3.3.102.v20081014_34x,3.3.102.v20081014_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui' range='[3.4.2.M20090204-0800,3.4.2.M20090204-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.team.core' range='[3.4.2.r34x_20080115,3.4.2.r34x_20080115]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.expressions' range='[3.4.1.r342_v20081203-0800,3.4.1.r342_v20081203-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingorg.eclipse.equinox.p2.reconciler.dropins' range='[1.0.4.v20081027-2115,1.0.4.v20081027-2115]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='javax.servlet' range='[2.4.0.v200806031604,2.4.0.v200806031604]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='a.jre' range='[1.6.0,1.6.0]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.commands' range='[3.4.0.I20080509-2000,3.4.0.I20080509-2000]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform.ide.launcher.win32.win32.x86' range='[3.4.2.M20090211-1700,3.4.2.M20090211-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.frameworkadmin' range='[1.0.2.R34x_v20081007,1.0.2.R34x_v20081007]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingorg.eclipse.platform.ide.launcher.win32.win32.x86' range='[3.4.2.M20090211-1700,3.4.2.M20090211-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.metadata.repository' range='[1.0.0.v20080604,1.0.0.v20080604]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='com.ibm.icu' range='[3.8.1.v20080530,3.8.1.v20080530]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ecf' range='[2.0.0.v20080611-1715,2.0.0.v20080611-1715]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.apache.commons.el' range='[1.0.0.v200806031608,1.0.0.v200806031608]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.jface.text' range='[3.4.2.r342_v20081119-0800,3.4.2.r342_v20081119-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.update.scheduler' range='[3.2.100.v20080404,3.2.100.v20080404]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.intro' range='[3.2.201.v20080702_34x,3.2.201.v20080702_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.resources' range='[3.4.2.R34x_v20090126,3.4.2.R34x_v20090126]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingorg.eclipse.platform.ide.ini.win32.win32.x86' range='[3.4.2.M20090211-1700,3.4.2.M20090211-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform.feature.jar' range='[3.4.2.R342_v20090122-9I96EiWElHi8lheoJKJIvhM3JfVsYbRrgVIWL,3.4.2.R342_v20090122-9I96EiWElHi8lheoJKJIvhM3JfVsYbRrgVIWL]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.update.core' range='[3.2.202.R34x_v20081128,3.2.202.R34x_v20081128]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.apache.jasper' range='[5.5.17.v200806031609,5.5.17.v200806031609]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.workbench.texteditor' range='[3.4.1.r341_v20080827-1100,3.4.1.r341_v20080827-1100]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.swt.win32.win32.x86' range='[3.4.1.v3452b,3.4.1.v3452b]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.intro.universal' range='[3.2.200.v20080508,3.2.200.v20080508]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.ide' range='[3.4.2.M20090127-1700,3.4.2.M20090127-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.metadata' range='[1.0.0.v20080514-1900,1.0.0.v20080514-1900]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.directorywatcher' range='[1.0.2.v20080806-1619,1.0.2.v20080806-1619]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='javax.servlet.jsp' range='[2.0.0.v200806031607,2.0.0.v200806031607]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.update.configurator' range='[3.2.201.R34x_v20080819,3.2.201.R34x_v20080819]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.browser' range='[3.2.201.v20080708_34x,3.2.201.v20080708_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='com.jcraft.jsch' range='[0.1.37.v200803061811,0.1.37.v200803061811]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.net' range='[1.0.0.I20080605,1.0.0.I20080605]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingwin32.win32.x86org.eclipse.core.runtime' range='[3.4.0.v20080512,3.4.0.v20080512]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.resources.compatibility' range='[3.4.0.v20080604-1400,3.4.0.v20080604-1400]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ltk.ui.refactoring' range='[3.4.1.r341_v20080716-0800,3.4.1.r341_v20080716-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.compare' range='[3.4.1.r34x_20090121,3.4.1.r34x_20090121]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.app' range='[1.1.0.v20080421-2006,1.1.0.v20080421-2006]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.common' range='[3.4.0.v20080421-2006,3.4.0.v20080421-2006]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.variables' range='[3.2.100.v20080529-1300,3.2.100.v20080529-1300]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.console' range='[3.3.1.v20090128_r342,3.3.1.v20090128_r342]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.jsch.ui' range='[1.1.100.I20080415,1.1.100.I20080415]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help.feature.jar' range='[1.0.2.R342_v20090122-7r7xEKaEJBZu5oGhP3u6nOmbM9VK,1.0.2.R342_v20090122-7r7xEKaEJBZu5oGhP3u6nOmbM9VK]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ecf.ssl' range='[1.0.0.v20080611-1715,1.0.0.v20080611-1715]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.touchpoint.natives' range='[1.0.0.v20080505-1850,1.0.0.v20080505-1850]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.presentations.r21' range='[3.2.100.I20080512-2000,3.2.100.I20080512-2000]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ant.core' range='[3.2.0.v20080529,3.2.0.v20080529]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.navigator' range='[3.3.102.M20090127-1700,3.3.102.M20090127-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.preferences' range='[3.2.201.R34x_v20080709,3.2.201.R34x_v20080709]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.ide.application' range='[1.0.1.M20090204-0800,1.0.1.M20090204-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.rcp' range='[3.4.1.R342_v20090205,3.4.1.R342_v20090205]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.exemplarysetup' range='[1.0.0.v20080427-2136,1.0.0.v20080427-2136]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.jface' range='[3.4.2.M20090107-0800,3.4.2.M20090107-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.net.win32.x86' range='[1.0.0.I20080521,1.0.0.I20080521]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.views' range='[3.3.1.M20081112-0800,3.3.1.M20081112-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help.feature.group' range='[1.0.2.R342_v20090122-7r7xEKaEJBZu5oGhP3u6nOmbM9VK,1.0.2.R342_v20090122-7r7xEKaEJBZu5oGhP3u6nOmbM9VK]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.security.win32.x86' range='[1.0.0.v20080529-1600,1.0.0.v20080529-1600]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ecf.provider.filetransfer' range='[2.0.0.v20080611-1715,2.0.0.v20080611-1715]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.launcher' range='[1.0.101.R34x_v20081125,1.0.101.R34x_v20081125]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.jobs' range='[3.4.1.R34x_v20081128,3.4.1.R34x_v20081128]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='tooling.source.default' range='[1.0.0,1.0.0]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.debug.core' range='[3.4.1.v20090106_r342,3.4.1.v20090106_r342]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.jface.databinding' range='[1.2.1.M20080827-0800a,1.2.1.M20080827-0800a]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ecf.identity' range='[2.0.0.v20080611-1715,2.0.0.v20080611-1715]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.engine' range='[1.0.4.v20080930,1.0.4.v20080930]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.apache.ant' range='[1.7.0.v200803061910,1.7.0.v200803061910]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.http.jetty' range='[1.1.0.v20080425,1.1.0.v20080425]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.extensionlocation' range='[1.0.4.v20081027-2115,1.0.4.v20081027-2115]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.runtime.compatibility.registry' range='[3.2.200.v20080610,3.2.200.v20080610]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.osgi' range='[3.4.3.R34x_v20081215-1030,3.4.3.R34x_v20081215-1030]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.garbagecollector' range='[1.0.1.R34x_v20080818,1.0.1.R34x_v20080818]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.apache.commons.logging' range='[1.0.4.v20080605-1930,1.0.4.v20080605-1930]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.win32' range='[3.2.100.v20080408-0800,3.2.100.v20080408-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help.appserver' range='[3.1.300.v20080507,3.1.300.v20080507]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.team.ui' range='[3.4.1.r34x_20080827,3.4.1.r34x_20080827]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.cheatsheets' range='[3.3.101.v20080702_34x,3.3.101.v20080702_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.resources.win32.x86' range='[3.4.0.v20071204,3.4.0.v20071204]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.search' range='[3.4.1.r341_v20080813-0800,3.4.1.r341_v20080813-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help' range='[3.3.102.v20081014_34x,3.3.102.v20081014_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.text' range='[3.4.0.v20080605-1800,3.4.0.v20080605-1800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.http.servlet' range='[1.0.100.v20080427-0830,1.0.100.v20080427-0830]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.ui.sdk' range='[1.0.1.R34x_v20081029,1.0.1.R34x_v20081029]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.filebuffers' range='[3.4.0.v20080603-2000,3.4.0.v20080603-2000]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.http.registry' range='[1.0.100.v20080427-0830,1.0.100.v20080427-0830]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.artifact.repository' range='[1.0.4.v20080930,1.0.4.v20080930]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.boot' range='[3.1.100.v20080218,3.1.100.v20080218]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.workbench' range='[3.4.2.M20090127-1700,3.4.2.M20090127-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.ui' range='[1.0.4.R34x_v20090123,1.0.4.R34x_v20090123]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.registry' range='[3.4.0.v20080516-0950,3.4.0.v20080516-0950]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help.webapp' range='[3.3.101.M20080805_34x,3.3.101.M20080805_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.navigator.resources' range='[3.3.101.M20080910-0800,3.3.101.M20080910-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.jsch.core' range='[1.1.100.I20080604,1.1.100.I20080604]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform.doc.user' range='[3.4.2.r342_v20081031-0800,3.4.2.r342_v20081031-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform' range='[3.3.101.v200902111700,3.3.101.v200902111700]'/>
+      </requires>
+      <touchpoint id='null' version='0.0.0'/>
+    </unit>
+    <unit id='PlatformProfile' version='0.0.0.1397654024317' singleton='false'>
+      <properties size='12'>
+        <property name='org.eclipse.equinox.p2.type.profile' value='true'/>
+        <property name='org.eclipse.equinox.p2.cache' value='C:\Jennic\Tools\eclipse'/>
+        <property name='org.eclipse.equinox.p2.flavor' value='tooling'/>
+        <property name='org.eclipse.equinox.p2.roaming' value='true'/>
+        <property name='org.eclipse.update.install.features' value='true'/>
+        <property name='org.eclipse.equinox.p2.environments' value='osgi.ws=win32,osgi.os=win32,osgi.arch=x86'/>
+        <property name='org.eclipse.equinox.p2.installFolder' value='C:\Jennic\Tools\eclipse'/>
+        <property name='eclipse.touchpoint.launcherName' value='eclipse.exe'/>
+        <property name='org.eclipse.equinox.p2.cache.extensions' value='file:/C:/Jennic/Tools/eclipse/.eclipseextension|file:/C:/Jennic/Tools/eclipse/configuration/org.eclipse.osgi/bundles/67/data/listener_1925729951/'/>
+        <property name='---IUPROPERTY---org.eclipse.platform.ide---IUPROPERTYKEY---org.eclipse.equinox.p2.type.root' value='true'/>
+        <property name='---IUPROPERTY---org.eclipse.platform.ide---IUPROPERTYKEY---org.eclipse.equinox.p2.internal.inclusion.rules' value='STRICT'/>
+        <property name='---IUPROPERTY---org.eclipse.platform.ide.launcher.win32.win32.x86---IUPROPERTYKEY---unzipped|@artifact|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse' value='/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/notice.html|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/configuration/config.ini|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/configuration/.settings/org.eclipse.equinox.p2.metadata.repository.prefs|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/configuration/.settings/org.eclipse.equinox.p2.artifact.repository.prefs|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/readme/readme_eclipse.html|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/eclipse.exe|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/eclipsec.exe|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/.eclipseproduct|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/eclipse.ini|/builds/M/src/M20090211-1700/p2temp/equinox.p2.build/platform.install.win32.win32.x86/eclipse/epl-v10.html|'/>
+      </properties>
+      <requires size='156'>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.jsp.jasper' range='[1.0.100.v20080427-0830,1.0.100.v20080427-0830]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.osgi.util' range='[3.1.300.v20080303,3.1.300.v20080303]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingorg.eclipse.equinox.simpleconfigurator' range='[1.0.0.v20080604,1.0.0.v20080604]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='tooling.org.eclipse.update.feature.default' range='[1.0.0,1.0.0]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.runtime' range='[3.4.0.v20080512,3.4.0.v20080512]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.jsp.jasper.registry' range='[1.0.0.v20080427-0830,1.0.0.v20080427-0830]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.net' range='[1.1.0.I20080604,1.1.0.I20080604]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ltk.core.refactoring' range='[3.4.2.r342_v20081028-0800,3.4.2.r342_v20081028-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.simpleconfigurator' range='[1.0.0.v20080604,1.0.0.v20080604]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.rcp.feature.jar' range='[3.4.200.R342_v20090122-989JESTEbig-SVaL8UJHcYBr4A63,3.4.200.R342_v20090122-989JESTEbig-SVaL8UJHcYBr4A63]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.update.core.win32' range='[3.2.100.v20080107,3.2.100.v20080107]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.databinding' range='[1.1.1.M20080827-0800b,1.1.1.M20080827-0800b]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.filesystem.win32.x86' range='[1.1.0.v20080604-1400,1.1.0.v20080604-1400]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.filesystem' range='[1.2.0.v20080604-1400,1.2.0.v20080604-1400]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.console' range='[1.0.0.v20080514-1900,1.0.0.v20080514-1900]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.user.ui.feature.group' range='[1.0.2.r34x_v20090120-7d-7tEQcCaaYSBeNOClOn02267,1.0.2.r34x_v20090120-7d-7tEQcCaaYSBeNOClOn02267]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.sat4j.core' range='[2.0.3.v20081021,2.0.3.v20081021]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help.base' range='[3.3.103.v20090128_34x,3.3.103.v20090128_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingwin32.win32.x86org.eclipse.update.configurator' range='[3.2.201.R34x_v20080819,3.2.201.R34x_v20080819]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.security' range='[1.0.1.R34x_v20080721,1.0.1.R34x_v20080721]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.databinding.beans' range='[1.1.1.M20080827-0800a,1.1.1.M20080827-0800a]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.user.ui.feature.jar' range='[1.0.2.r34x_v20090120-7d-7tEQcCaaYSBeNOClOn02267,1.0.2.r34x_v20090120-7d-7tEQcCaaYSBeNOClOn02267]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.workbench.compatibility' range='[3.2.0.I20080509-2000,3.2.0.I20080509-2000]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.runtime.compatibility' range='[3.2.0.v20071008,3.2.0.v20071008]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='tooling.osgi.bundle.default' range='[1.0.0,1.0.0]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingwin32.win32.x86org.eclipse.equinox.common' range='[3.4.0.v20080421-2006,3.4.0.v20080421-2006]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.director' range='[1.0.4.v20081112-1019,1.0.4.v20081112-1019]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.swt' range='[3.4.2.v3452b,3.4.2.v3452b]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingorg.eclipse.equinox.launcher' range='[1.0.101.R34x_v20081125,1.0.101.R34x_v20081125]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ecf.provider.filetransfer.ssl' range='[1.0.0.v20080611-1715,1.0.0.v20080611-1715]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.simpleconfigurator.manipulator' range='[1.0.4.v20080930,1.0.4.v20080930]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.director.app' range='[1.0.1.R34x_v20080729,1.0.1.R34x_v20080729]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.views.properties.tabbed' range='[3.4.2.M20090127-1700,3.4.2.M20090127-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.apache.lucene.analysis' range='[1.9.1.v20080530-1600,1.9.1.v20080530-1600]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.security.ui' range='[1.0.0.v20080603-1810,1.0.0.v20080603-1810]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.touchpoint.eclipse' range='[1.0.2.v20081119-1055,1.0.2.v20081119-1055]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.forms' range='[3.3.103.v20081027_34x,3.3.103.v20081027_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.externaltools' range='[3.2.0.v20080514-1542,3.2.0.v20080514-1542]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.mortbay.jetty' range='[5.1.14.v200806031611,5.1.14.v200806031611]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ecf.filetransfer' range='[2.0.0.v20080611-1715,2.0.0.v20080611-1715]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.editors' range='[3.4.0.v20080603-2000,3.4.0.v20080603-2000]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.core' range='[1.0.4.v20081112-1019,1.0.4.v20081112-1019]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform.ide.launcher.win32.win32.x86.eclipse.exe' range='[3.4.2.M20090211-1700,3.4.2.M20090211-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.metadata.generator' range='[1.0.4.v20081217,1.0.4.v20081217]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.osgi.services' range='[3.1.200.v20071203,3.1.200.v20071203]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.jarprocessor' range='[1.0.0.v20080514-1900,1.0.0.v20080514-1900]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.contenttype' range='[3.3.0.v20080604-1400,3.3.0.v20080604-1400]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.updatesite' range='[1.0.1.R34x_v20080808-1156,1.0.1.R34x_v20080808-1156]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.runtime.compatibility.auth' range='[3.2.100.v20070502,3.2.100.v20070502]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform.feature.group' range='[3.4.2.R342_v20090122-9I96EiWElHi8lheoJKJIvhM3JfVsYbRrgVIWL,3.4.2.R342_v20090122-9I96EiWElHi8lheoJKJIvhM3JfVsYbRrgVIWL]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.launcher.win32.win32.x86' range='[1.0.101.R34x_v20080731,1.0.101.R34x_v20080731]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.update.ui' range='[3.2.101.R34x_v20081128,3.2.101.R34x_v20081128]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.rcp.feature.group' range='[3.4.200.R342_v20090122-989JESTEbig-SVaL8UJHcYBr4A63,3.4.200.R342_v20090122-989JESTEbig-SVaL8UJHcYBr4A63]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform.ide' range='[3.4.2.M20090211-1700,3.4.2.M20090211-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingorg.eclipse.platform.ide.config.win32.win32.x86' range='[3.4.2.M20090211-1700,3.4.2.M20090211-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.reconciler.dropins' range='[1.0.4.v20081027-2115,1.0.4.v20081027-2115]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.frameworkadmin.equinox' range='[1.0.4.v20080930,1.0.4.v20080930]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.debug.ui' range='[3.4.2.v20090110_r342,3.4.2.v20090110_r342]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.sat4j.pb' range='[2.0.3.v20081021,2.0.3.v20081021]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.updatechecker' range='[1.0.0.v20080427-2136,1.0.0.v20080427-2136]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.apache.lucene' range='[1.9.1.v20080530-1600,1.9.1.v20080530-1600]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help.ui' range='[3.3.102.v20081014_34x,3.3.102.v20081014_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui' range='[3.4.2.M20090204-0800,3.4.2.M20090204-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.team.core' range='[3.4.2.r34x_20080115,3.4.2.r34x_20080115]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.expressions' range='[3.4.1.r342_v20081203-0800,3.4.1.r342_v20081203-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingorg.eclipse.equinox.p2.reconciler.dropins' range='[1.0.4.v20081027-2115,1.0.4.v20081027-2115]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='javax.servlet' range='[2.4.0.v200806031604,2.4.0.v200806031604]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='a.jre' range='[1.6.0,1.6.0]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.commands' range='[3.4.0.I20080509-2000,3.4.0.I20080509-2000]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform.ide.launcher.win32.win32.x86' range='[3.4.2.M20090211-1700,3.4.2.M20090211-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.frameworkadmin' range='[1.0.2.R34x_v20081007,1.0.2.R34x_v20081007]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingorg.eclipse.platform.ide.launcher.win32.win32.x86' range='[3.4.2.M20090211-1700,3.4.2.M20090211-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.metadata.repository' range='[1.0.0.v20080604,1.0.0.v20080604]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='com.ibm.icu' range='[3.8.1.v20080530,3.8.1.v20080530]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ecf' range='[2.0.0.v20080611-1715,2.0.0.v20080611-1715]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.apache.commons.el' range='[1.0.0.v200806031608,1.0.0.v200806031608]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.jface.text' range='[3.4.2.r342_v20081119-0800,3.4.2.r342_v20081119-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.update.scheduler' range='[3.2.100.v20080404,3.2.100.v20080404]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.intro' range='[3.2.201.v20080702_34x,3.2.201.v20080702_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.resources' range='[3.4.2.R34x_v20090126,3.4.2.R34x_v20090126]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingorg.eclipse.platform.ide.ini.win32.win32.x86' range='[3.4.2.M20090211-1700,3.4.2.M20090211-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform.feature.jar' range='[3.4.2.R342_v20090122-9I96EiWElHi8lheoJKJIvhM3JfVsYbRrgVIWL,3.4.2.R342_v20090122-9I96EiWElHi8lheoJKJIvhM3JfVsYbRrgVIWL]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.update.core' range='[3.2.202.R34x_v20081128,3.2.202.R34x_v20081128]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.apache.jasper' range='[5.5.17.v200806031609,5.5.17.v200806031609]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.workbench.texteditor' range='[3.4.1.r341_v20080827-1100,3.4.1.r341_v20080827-1100]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.swt.win32.win32.x86' range='[3.4.1.v3452b,3.4.1.v3452b]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.intro.universal' range='[3.2.200.v20080508,3.2.200.v20080508]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.ide' range='[3.4.2.M20090127-1700,3.4.2.M20090127-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.metadata' range='[1.0.0.v20080514-1900,1.0.0.v20080514-1900]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.directorywatcher' range='[1.0.2.v20080806-1619,1.0.2.v20080806-1619]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='javax.servlet.jsp' range='[2.0.0.v200806031607,2.0.0.v200806031607]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.update.configurator' range='[3.2.201.R34x_v20080819,3.2.201.R34x_v20080819]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.browser' range='[3.2.201.v20080708_34x,3.2.201.v20080708_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='com.jcraft.jsch' range='[0.1.37.v200803061811,0.1.37.v200803061811]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.net' range='[1.0.0.I20080605,1.0.0.I20080605]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='toolingwin32.win32.x86org.eclipse.core.runtime' range='[3.4.0.v20080512,3.4.0.v20080512]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.resources.compatibility' range='[3.4.0.v20080604-1400,3.4.0.v20080604-1400]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ltk.ui.refactoring' range='[3.4.1.r341_v20080716-0800,3.4.1.r341_v20080716-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.compare' range='[3.4.1.r34x_20090121,3.4.1.r34x_20090121]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.app' range='[1.1.0.v20080421-2006,1.1.0.v20080421-2006]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.common' range='[3.4.0.v20080421-2006,3.4.0.v20080421-2006]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.variables' range='[3.2.100.v20080529-1300,3.2.100.v20080529-1300]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.console' range='[3.3.1.v20090128_r342,3.3.1.v20090128_r342]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.jsch.ui' range='[1.1.100.I20080415,1.1.100.I20080415]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help.feature.jar' range='[1.0.2.R342_v20090122-7r7xEKaEJBZu5oGhP3u6nOmbM9VK,1.0.2.R342_v20090122-7r7xEKaEJBZu5oGhP3u6nOmbM9VK]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ecf.ssl' range='[1.0.0.v20080611-1715,1.0.0.v20080611-1715]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.touchpoint.natives' range='[1.0.0.v20080505-1850,1.0.0.v20080505-1850]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.presentations.r21' range='[3.2.100.I20080512-2000,3.2.100.I20080512-2000]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ant.core' range='[3.2.0.v20080529,3.2.0.v20080529]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.navigator' range='[3.3.102.M20090127-1700,3.3.102.M20090127-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.preferences' range='[3.2.201.R34x_v20080709,3.2.201.R34x_v20080709]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.ide.application' range='[1.0.1.M20090204-0800,1.0.1.M20090204-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.rcp' range='[3.4.1.R342_v20090205,3.4.1.R342_v20090205]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.exemplarysetup' range='[1.0.0.v20080427-2136,1.0.0.v20080427-2136]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.jface' range='[3.4.2.M20090107-0800,3.4.2.M20090107-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.net.win32.x86' range='[1.0.0.I20080521,1.0.0.I20080521]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.views' range='[3.3.1.M20081112-0800,3.3.1.M20081112-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help.feature.group' range='[1.0.2.R342_v20090122-7r7xEKaEJBZu5oGhP3u6nOmbM9VK,1.0.2.R342_v20090122-7r7xEKaEJBZu5oGhP3u6nOmbM9VK]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.security.win32.x86' range='[1.0.0.v20080529-1600,1.0.0.v20080529-1600]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ecf.provider.filetransfer' range='[2.0.0.v20080611-1715,2.0.0.v20080611-1715]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.launcher' range='[1.0.101.R34x_v20081125,1.0.101.R34x_v20081125]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.jobs' range='[3.4.1.R34x_v20081128,3.4.1.R34x_v20081128]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='tooling.source.default' range='[1.0.0,1.0.0]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.debug.core' range='[3.4.1.v20090106_r342,3.4.1.v20090106_r342]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.jface.databinding' range='[1.2.1.M20080827-0800a,1.2.1.M20080827-0800a]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ecf.identity' range='[2.0.0.v20080611-1715,2.0.0.v20080611-1715]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.engine' range='[1.0.4.v20080930,1.0.4.v20080930]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.apache.ant' range='[1.7.0.v200803061910,1.7.0.v200803061910]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.http.jetty' range='[1.1.0.v20080425,1.1.0.v20080425]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.extensionlocation' range='[1.0.4.v20081027-2115,1.0.4.v20081027-2115]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.runtime.compatibility.registry' range='[3.2.200.v20080610,3.2.200.v20080610]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.osgi' range='[3.4.3.R34x_v20081215-1030,3.4.3.R34x_v20081215-1030]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.garbagecollector' range='[1.0.1.R34x_v20080818,1.0.1.R34x_v20080818]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.apache.commons.logging' range='[1.0.4.v20080605-1930,1.0.4.v20080605-1930]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.win32' range='[3.2.100.v20080408-0800,3.2.100.v20080408-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help.appserver' range='[3.1.300.v20080507,3.1.300.v20080507]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.team.ui' range='[3.4.1.r34x_20080827,3.4.1.r34x_20080827]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.cheatsheets' range='[3.3.101.v20080702_34x,3.3.101.v20080702_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.resources.win32.x86' range='[3.4.0.v20071204,3.4.0.v20071204]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.search' range='[3.4.1.r341_v20080813-0800,3.4.1.r341_v20080813-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help' range='[3.3.102.v20081014_34x,3.3.102.v20081014_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.text' range='[3.4.0.v20080605-1800,3.4.0.v20080605-1800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.http.servlet' range='[1.0.100.v20080427-0830,1.0.100.v20080427-0830]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.ui.sdk' range='[1.0.1.R34x_v20081029,1.0.1.R34x_v20081029]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.filebuffers' range='[3.4.0.v20080603-2000,3.4.0.v20080603-2000]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.http.registry' range='[1.0.100.v20080427-0830,1.0.100.v20080427-0830]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.artifact.repository' range='[1.0.4.v20080930,1.0.4.v20080930]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.core.boot' range='[3.1.100.v20080218,3.1.100.v20080218]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.workbench' range='[3.4.2.M20090127-1700,3.4.2.M20090127-1700]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.p2.ui' range='[1.0.4.R34x_v20090123,1.0.4.R34x_v20090123]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.equinox.registry' range='[3.4.0.v20080516-0950,3.4.0.v20080516-0950]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.help.webapp' range='[3.3.101.M20080805_34x,3.3.101.M20080805_34x]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.ui.navigator.resources' range='[3.3.101.M20080910-0800,3.3.101.M20080910-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.jsch.core' range='[1.1.100.I20080604,1.1.100.I20080604]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform.doc.user' range='[3.4.2.r342_v20081031-0800,3.4.2.r342_v20081031-0800]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='org.eclipse.platform' range='[3.3.101.v200902111700,3.3.101.v200902111700]'/>
+      </requires>
+      <touchpoint id='null' version='0.0.0'/>
+    </unit>
+  </units>
+</repository>

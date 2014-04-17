@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config date="1397654025386" transient="false" version="3.0">
+<site enabled="true" policy="USER-EXCLUDE" updateable="true" url="platform:/base/">
+<feature id="org.eclipse.cdt.platform" url="features/org.eclipse.cdt.platform_5.0.2.200902130801/" version="5.0.2.200902130801">
+</feature>
+<feature id="org.eclipse.mylyn_feature" plugin-identifier="org.eclipse.mylyn" url="features/org.eclipse.mylyn_feature_3.0.5.v20090218-1800-e3x/" version="3.0.5.v20090218-1800-e3x">
+</feature>
+<feature id="org.eclipse.epp.usagedata.feature" url="features/org.eclipse.epp.usagedata.feature_1.0.1.R200809220400/" version="1.0.1.R200809220400">
+</feature>
+<feature id="org.eclipse.platform" url="features/org.eclipse.platform_3.4.2.R342_v20090122-9I96EiWElHi8lheoJKJIvhM3JfVsYbRrgVIWL/" version="3.4.2.R342_v20090122-9I96EiWElHi8lheoJKJIvhM3JfVsYbRrgVIWL">
+</feature>
+<feature id="org.eclipse.rcp" url="features/org.eclipse.rcp_3.4.200.R342_v20090122-989JESTEbig-SVaL8UJHcYBr4A63/" version="3.4.200.R342_v20090122-989JESTEbig-SVaL8UJHcYBr4A63">
+</feature>
+<feature id="org.eclipse.mylyn.bugzilla_feature" plugin-identifier="org.eclipse.mylyn" url="features/org.eclipse.mylyn.bugzilla_feature_3.0.5.v20090218-1800-e3x/" version="3.0.5.v20090218-1800-e3x">
+</feature>
+<feature id="org.eclipse.help" plugin-identifier="org.eclipse.help.base" url="features/org.eclipse.help_1.0.2.R342_v20090122-7r7xEKaEJBZu5oGhP3u6nOmbM9VK/" version="1.0.2.R342_v20090122-7r7xEKaEJBZu5oGhP3u6nOmbM9VK">
+</feature>
+<feature id="org.eclipse.cdt.mylyn" url="features/org.eclipse.cdt.mylyn_5.0.2.200902130801/" version="5.0.2.200902130801">
+</feature>
+<feature id="org.eclipse.cdt" url="features/org.eclipse.cdt_5.0.2.200902130801/" version="5.0.2.200902130801">
+</feature>
+<feature id="org.eclipse.cdt.gnu.build" url="features/org.eclipse.cdt.gnu.build_5.0.2.200902130801/" version="5.0.2.200902130801">
+</feature>
+<feature id="org.eclipse.equinox.p2.user.ui" url="features/org.eclipse.equinox.p2.user.ui_1.0.2.r34x_v20090120-7d-7tEQcCaaYSBeNOClOn02267/" version="1.0.2.r34x_v20090120-7d-7tEQcCaaYSBeNOClOn02267">
+</feature>
+<feature id="org.eclipse.cvs" url="features/org.eclipse.cvs_1.1.2.R342_v20090122-7C79E9x9sLM1t6M9YD7_A7/" version="1.1.2.R342_v20090122-7C79E9x9sLM1t6M9YD7_A7">
+</feature>
+<feature id="org.eclipse.mylyn.ide_feature" plugin-identifier="org.eclipse.mylyn" url="features/org.eclipse.mylyn.ide_feature_3.0.5.v20090218-1800-e3x/" version="3.0.5.v20090218-1800-e3x">
+</feature>
+<feature id="org.eclipse.mylyn.team_feature" plugin-identifier="org.eclipse.mylyn" url="features/org.eclipse.mylyn.team_feature_3.0.5.v20090218-1800-e3x/" version="3.0.5.v20090218-1800-e3x">
+</feature>
+<feature id="org.eclipse.cdt.gnu.debug" url="features/org.eclipse.cdt.gnu.debug_5.0.2.200902130801/" version="5.0.2.200902130801">
+</feature>
+<feature id="org.eclipse.mylyn.context_feature" plugin-identifier="org.eclipse.mylyn" url="features/org.eclipse.mylyn.context_feature_3.0.5.v20090218-1800-e3x/" version="3.0.5.v20090218-1800-e3x">
+</feature>
+</site>
+</config>

@@ -1,0 +1,30 @@
+Manifest-Version: 1.0
+Bundle-SymbolicName: org.eclipse.cdt.mylyn
+Bundle-ManifestVersion: 2
+Bundle-Name: Mylyn Plug-in
+Bundle-Version: 1.0.0.200902130801
+
+Name: about.mappings
+SHA1-Digest: dcIRJgDNN1OHnr2WECdVFNrlMmg=
+
+Name: about.ini
+SHA1-Digest: /Q3b71rRyOQvoiBKLqo6VInAGo4=
+
+Name: epl-v10.html
+SHA1-Digest: pTOyybcpEe+Y8lkSVUtarMleXqE=
+
+Name: about.html
+SHA1-Digest: qRxCrhx2bqfpek8e2pDytN3lYdo=
+
+Name: eclipse32.gif
+SHA1-Digest: OEzrrdlwkZJntOw0ED9ewvFb4ms=
+
+Name: META-INF/eclipse.inf
+SHA1-Digest: KyT9FF7C7t86NoBoa2kZT3ZJBfw=
+
+Name: about.properties
+SHA1-Digest: lnkTzNcUpyK7zaxm+cKx5rmY+rc=
+
+Name: notice.html
+SHA1-Digest: YXfaVLayE8gaE0VWfKzUHsp6IyM=
+

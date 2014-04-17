@@ -1,0 +1,18 @@
+SYSTEM:S-1-5-18:18:
+None:S-1-5-21-1821619201-1608406541-2194939800-513:513:
+Administrators:S-1-5-32-544:544:
+Backup Operators:S-1-5-32-551:551:
+Cryptographic Operators:S-1-5-32-569:569:
+Distributed COM Users:S-1-5-32-562:562:
+Event Log Readers:S-1-5-32-573:573:
+Guests:S-1-5-32-546:546:
+IIS_IUSRS:S-1-5-32-568:568:
+Network Configuration Operators:S-1-5-32-556:556:
+Performance Log Users:S-1-5-32-559:559:
+Performance Monitor Users:S-1-5-32-558:558:
+Power Users:S-1-5-32-547:547:
+Remote Desktop Users:S-1-5-32-555:555:
+Replicator:S-1-5-32-552:552:
+Users:S-1-5-32-545:545:
+TelnetClients:S-1-5-21-1821619201-1608406541-2194939800-1001:1001:
+mkgroup_l_d:S-1-5-32-545:10545:
