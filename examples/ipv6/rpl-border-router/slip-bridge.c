@@ -46,7 +46,7 @@
 
 #define UIP_IP_BUF        ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
 
-#define DEBUG DEBUG_PRINT
+#define DEBUG DEBUG_FULL
 #include "net/uip-debug.h"
 
 #ifndef BAUD2UBR
@@ -60,7 +60,7 @@ static uip_ipaddr_t last_sender;
 static void
 slip_input_callback(void)
 {
- // PRINTF("SIN: %u\n", uip_len);
+  PRINTF("SIN: %u\n", uip_len);
   if(uip_buf[0] == '!') {
     PRINTF("Got configuration message of type %c\n", uip_buf[1]);
     uip_len = 0;

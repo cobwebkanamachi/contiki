@@ -51,7 +51,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#define DEBUG DEBUG_NONE
+#define DEBUG DEBUG_FULL
 #include "net/uip-debug.h"
 
 uint16_t dag_id[] = {0x1111, 0x1100, 0, 0, 0, 0, 0, 0x0011};
@@ -101,7 +101,7 @@ PROCESS_THREAD(webserver_nogui_process, ev, data)
     PROCESS_WAIT_EVENT_UNTIL(ev == tcpip_event);
     httpd_appcall(data);
   }
-  
+
   PROCESS_END();
 }
 AUTOSTART_PROCESSES(&border_router_process,&webserver_nogui_process);
@@ -178,7 +178,7 @@ PT_THREAD(generate_routes(struct httpd_state *s))
       switch (nbr->state) {
       case NBR_INCOMPLETE: ADD(" INCOMPLETE");break;
       case NBR_REACHABLE: ADD(" REACHABLE");break;
-      case NBR_STALE: ADD(" STALE");break;      
+      case NBR_STALE: ADD(" STALE");break;
       case NBR_DELAY: ADD(" DELAY");break;
       case NBR_PROBE: ADD(" NBR_PROBE");break;
       }
@@ -190,7 +190,7 @@ PT_THREAD(generate_routes(struct httpd_state *s))
       switch (nbr->state) {
       case NBR_INCOMPLETE: ADD(" INCOMPLETE");break;
       case NBR_REACHABLE: ADD(" REACHABLE");break;
-      case NBR_STALE: ADD(" STALE");break;      
+      case NBR_STALE: ADD(" STALE");break;
       case NBR_DELAY: ADD(" DELAY");break;
       case NBR_PROBE: ADD(" NBR_PROBE");break;
       }
@@ -312,6 +312,7 @@ request_prefix(void)
   /* mess up uip_buf with a dirty request... */
   uip_buf[0] = '?';
   uip_buf[1] = 'P';
+//  uip_buf[2] = '\n';
   uip_len = 2;
   slip_send();
   uip_len = 0;
@@ -336,7 +337,7 @@ PROCESS_THREAD(border_router_process, ev, data)
   PROCESS_BEGIN();
 
 /* While waiting for the prefix to be sent through the SLIP connection, the future
- * border router can join an existing DAG as a parent or child, or acquire a default 
+ * border router can join an existing DAG as a parent or child, or acquire a default
  * router that will later take precedence over the SLIP fallback interface.
  * Prevent that by turning the radio off until we are initialized as a DAG root.
  */
@@ -345,7 +346,7 @@ PROCESS_THREAD(border_router_process, ev, data)
 
   PROCESS_PAUSE();
 
-  SENSORS_ACTIVATE(button_sensor);
+  //SENSORS_ACTIVATE(button_sensor);
 
   PRINTF("RPL-Border router started\n");
 #if 0
@@ -355,13 +356,21 @@ PROCESS_THREAD(border_router_process, ev, data)
      cpu will interfere with establishing the SLIP connection */
   NETSTACK_MAC.off(1);
 #endif
- 
+
   /* Request prefix until it has been received */
   while(!prefix_set) {
     etimer_set(&et, CLOCK_SECOND);
     request_prefix();
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+    PRINTF("not prefix_set\n");
+    //XXX hack!
+    uip_ipaddr_t prefix_64 = {{0}};
+    prefix_64.u16[0]=0xaaaa;
+    set_prefix_64(&prefix_64);
+
   }
+
+  PRINTF("prefix_set\n");
 
   dag = rpl_set_root(RPL_DEFAULT_INSTANCE,(uip_ip6addr_t *)dag_id);
   if(dag != NULL) {
@@ -372,18 +381,20 @@ PROCESS_THREAD(border_router_process, ev, data)
   /* Now turn the radio on, but disable radio duty cycling.
    * Since we are the DAG root, reception delays would constrain mesh throughbut.
    */
-  NETSTACK_MAC.off(1);
-  
+ NETSTACK_MAC.off(1);
+
 #if DEBUG || 1
   print_local_addresses();
 #endif
 
+  PRINTF("Initiating global repair\n");
+  rpl_repair_root(RPL_DEFAULT_INSTANCE);
   while(1) {
     PROCESS_YIELD();
-    if (ev == sensors_event && data == &button_sensor) {
-      PRINTF("Initiating global repair\n");
-      rpl_repair_root(RPL_DEFAULT_INSTANCE);
-    }
+//    if (ev == sensors_event && data == &button_sensor) {
+//      PRINTF("Initiating global repair\n");
+//      rpl_repair_root(RPL_DEFAULT_INSTANCE);
+//    }
   }
 
   PROCESS_END();
