@@ -10,7 +10,7 @@ CONTIKI_TARGET_DIRS = . dev net net/mac net/rime
 CONTIKI_TARGET_MAIN = ${addprefix $(OBJECTDIR)/,contiki-main.o}
 
 CONTIKI_TARGET_SOURCEFILES = contiki-main.c clock.c sprintf.c uart0.c watchdog.c timer-arch.c leds-arch.c \
- button-sensor.c sensors.c leds.c
+ button-sensor.c sensors.c leds.c slip_uart0.c
 
 #For MicroMAC (radio) library
 CONTIKI_TARGET_SOURCEFILES += micromac-radio.c packetbuf.c frame802154.c framer-802154.c chameleon-bitopt.c
