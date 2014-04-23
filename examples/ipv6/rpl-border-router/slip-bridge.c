@@ -46,7 +46,7 @@
 
 #define UIP_IP_BUF        ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
 
-#define DEBUG DEBUG_FULL
+#define DEBUG DEBUG_NONE
 #include "net/uip-debug.h"
 
 #ifndef BAUD2UBR
@@ -116,7 +116,7 @@ output(void)
     PRINT6ADDR(&UIP_IP_BUF->destipaddr);
     PRINTF("\n");
   } else {
- //   PRINTF("SUT: %u\n", uip_len);
+    PRINTF("SUT: %u\n", uip_len);
     slip_send();
   }
 }

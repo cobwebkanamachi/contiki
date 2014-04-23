@@ -51,7 +51,11 @@
 #include <string.h>
 #include <ctype.h>
 
-#define DEBUG DEBUG_FULL
+#ifndef WEBSERVER
+#define WEBSERVER 1
+#endif
+
+#define DEBUG DEBUG_NONE
 #include "net/uip-debug.h"
 
 uint16_t dag_id[] = {0x1111, 0x1100, 0, 0, 0, 0, 0, 0x0011};
@@ -77,15 +81,15 @@ AUTOSTART_PROCESSES(&border_router_process,&webserver_nogui_process);
 /* The internal webserver can provide additional information if
  * enough program flash is available.
  */
-#define WEBSERVER_CONF_LOADTIME 0
-#define WEBSERVER_CONF_FILESTATS 0
-#define WEBSERVER_CONF_NEIGHBOR_STATUS 0
+#define WEBSERVER_CONF_LOADTIME 1
+#define WEBSERVER_CONF_FILESTATS 1
+#define WEBSERVER_CONF_NEIGHBOR_STATUS 1
 /* Adding links requires a larger RAM buffer. To avoid static allocation
  * the stack can be used for formatting; however tcp retransmissions
  * and multiple connections can result in garbled segments.
  * TODO:use PSOCk_GENERATOR_SEND and tcp state storage to fix this.
  */
-#define WEBSERVER_CONF_ROUTE_LINKS 0
+#define WEBSERVER_CONF_ROUTE_LINKS 1
 #if WEBSERVER_CONF_ROUTE_LINKS
 #define BUF_USES_STACK 1
 #endif
@@ -269,7 +273,7 @@ PT_THREAD(generate_routes(struct httpd_state *s))
 
 #if WEBSERVER_CONF_LOADTIME
   numticks = clock_time() - numticks + 1;
-  ADD(" <i>(%u.%02u sec)</i>",numticks/CLOCK_SECOND,(100*(numticks%CLOCK_SECOND))/CLOCK_SECOND));
+  ADD(" <i>(%u.%02u sec)</i>", numticks/CLOCK_SECOND, (100*(numticks%CLOCK_SECOND))/CLOCK_SECOND);
 #endif
 
   SEND_STRING(&s->sout, buf);
@@ -363,11 +367,6 @@ PROCESS_THREAD(border_router_process, ev, data)
     request_prefix();
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
     PRINTF("not prefix_set\n");
-    //XXX hack!
-    uip_ipaddr_t prefix_64 = {{0}};
-    prefix_64.u16[0]=0xaaaa;
-    set_prefix_64(&prefix_64);
-
   }
 
   PRINTF("prefix_set\n");
@@ -379,7 +378,7 @@ PROCESS_THREAD(border_router_process, ev, data)
   }
 
   /* Now turn the radio on, but disable radio duty cycling.
-   * Since we are the DAG root, reception delays would constrain mesh throughbut.
+   * Since we are the DAG root, reception delays would constrain mesh throughput.
    */
  NETSTACK_MAC.off(1);
 
