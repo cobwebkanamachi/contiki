@@ -399,7 +399,7 @@ micromac_radio_read(void *buf, unsigned short bufsize)
 	//should copy the whole thing or else something wrong happens probably because of alignment
 	//XXX check for possibility of overflow: rx_frame_buffer_read_ptr == rx_frame_buffer_write_ptr
 	memcpy(buf, rx_frame_buffer_read_ptr, sizeof(tsMacFrame));
-	printf(
+	PRINTF(
 			"len: %u, u8PayloadLength %u, u16Unused %u\n",
 			len, rx_frame_buffer_read_ptr->u8PayloadLength, ((tsMacFrame*)buf)->u16Unused);
 	switch_rx_read_buffer();
@@ -409,7 +409,7 @@ micromac_radio_read(void *buf, unsigned short bufsize)
 	RELEASE_LOCK();
 	int i;
 	for (i = 0; i < len; i++) {
-		printf("%02x ", ((uint8_t*)buf)[i]);
+		PRINTF("%02x ", ((uint8_t*)buf)[i]);
 	}
 	PRINTF("micromac_radio: reading %d bytes\n", len);
 
