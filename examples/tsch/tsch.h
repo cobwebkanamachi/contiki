@@ -42,8 +42,8 @@
 #include "contiki-conf.h"
 #include "net/mac/rdc.h"
 #include "tsch-parameters.h"
-int tsch_associate(struct rtimer *, uint16_t rpl_rank);
-extern const struct rdc_driver tschrdc_driver;
 
+int tsch_associate(struct rtimer * timer, void * ass_ptr);
+extern const struct rdc_driver tschrdc_driver;
 
 #endif /* __TSCH_H__ */

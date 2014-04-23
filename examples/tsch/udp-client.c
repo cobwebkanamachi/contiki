@@ -146,8 +146,8 @@ set_global_address(void)
   uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
 #endif
 
-	#include "tsch.h"
-  tsch_associate(NULL, 0xffff);
+//	#include "tsch.h"
+//  tsch_associate(NULL, 0xffff);
 
 }
 /*---------------------------------------------------------------------------*/

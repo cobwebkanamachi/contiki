@@ -143,8 +143,8 @@ PROCESS_THREAD(udp_server_process, ev, data)
     uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
     rpl_set_prefix(dag, &ipaddr, 64);
     PRINTF("created a new RPL dag\n");
-		#include "tsch.h"
-    tsch_associate(NULL, dag->rank);
+//		#include "tsch.h"
+//    tsch_associate(NULL, dag->rank);
   } else {
     PRINTF("failed to create a new RPL DAG\n");
   }

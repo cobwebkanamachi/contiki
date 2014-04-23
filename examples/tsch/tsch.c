@@ -517,6 +517,10 @@ hop_channel(uint8_t offset)
 /*---------------------------------------------------------------------------*/
 PROCESS(tsch_tx_callback_process, "tsch_tx_callback_process");
 /*---------------------------------------------------------------------------*/
+PROCESS(eb_process, "EB process");
+AUTOSTART_PROCESSES(&eb_process);
+#define EB_SEND_INTERVAL 8
+/*---------------------------------------------------------------------------*/
 static cell_t *
 get_cell(uint16_t timeslot)
 {
@@ -1036,6 +1040,7 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 	buf[i++] = 0x00;
 	//b8: seqno suppression - b9:IE-list-present=1 - b10-11: destination address mode - b12-b13:frame version=2 - b14-15: src address mode=2
 	buf[i++] = 2 | 32 | 128;
+	if(!ieee154e_vars.mac_ebsn) ieee154e_vars.mac_ebsn++;
 	buf[i++] = ieee154e_vars.mac_ebsn++;
 
 	/* copy src PAN ID and long src address */
@@ -1143,8 +1148,9 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 }
 /*---------------------------------------------------------------------------*/
 void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack);
+#include "net/rpl/rpl.h"
 int
-tsch_associate(struct rtimer * timer, uint16_t rpl_rank)
+tsch_associate(struct rtimer * timer, void * ass_ptr)
 {
 	PT_BEGIN( &enhanced_beacon_pt );
 	/* TODO Synchronize
@@ -1152,9 +1158,24 @@ tsch_associate(struct rtimer * timer, uint16_t rpl_rank)
 	 * otherwise, wait for EBs to associate with a master
 	 */
 	COOJA_DEBUG_STR("tsch_associate\n");
+	ieee154e_vars.start = RTIMER_NOW();
+	/* Trying to get the RPL DAG, and polling until it becomes available  */
+	static rpl_dag_t * my_rpl_dag = NULL;
+//	my_rpl_dag = rpl_get_any_dag();
+	while(my_rpl_dag == NULL) {
+		COOJA_DEBUG_STR("waiting for RPL dag to become available\n");
+		rtimer_set(&t, RTIMER_NOW() + RTIMER_SECOND, 1, (void	(*)(struct rtimer *, void *)) tsch_associate, NULL);
+		PT_YIELD(&enhanced_beacon_pt);
+		my_rpl_dag = rpl_get_any_dag();
+		on();
+	}
+	my_rpl_dag = my_rpl_dag->instance->current_dag;
+	ieee154e_vars.join_priority = my_rpl_dag->rank > 0xff ? 0xff : my_rpl_dag->rank;
 
-	ieee154e_vars.join_priority = rpl_rank > 0xff ? 0xff : rpl_rank;
-	if(rpl_rank < 0xffff) {
+	//XXX not working...
+	//if this is root start now
+	if(my_rpl_dag->rank < 2) {
+		COOJA_DEBUG_STR("tsch_associate: rpl root\n");
 		//for now assume we are in sync
 		ieee154e_vars.is_sync = 1;
 		//something other than 0 for now
@@ -1165,18 +1186,17 @@ tsch_associate(struct rtimer * timer, uint16_t rpl_rank)
 		//look for a root to sync with
 		ieee154e_vars.state = TSCH_SEARCHING;
 	}
-	//	rpl_dag_t * my_rpl_dag = NULL;
-	//	my_rpl_dag = rpl_get_any_dag();
+	COOJA_DEBUG_PRINTF("tsch_associate: rpl rand %d\n", my_rpl_dag->rank);
+
 	softack_interrupt_exit_callback_f *interrupt_exit = tsch_wait_for_eb;
 	softack_make_callback_f *softack_make = NULL;
 	NETSTACK_RADIO_softack_subscribe(softack_make, interrupt_exit);
 
-	ieee154e_vars.start = RTIMER_NOW();
 	uint8_t cca_status = 0;
 	while (ieee154e_vars.state == TSCH_SEARCHING) {
 		waiting_for_radio_interrupt = 1;
-		on();
 		while (!cca_status) {
+			on();
 			cca_status = (!NETSTACK_RADIO.channel_clear()
 							|| NETSTACK_RADIO.pending_packet() || NETSTACK_RADIO.receiving_packet());
 			//if signal is detected on radio, yield to give radio interrupt a chance to receive it
@@ -1210,7 +1230,8 @@ tsch_associate(struct rtimer * timer, uint16_t rpl_rank)
 				if(!++ieee154e_vars.asn.asn_4lsb) {
 					ieee154e_vars.asn.asn_msb++;
 				}
-				/* XXX HACK should be set in sent schedule --Set parent as timesource */
+				/* XXX HACK this should be set in sent schedule
+				 * --Set parent as timesource */
 				struct neighbor_queue *n = neighbor_queue_from_addr(&last_rf->source_address);
 				if (n == NULL) {
 					//add new neighbor to list of neighbors
@@ -1256,6 +1277,8 @@ tsch_associate(struct rtimer * timer, uint16_t rpl_rank)
 	/* Make EB packet, but do not forget to update mac_ebsn in it or when changing schedule*/
 	make_eb(ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN);
 	schedule_fixed(&t, ieee154e_vars.start, TsSlotDuration);
+	//start the process for sending EBs
+	process_post(&eb_process, PROCESS_EVENT_POLL, NULL);
 	PT_END( &enhanced_beacon_pt );
 }
 /*---------------------------------------------------------------------------*/
@@ -1293,8 +1316,8 @@ init(void)
 	ieee154e_vars.join_priority = 0xff; /* inherit from RPL - PAN coordinator: 0 -- lower is better */
 	nbr_table_register(neighbor_list, NULL);
 	working_on_queue = 0;
-	//schedule next wakeup? or leave for higher layer to decide? i.e, scan, ...
-	//tsch_associate();
+	//try to associate to a network or start one if setup as RPL root
+	tsch_associate(&t, NULL);
 }
 /*---------------------------------------------------------------------------*/
 /* a polled-process to invoke the MAC tx callback asynchronously */
@@ -1316,28 +1339,24 @@ PROCESS_THREAD(tsch_tx_callback_process, ev, data)
 	}
 	PROCESS_END();
 }
-/*---------------------------------------------------------------------------*/
-PROCESS(eb_process, "EB process");
-AUTOSTART_PROCESSES(&eb_process);
-#define EB_SEND_INTERVAL 8
+
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(eb_process, ev, data)
 {
   static struct etimer periodic;
   static uint8_t timeout = 0;
   PROCESS_BEGIN();
-//  PROCESS_PAUSE();
-  etimer_set(&periodic, TsSlotDuration*ieee154e_vars.current_slotframe->length);
+	PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
+  if(ieee154e_vars.current_slotframe) {
+  	etimer_set(&periodic, TsSlotDuration*ieee154e_vars.current_slotframe->length);
+  }
   while(1) {
     PROCESS_YIELD();
     if(etimer_expired(&periodic)) {
       etimer_reset(&periodic);
       timeout++;
-			if(timeout%EB_SEND_INTERVAL == 0)
-				hop_channel(timeout);
-
-      /* send EB only half of the time, randomly */
-      if(generate_random_byte(8) >= 8/EB_SEND_INTERVAL) {
+      /* XXX send EB only half of the time, randomly 8/EB_SEND_INTERVAL*/
+      if(generate_random_byte(8) >= 0) {
 				if(ieee154e_vars.eb_buf[2]) { //is EB packet ready
 					ieee154e_vars.eb_buf[2] = ieee154e_vars.mac_ebsn++;
 					add_packet_to_queue(NULL, ieee154e_vars.eb_buf, &EB_CELL_ADDRESS);

@@ -67,14 +67,14 @@ cc2420_arch_sfd_init(void)
 {
   /* Need to select the special function! */
   P4SEL = BV(CC2420_SFD_PIN);
-  
+
   /* start timer B - 32768 ticks per second */
   TBCTL = TBSSEL_1 | TBCLR;
-  
+
   /* CM_3 = capture mode - capture on both edges */
   TBCCTL1 = CM_3 | CAP | SCS;
   TBCCTL1 |= CCIE;
-  
+
   /* Start Timer_B in continuous mode. */
   TBCTL |= MC1;
 

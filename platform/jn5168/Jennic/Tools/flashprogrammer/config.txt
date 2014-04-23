@@ -1,14 +1,21 @@
 (lp1
 .(lp2
-.S'COM3'
+VC:\u005CUsers\u005CBN\u005CDocuments\u005CGitHub\u005Crich\u005Ccontiki\u005Cexamples\u005Cipv6\u005Crpl-border-router\u005Cborder-router.jn5168.bin
 p3
+aVC:\u005CUsers\u005CBN\u005CDocuments\u005CGitHub\u005Crich\u005Ccontiki\u005Cexamples\u005Cipv6\u005Crpl-border-router\u005Cborder-router.jn5168
+p4
+a.VCOM10
 .I0
-.I0
+.I5
 .I00
-.(lp4
-.I00
-.I01
 .(lp5
-.S'0x00000000, 0x00000000, 0x00000000, 0x80000000'
+VC:\u005CUsers\u005CBN\u005CDocuments\u005CGitHub\u005Crich\u005Ccontiki\u005Cexamples\u005Cipv6\u005Crpl-border-router\u005Cborder-router.jn5168
 p6
+aVC:\u005CUsers\u005CBN\u005CDocuments\u005CGitHub\u005Crich\u005Ccontiki\u005Cexamples\u005Cipv6\u005Crpl-border-router\u005Cborder-router.jn5168.bin
+p7
+a.I01
+.I01
+.(lp8
+.S'0x00000000, 0x00000000, 0x00000000, 0x80000000'
+p9
 .
