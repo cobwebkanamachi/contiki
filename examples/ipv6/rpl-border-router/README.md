@@ -29,4 +29,4 @@ To run the example on real nodes under Linux
 
 5. You should now be able to browse to your router node using your web browser:
    http://[<ROUTER IPv6 ADDRESS>]/. On this page you should see a list of all
-   accessible nodes with their IP adresses.
+   accessible nodes with their IP addresses.
