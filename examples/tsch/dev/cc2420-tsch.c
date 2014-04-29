@@ -581,12 +581,12 @@ cc2420_set_pan_addr(unsigned pan,
  * Interrupt leaves frame intact in FIFO. !!! not anymore !!!
  */
 
-static softack_make_callback_f *softack_make_callback = NULL;
-static softack_interrupt_exit_callback_f *interrupt_exit_callback = NULL;
+volatile softack_make_callback_f *softack_make_callback = NULL;
+volatile softack_interrupt_exit_callback_f *interrupt_exit_callback = NULL;
 
 /* Subscribe with two callbacks called from FIFOP interrupt */
 void
-cc2420_softack_subscribe(softack_make_callback_f *softack_make, softack_interrupt_exit_callback_f *interrupt_exit)
+cc2420_softack_subscribe(volatile softack_make_callback_f *softack_make, volatile softack_interrupt_exit_callback_f *interrupt_exit)
 {
 	softack_make_callback = softack_make;
   interrupt_exit_callback = interrupt_exit;
@@ -815,16 +815,13 @@ cc2420_interrupt(void)
 			ackbuf[1] = 0x02;
 			ackbuf[2] = 0;
 		}
-		COOJA_DEBUG_STR("softack_make_callback2");
 	}
 
 	if(do_ack && ackbuf[0] > AUX_LEN) {   /* Prepare ack */
 		COOJA_DEBUG_STR("do_ack");
 		/* Write ack in fifo */
 		CC2420_STROBE(CC2420_SFLUSHTX); /* Flush Tx fifo */
-		//ackbuf[0] = 9;
-//		ack_len = ackbuf[0] - AUX_LEN + 1;
-		CC2420_WRITE_FIFO_BUF(ackbuf, ackbuf[0] - AUX_LEN + 1); // ackbuf[0] - AUX_LEN + 1
+		CC2420_WRITE_FIFO_BUF(ackbuf, ackbuf[0] - AUX_LEN + 1);
 	}
 
 	/* Wait for end of reception */
@@ -872,8 +869,9 @@ cc2420_interrupt(void)
   flushrx();
   CC2420_CLEAR_FIFOP_INT();
   RELEASE_LOCK();
-  COOJA_DEBUG_STR("cc2420_interrupt end\n");
+//  COOJA_DEBUG_STR("cc2420_interrupt end\n");
 	if(interrupt_exit_callback != NULL) {
+	  COOJA_DEBUG_STR("cc2420_interrupt end interrupt_exit_callback not null\n");
 		interrupt_exit_callback(is_ack, need_ack, last_rf);
 	}
 	return 1;

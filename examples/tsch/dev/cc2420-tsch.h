@@ -114,7 +114,7 @@ typedef void(softack_make_callback_f)(uint8_t **ackbuf, uint8_t seqno, rtimer_cl
 typedef void(softack_interrupt_exit_callback_f)(uint8_t is_ack, uint8_t need_ack, struct received_frame_s * last_rf);
 
 /* Subscribe with two callbacks called from FIFOP interrupt */
-void cc2420_softack_subscribe(softack_make_callback_f *softack_make, softack_interrupt_exit_callback_f *interrupt_exit);
+void cc2420_softack_subscribe(volatile softack_make_callback_f *softack_make, volatile softack_interrupt_exit_callback_f *interrupt_exit);
 rtimer_clock_t cc2420_get_rx_end_time(void);
 void cc2420_arch_init(void);
 void cc2420_send_ack(void);

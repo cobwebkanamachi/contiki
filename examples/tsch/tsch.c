@@ -61,7 +61,8 @@
 #define PRINTF(...)
 #endif
 
-#if ( QUEUEBUF_CONF_NUM && !(QUEUEBUF_CONF_NUM & (QUEUEBUF_CONF_NUM-1)) ) /* is it non-zero and a power of two? */
+/* TSCH queue size: is it non-zero and a power of two? */
+#if ( QUEUEBUF_CONF_NUM && !(QUEUEBUF_CONF_NUM & (QUEUEBUF_CONF_NUM-1)) )
 #define NBR_BUFFER_SIZE QUEUEBUF_CONF_NUM // POWER OF 2 -- queue size
 #else
 #define NBR_BUFFER_SIZE 8
@@ -114,7 +115,7 @@ struct TSCH_packet
 
 struct neighbor_queue
 {
-	uint8_t time_source;
+	uint8_t is_time_source; //is this neighbor a time source?
 	uint8_t BE_value; // current value of backoff exponent
 	uint8_t BW_value; // current value of backoff counter
 	struct TSCH_packet buffer[NBR_BUFFER_SIZE]; // circular buffer of packets. Its size should be a power of two
@@ -130,7 +131,7 @@ static const rimeaddr_t CELL_ADDRESS3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03
 static const cell_t generic_shared_cell = { 0xffff, 0, LINK_OPTION_TX | LINK_OPTION_RX
 		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &BROADCAST_CELL_ADDRESS };
 static const cell_t generic_eb_cell = { 0, 0, LINK_OPTION_TX, LINK_TYPE_ADVERTISING,
-		&BROADCAST_CELL_ADDRESS };
+		&EB_CELL_ADDRESS };
 static const cell_t cell_to_1 = { 1, 0, LINK_OPTION_TX | LINK_OPTION_RX
 		| LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING, LINK_TYPE_NORMAL,
 		&CELL_ADDRESS1 };
@@ -178,8 +179,11 @@ int
 remove_packet_from_queue(const rimeaddr_t *addr);
 struct TSCH_packet*
 read_packet_from_queue(const rimeaddr_t *addr);
+/*---------------------------------------------------------------------------*/
 static void
 tsch_timer(void *ptr);
+static int
+make_eb(uint8_t * buf, uint8_t buf_size);
 /*---------------------------------------------------------------------------*/
 /** This function takes the MSB of gcc generated random number
  * because the LSB alone has very bad random characteristics,
@@ -218,7 +222,7 @@ add_queue(const rimeaddr_t *addr)
 		n->BW_value = 0;
 		n->put_ptr = 0;
 		n->get_ptr = 0;
-		n->time_source = 0;
+		n->is_time_source = 0;
 		uint8_t i;
 		for (i = 0; i < NBR_BUFFER_SIZE; i++) {
 			n->buffer[i].pkt = 0;
@@ -516,9 +520,6 @@ hop_channel(uint8_t offset)
 }
 /*---------------------------------------------------------------------------*/
 PROCESS(tsch_tx_callback_process, "tsch_tx_callback_process");
-/*---------------------------------------------------------------------------*/
-PROCESS(eb_process, "EB process");
-AUTOSTART_PROCESSES(&eb_process);
 #define EB_SEND_INTERVAL 8
 /*---------------------------------------------------------------------------*/
 static cell_t *
@@ -578,7 +579,10 @@ powercycle(struct rtimer *t, void *ptr)
 	 * otherwise, schedule next wakeup
 	 */
 	PT_BEGIN(&mpt);
+	PT_YIELD(&mpt);
+
 	static volatile uint16_t timeslot = 0;
+	timeslot = ieee154e_vars.asn.asn_4lsb % (ieee154e_vars.current_slotframe->length);
 	static volatile int32_t drift_correction = 0;
 	static volatile int32_t drift = 0; //estimated drift to all time source neighbors
 	static volatile uint16_t drift_counter = 0; //number of received drift corrections source neighbors
@@ -586,6 +590,8 @@ powercycle(struct rtimer *t, void *ptr)
 	static cell_t * cell = NULL;
 	static struct TSCH_packet* p = NULL;
 	static struct neighbor_queue *n = NULL;
+	static void * payload = NULL;
+	static unsigned short payload_len = 0;
 	ieee154e_vars.start = RTIMER_NOW();
 	//while MAC-RDC is not disabled, and while its synchronized
 	while (ieee154e_vars.is_sync && ieee154e_vars.state != TSCH_OFF) {
@@ -601,6 +607,8 @@ powercycle(struct rtimer *t, void *ptr)
 			cell_decison = CELL_OFF;
 		} else {
 			hop_channel(cell->channel_offset);
+			payload = NULL;
+			payload_len = 0;
 			p = NULL;
 			n = NULL;
 			last_drift=0;
@@ -613,8 +621,17 @@ powercycle(struct rtimer *t, void *ptr)
 				if (cell->link_type == LINK_TYPE_ADVERTISING) {
 					//TODO fetch adv/EB packets
 					n = neighbor_queue_from_addr(&EB_CELL_ADDRESS);
-					if (n != NULL) {
-						p = read_packet_from_neighbor_queue(n);
+//					if (n != NULL) {
+//						p = read_packet_from_neighbor_queue(n);
+//						if(p) {
+//							COOJA_DEBUG_STR("LINK_TYPE_ADVERTISING EB packet available to send\n");
+//						}
+//					}
+					if(1||generate_random_byte(8) >= 0) {
+						payload_len = make_eb(ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN+1); //last byte in eb buf is for length
+						payload = ieee154e_vars.eb_buf;
+					} else {
+
 					}
 				} else { //NORMAL link
 					//pick a packet from the neighbors queue who is associated with this cell
@@ -628,11 +645,15 @@ powercycle(struct rtimer *t, void *ptr)
 							p = get_next_packet_for_shared_slot_tx();
 						}
 					}
+					if(p!= NULL) {
+						payload = queuebuf_dataptr(p->pkt);
+						payload_len = queuebuf_datalen(p->pkt);
+					}
 				}
 			}
 
 			if(cell->link_options & LINK_OPTION_TX) {
-				if(p != NULL) {
+				if(payload != NULL) {
 					// if dedicated slot or shared slot and BW_value=0, we transmit the packet
 					if(!(cell->link_options & LINK_OPTION_SHARED)
 						|| n->BW_value == 0) {
@@ -657,10 +678,6 @@ powercycle(struct rtimer *t, void *ptr)
 			} else if (cell_decison == CELL_TX) {
 				COOJA_DEBUG_STR("CELL_TX");
 				//timeslot_tx(t, ieee154e_vars.start, packet, packet_len);
-				static void * payload = NULL;
-				static unsigned short payload_len = 0;
-				payload = queuebuf_dataptr(p->pkt);
-				payload_len = queuebuf_datalen(p->pkt);
 				//TODO There are small timing variations visible in cooja, which needs tuning
 				static uint8_t is_broadcast = 0, len, seqno, ret;
 				uint16_t ack_sfd_time = 0;
@@ -757,7 +774,7 @@ powercycle(struct rtimer *t, void *ptr)
 												 * 	difference into an average of the drift to all its time source neighbors. The averaging method is
 												 * 	implementation dependent. If the receiver is not a clock source, the time correction is ignored.
 												 */
-												if (n->time_source) {
+												if (n->is_time_source) {
 													COOJA_DEBUG_STR("ACK from time_source");
 													/* extract time correction */
 													int16_t d=0;
@@ -870,7 +887,7 @@ powercycle(struct rtimer *t, void *ptr)
 				p->ret=ret;
 				process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, p);
 			} else if (cell_decison == CELL_RX) {
-//				timeslot_rx(t, ieee154e_vars.start, msg, MSG_LEN);
+				/* this cell is RX cell. Check if it is used for keep alive as well*/
 				if (cell->link_options & LINK_OPTION_TIME_KEEPING) {
 					// TODO
 				}
@@ -899,7 +916,6 @@ powercycle(struct rtimer *t, void *ptr)
 					if (!(NETSTACK_RADIO_get_rx_end_time() || cca_status || NETSTACK_RADIO.pending_packet()
 							|| !NETSTACK_RADIO.channel_clear()
 							|| NETSTACK_RADIO.receiving_packet())) {
-						COOJA_DEBUG_STR("RX no packet in air\n");
 						off(keep_radio_on);
 						//no packets on air
 						ret = 0;
@@ -919,7 +935,6 @@ powercycle(struct rtimer *t, void *ptr)
 						if (need_ack) {
 							schedule_fixed(t, NETSTACK_RADIO_get_rx_end_time(), TsTxAckDelay - delayTx);
 							PT_YIELD(&mpt);
-							COOJA_DEBUG_STR("send_ack()");
 							NETSTACK_RADIO_send_ack();
 						}
 						/* If the originator was a time source neighbor, the receiver adjusts its own clock by incorporating the
@@ -931,7 +946,7 @@ powercycle(struct rtimer *t, void *ptr)
 							COOJA_DEBUG_PRINTF("drift seen %d\n", last_drift);
 							// check the source address for potential time-source match
 							n = neighbor_queue_from_addr(&last_rf->source_address);
-							if(n != NULL && n->time_source) {
+							if(n != NULL && n->is_time_source) {
 								// should be the average of drifts to all time sources
 								drift_correction -= last_drift;
 								++drift_counter;
@@ -1052,10 +1067,9 @@ make_eb(uint8_t * buf, uint8_t buf_size)
   for(k = 8; k > 0; k--) {
     buf[i++] = rimeaddr_node_addr.u8[k - 1];
   }
-	/* XXX only in 6top: ignore ... EB length, group ID and type: leave 2 bytes for that */
-//	i+=2;
-//	buf[i++] = 0x00;
-//	buf[i++] = ((1 << 1)|1)<<3; //b0-2:: left for length MSB, b3-6: GroupID, b7: Type
+	/* XXX in 6top: EB length, group ID and type: leave 2 bytes for that */
+	buf[i++] = 0x00;
+	buf[i++] = ((1 << 1)|1)<<3; //b0-2:: left for length MSB, b3-6: GroupID, b7: Type
 
 	/* Append TSCH sync IE */
 	len = 6;
@@ -1120,7 +1134,7 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 			buf[len] = 4 + 5 * buf[k];
 		}
 	}
-
+	buf[buf_size-1]=i;
 	/* Append time correction IE */
 	//Put IEs: sync, slotframe and link, timeslot and channel hopping sequence
 //	if (reported_drift != 0) {
@@ -1129,9 +1143,10 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 //	}
 
 	/* XXX only in 6top -- ignore ... EB length, group ID and type: leave 2 bytes for that */
-//		buf[3] = i;
-//		buf[4] = ((i>>8)&0x7)|((1 << 1)|1)<<3; //b0-2:: left for length MSB, b3-6: GroupID, b7: Type
-	return 1;
+	//FCF: in buf[0,1] - EBSN: in buf[2] - srcPAN: 3,4 - srcAddr: 5-12
+	buf[13] = i;
+	buf[14] = ((i>>8)&0x7)|(((1 << 1)|1)<<3); //b0-2:: left for length MSB, b3-6: GroupID, b7: Type
+	return i;
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -1139,7 +1154,51 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 {
 	need_ack = need_ack_irq;
 	last_rf = last_rf_irq;
-	if (waiting_for_radio_interrupt || NETSTACK_RADIO_get_rx_end_time() != 0) {
+	if (last_rf != NULL && (waiting_for_radio_interrupt || NETSTACK_RADIO_get_rx_end_time() != 0)) {
+		COOJA_DEBUG_STR("EB tsch_wait_for_eb");
+		if ( (FRAME802154_BEACONFRAME == last_rf->buf[0]&7)
+				&& (last_rf->buf[1] & (2 | 32 | 128))) {
+			COOJA_DEBUG_STR("EB IE-list present");
+			if ((last_rf->buf[16] & 0xfe) == 0x34) { //sync IE? (0x1a << 1) ==0 0x34
+				COOJA_DEBUG_STR("EB sync header");
+				ieee154e_vars.asn.asn_4lsb = last_rf->buf[14] + (last_rf->buf[15] << 8)
+						+ (last_rf->buf[16] << 16) + (last_rf->buf[17] << 24);
+				ieee154e_vars.asn.asn_msb = last_rf->buf[18];
+				ieee154e_vars.join_priority = last_rf->buf[19];
+				//to disable reading the packet
+				last_rf->len = 0;
+				//sync for next slot
+				/* get the first slot in the next slotframe. */
+
+				uint16_t dt, duration, next_timeslot;
+//				uint8_t timeslot = ieee154e_vars.asn.asn_4lsb % ieee154e_vars.current_slotframe->length;
+//				dt = ieee154e_vars.current_slotframe->length - timeslot;
+				dt = 20;
+				duration = dt * TsSlotDuration;
+				//increase asn
+				ieee154e_vars.asn.asn_4lsb += dt+1;
+				if(!ieee154e_vars.asn.asn_4lsb) {
+					ieee154e_vars.asn.asn_msb++;
+				}
+				ieee154e_vars.start = last_rf->sfd_timestamp - (rtimer_clock_t)(NETSTACK_RADIO_get_rx_end_time()-last_rf->sfd_timestamp) - TsTxOffset;
+				//schedule for the next slotframe
+				ieee154e_vars.start += duration;
+				/* XXX HACK this should be set in sent schedule
+				 * --Set parent as timesource */
+				struct neighbor_queue *n = neighbor_queue_from_addr(&last_rf->source_address);
+				if (n == NULL) {
+					//add new neighbor to list of neighbors
+					n=add_queue(&last_rf->source_address);
+				}
+				if( n!= NULL ) {
+					n->is_time_source = 1;
+				}
+				//we are in sync
+				ieee154e_vars.is_sync = 1;
+				ieee154e_vars.state = TSCH_ASSOCIATED;
+			}
+		}
+
 		waiting_for_radio_interrupt = 0;
 		rtimer_set(&t, RTIMER_NOW() + 5, 1, (void
 		(*)(struct rtimer *, void *)) tsch_associate, NULL);
@@ -1157,95 +1216,76 @@ tsch_associate(struct rtimer * timer, void * ass_ptr)
 	 * If we are a master, start right away
 	 * otherwise, wait for EBs to associate with a master
 	 */
-	COOJA_DEBUG_STR("tsch_associate\n");
 	ieee154e_vars.start = RTIMER_NOW();
 	/* Trying to get the RPL DAG, and polling until it becomes available  */
 	static rpl_dag_t * my_rpl_dag = NULL;
-//	my_rpl_dag = rpl_get_any_dag();
-	while(my_rpl_dag == NULL) {
-		COOJA_DEBUG_STR("waiting for RPL dag to become available\n");
-		rtimer_set(&t, RTIMER_NOW() + RTIMER_SECOND, 1, (void	(*)(struct rtimer *, void *)) tsch_associate, NULL);
-		PT_YIELD(&enhanced_beacon_pt);
-		my_rpl_dag = rpl_get_any_dag();
-		on();
-	}
-	my_rpl_dag = my_rpl_dag->instance->current_dag;
-	ieee154e_vars.join_priority = my_rpl_dag->rank > 0xff ? 0xff : my_rpl_dag->rank;
+	static uint8_t cca_status = 0;
+	//we need to sync
+	ieee154e_vars.is_sync = 0;
+	//look for a root to sync with
+	ieee154e_vars.state = TSCH_SEARCHING;
+	ieee154e_vars.join_priority = 0xff;
 
-	//XXX not working...
-	//if this is root start now
-	if(my_rpl_dag->rank < 2) {
-		COOJA_DEBUG_STR("tsch_associate: rpl root\n");
-		//for now assume we are in sync
-		ieee154e_vars.is_sync = 1;
-		//something other than 0 for now
-		ieee154e_vars.state = TSCH_ASSOCIATED;
-	} else {
-		//we need to sync
-		ieee154e_vars.is_sync = 0;
-		//look for a root to sync with
-		ieee154e_vars.state = TSCH_SEARCHING;
-	}
-	COOJA_DEBUG_PRINTF("tsch_associate: rpl rand %d\n", my_rpl_dag->rank);
-
-	softack_interrupt_exit_callback_f *interrupt_exit = tsch_wait_for_eb;
-	softack_make_callback_f *softack_make = NULL;
+	/* setup radio functions for intercepting EB */
+	volatile softack_interrupt_exit_callback_f *interrupt_exit = tsch_wait_for_eb;
+	volatile softack_make_callback_f *softack_make = NULL;
 	NETSTACK_RADIO_softack_subscribe(softack_make, interrupt_exit);
 
-	uint8_t cca_status = 0;
-	while (ieee154e_vars.state == TSCH_SEARCHING) {
+	while(my_rpl_dag == NULL && ieee154e_vars.state == TSCH_SEARCHING) {
+		rtimer_set(&t, RTIMER_NOW() + RTIMER_SECOND, 1, (void	(*)(struct rtimer *, void *)) tsch_associate, NULL);
+		PT_YIELD(&enhanced_beacon_pt);
+
+		on();
+		COOJA_DEBUG_STR("waiting for RPL dag");
+		//XXX not working...
 		waiting_for_radio_interrupt = 1;
-		while (!cca_status) {
+		while (!cca_status && ieee154e_vars.state == TSCH_SEARCHING) {
+			/*If I am root (rank==1), then exit association process*/
+			rpl_instance_t* rpl = rpl_get_instance(RPL_DEFAULT_INSTANCE);
+			if(rpl != NULL) {
+				my_rpl_dag = rpl->current_dag;
+				ieee154e_vars.join_priority = (my_rpl_dag->rank) >> 16;
+			}
+			//if this is root start now
+			if(ieee154e_vars.join_priority < 2) {
+				COOJA_DEBUG_STR("tsch_associate: rpl root\n");
+				//for now assume we are in sync
+				ieee154e_vars.is_sync = 1;
+				//something other than 0 for now
+				ieee154e_vars.state = TSCH_ASSOCIATED;
+				break;
+			}
+			waiting_for_radio_interrupt = 1;
 			on();
 			cca_status = (!NETSTACK_RADIO.channel_clear()
 							|| NETSTACK_RADIO.pending_packet() || NETSTACK_RADIO.receiving_packet());
 			//if signal is detected on radio, yield to give radio interrupt a chance to receive it
 			if(!cca_status) {
+				rtimer_set(&t, RTIMER_NOW() + RTIMER_SECOND, 1, (void	(*)(struct rtimer *, void *)) tsch_associate, NULL);
 				PT_YIELD(&enhanced_beacon_pt);
 			}
-			//XXX hop channel after timeout
+			//TODO hop channel after timeout
+			//... set_channel...
+		}
+
+		if(ieee154e_vars.state == TSCH_ASSOCIATED) {
+			COOJA_DEBUG_STR("TSCH_ASSOCIATED");
+			break;
 		}
 
 		//is there an EB pending?
-		if (last_rf && NETSTACK_RADIO.pending_packet()) {
-			COOJA_DEBUG_STR("EB Read:\n");
-			//NETSTACK_RADIO.read(ieee154e_vars.eb_buf, last_rf->len);
-		} else if (NETSTACK_RADIO_pending_irq()) {
-			//we have received something in radio FIFO but radio interrupt has not fired because we are inside rtimer code
-			COOJA_DEBUG_STR("EB Read later:\n");
-			PT_YIELD(&enhanced_beacon_pt);
-		}
-		if (0 == last_rf->buf[0] && (last_rf->buf[1] & (2 | 32 | 128))) {
-			COOJA_DEBUG_STR("EB IE-list present");
-			if (last_rf->buf[2 + 11] & 0xfe == (0x1a << 1)) { //sync IE?
-				COOJA_DEBUG_STR("EB sync header");
-				ieee154e_vars.asn.asn_4lsb = last_rf->buf[14] + (last_rf->buf[15] << 8)
-						+ (last_rf->buf[16] << 16) + (last_rf->buf[17] << 24);
-				ieee154e_vars.asn.asn_msb = last_rf->buf[18];
-				ieee154e_vars.join_priority = last_rf->buf[19];
-
-				//sync for next slot
-				ieee154e_vars.start = last_rf->sfd_timestamp - TsTxOffset;
-				//increase ASN
-				if(!++ieee154e_vars.asn.asn_4lsb) {
-					ieee154e_vars.asn.asn_msb++;
-				}
-				/* XXX HACK this should be set in sent schedule
-				 * --Set parent as timesource */
-				struct neighbor_queue *n = neighbor_queue_from_addr(&last_rf->source_address);
-				if (n == NULL) {
-					//add new neighbor to list of neighbors
-					n=add_queue(&last_rf->source_address);
-				}
-				if( n!= NULL ) {
-					n->time_source = 1;
-				}
-				//we are in sync
-				ieee154e_vars.is_sync = 1;
-				ieee154e_vars.state = TSCH_ASSOCIATED;
-			}
-		}
+//		if (last_rf && NETSTACK_RADIO.pending_packet()) {
+//			COOJA_DEBUG_STR("EB pending:\n");
+//		} else if (NETSTACK_RADIO_pending_irq()) {
+//			//we have received something in radio FIFO but radio interrupt has not fired because we are inside rtimer code
+//			COOJA_DEBUG_STR("EB Read later:\n");
+//			PT_YIELD(&enhanced_beacon_pt);
+//		}
 	}
+
+	//schedule powercycle
+	schedule_fixed(&t, ieee154e_vars.start, TsSlotDuration);
+
 	softack_make = tsch_make_sync_ack;
 	interrupt_exit = tsch_resume_powercycle;
 	NETSTACK_RADIO_softack_subscribe(softack_make, interrupt_exit);
@@ -1268,17 +1308,16 @@ tsch_associate(struct rtimer * timer, void * ass_ptr)
 					n=add_queue(addr);
 				}
 				if( n!= NULL ) {
-					n->time_source = (links_list[i]->link_options & LINK_OPTION_TIME_KEEPING) ? 1 : n->time_source;
+					n->is_time_source = (links_list[i]->link_options & LINK_OPTION_TIME_KEEPING) ? 1 : n->is_time_source;
 				}
 			}
 		}
 	}
+	COOJA_DEBUG_STR("tsch_associate done");
 
 	/* Make EB packet, but do not forget to update mac_ebsn in it or when changing schedule*/
-	make_eb(ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN);
-	schedule_fixed(&t, ieee154e_vars.start, TsSlotDuration);
-	//start the process for sending EBs
-	process_post(&eb_process, PROCESS_EVENT_POLL, NULL);
+//	make_eb(ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN+1); //last byte in eb buf is for length
+//	rtimer_set(&t, RTIMER_NOW() + ieee154e_vars.start, 1, (void	(*)(struct rtimer *, void *)) powercycle, NULL);
 	PT_END( &enhanced_beacon_pt );
 }
 /*---------------------------------------------------------------------------*/
@@ -1316,8 +1355,10 @@ init(void)
 	ieee154e_vars.join_priority = 0xff; /* inherit from RPL - PAN coordinator: 0 -- lower is better */
 	nbr_table_register(neighbor_list, NULL);
 	working_on_queue = 0;
+  process_start(&tsch_tx_callback_process, NULL);
 	//try to associate to a network or start one if setup as RPL root
 	tsch_associate(&t, NULL);
+	powercycle(&t, NULL);
 }
 /*---------------------------------------------------------------------------*/
 /* a polled-process to invoke the MAC tx callback asynchronously */
@@ -1328,7 +1369,6 @@ PROCESS_THREAD(tsch_tx_callback_process, ev, data)
 	PRINTF("tsch_tx_callback_process: started\n");
 	while (1) {
 		PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
-
 		PRINTF("tsch_tx_callback_process: calling mac tx callback\n");
 		COOJA_DEBUG_STR("tsch_tx_callback_process: calling mac tx callback\n");
 		if(data != NULL) {
@@ -1338,33 +1378,6 @@ PROCESS_THREAD(tsch_tx_callback_process, ev, data)
 		}
 	}
 	PROCESS_END();
-}
-
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(eb_process, ev, data)
-{
-  static struct etimer periodic;
-  static uint8_t timeout = 0;
-  PROCESS_BEGIN();
-	PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
-  if(ieee154e_vars.current_slotframe) {
-  	etimer_set(&periodic, TsSlotDuration*ieee154e_vars.current_slotframe->length);
-  }
-  while(1) {
-    PROCESS_YIELD();
-    if(etimer_expired(&periodic)) {
-      etimer_reset(&periodic);
-      timeout++;
-      /* XXX send EB only half of the time, randomly 8/EB_SEND_INTERVAL*/
-      if(generate_random_byte(8) >= 0) {
-				if(ieee154e_vars.eb_buf[2]) { //is EB packet ready
-					ieee154e_vars.eb_buf[2] = ieee154e_vars.mac_ebsn++;
-					add_packet_to_queue(NULL, ieee154e_vars.eb_buf, &EB_CELL_ADDRESS);
-				}
-      }
-    }
-  }
-  PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
 const struct rdc_driver tschrdc_driver = {

@@ -108,7 +108,7 @@
   <plugin>
     se.sics.cooja.plugins.SimControl
     <width>280</width>
-    <z>4</z>
+    <z>5</z>
     <height>160</height>
     <location_x>400</location_x>
     <location_y>0</location_y>
@@ -125,7 +125,7 @@
       <viewport>1.7862400777572707 0.0 0.0 1.7862400777572707 166.67020050728829 72.27901259487757</viewport>
     </plugin_config>
     <width>400</width>
-    <z>0</z>
+    <z>4</z>
     <height>400</height>
     <location_x>1</location_x>
     <location_y>1</location_y>
@@ -137,10 +137,10 @@
       <formatted_time />
       <coloring />
     </plugin_config>
-    <width>1520</width>
-    <z>3</z>
+    <width>708</width>
+    <z>2</z>
     <height>240</height>
-    <location_x>400</location_x>
+    <location_x>402</location_x>
     <location_y>160</location_y>
   </plugin>
   <plugin>
@@ -152,10 +152,10 @@
       <showRadioRXTX />
       <showRadioHW />
       <showLEDs />
-      <zoomfactor>500.0</zoomfactor>
+      <zoomfactor>90.43289630856115</zoomfactor>
     </plugin_config>
     <width>1920</width>
-    <z>2</z>
+    <z>3</z>
     <height>166</height>
     <location_x>0</location_x>
     <location_y>954</location_y>
@@ -166,10 +166,24 @@
       <notes>Enter notes here</notes>
       <decorations>true</decorations>
     </plugin_config>
-    <width>1240</width>
+    <width>429</width>
     <z>1</z>
     <height>160</height>
     <location_x>680</location_x>
+    <location_y>-2</location_y>
+  </plugin>
+  <plugin>
+    se.sics.cooja.plugins.RadioLogger
+    <plugin_config>
+      <split>150</split>
+      <formatted_time />
+      <showdups>false</showdups>
+      <hidenodests>false</hidenodests>
+    </plugin_config>
+    <width>500</width>
+    <z>0</z>
+    <height>400</height>
+    <location_x>1110</location_x>
     <location_y>0</location_y>
   </plugin>
 </simconf>

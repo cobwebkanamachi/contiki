@@ -126,7 +126,7 @@ typedef struct {
 	rtimer_clock_t start; //cell start time
 	uint8_t slot_template_id;
 	uint8_t hop_sequence_id;
-	uint8_t eb_buf[TSCH_MAX_PACKET_LEN]; /* a buffer for EB packets */
+	uint8_t eb_buf[TSCH_MAX_PACKET_LEN+1]; /* a buffer for EB packets, last byte for length */
 } ieee154e_vars_t;
 
 #endif /* __TSCH_PARAMETERS_H__ */
