@@ -48,7 +48,7 @@
 #include "net/uip.h"
 #include "dev/leds.h"
 
-//#include "dev/button-sensor.h"
+#include "dev/button-sensor.h"
 //#include "dev/pir-sensor.h"
 //#include "dev/vib-sensor.h"
 
@@ -65,7 +65,7 @@
 #endif
 
 /*&pir_sensor, &vib_sensor*/
-//SENSORS(&button_sensor);
+SENSORS(&button_sensor);
 
 /*---------------------------------------------------------------------------*/
 #include "MMAC.h"
