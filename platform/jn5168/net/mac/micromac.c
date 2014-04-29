@@ -166,6 +166,7 @@ init(void)
   vMMAC_SetChannel(RF_CHANNEL);
   uint16_t u16PanId=IEEE802154_PANDID;
   uint16_t u16ShortAddress = rimeaddr_node_addr.u8[1]<<8 + rimeaddr_node_addr.u8[0];
+  //XXX returns wrong address
   MAC_ExtAddr_s* psMacAddr = pvAppApiGetMacAddrLocation();
   vMMAC_SetRxAddress(u16PanId, u16ShortAddress, psMacAddr);
   /* these parameters should disable hardware backoff, but still enable autoACK processing and TX CCA */

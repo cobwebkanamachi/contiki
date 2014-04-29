@@ -132,6 +132,22 @@ volatile static uint8_t rx_in_progress = 0;
 
 static int channel;
 /*---------------------------------------------------------------------------*/
+uint32_t* micromac_get_hw_mac_address_location(void) {
+	//pvAppApiGetMacAddrLocation() does not return the hw mac address location but something else (something that points to 0xdeadbeef00080006)
+	//the number is from http://www.nxp.com/documents/application_note/JN-AN-1003.pdf -- memory map
+	return (uint32_t *)0x01001580;
+}
+void
+micromac_get_hw_mac_address(tsExtAddr *psExtAddress)
+{
+	//WRONG: Does not respect field order. The CPU uses BIG_ENDIAN, and the struct has u32L first.
+	//memcpy(psExtAddress, pvAppApiGetMacAddrLocation(), sizeof(tsExtAddr));
+	// From jennic support:
+	uint32_t *pu32Mac = micromac_get_hw_mac_address_location();
+	psExtAddress->u32H = pu32Mac[0];
+	psExtAddress->u32L = pu32Mac[1];
+}
+/*---------------------------------------------------------------------------*/
 static void
 on(void)
 {
@@ -237,9 +253,8 @@ micromac_radio_init(void)
 	vMMAC_SetChannel(channel);
 	u16ShortAddress = rimeaddr_node_addr.u8[1] + (rimeaddr_node_addr.u8[0] << 8);
 	tsExtAddr psExtAddress;
-	uint32 *pu32Mac = pvAppApiGetMacAddrLocation();
-	psExtAddress.u32H = pu32Mac[0];
-	psExtAddress.u32L = pu32Mac[1];
+	micromac_get_hw_mac_address((tsExtAddr *)&psExtAddress);
+
 	vMMAC_SetRxAddress(u16PanId, u16ShortAddress, &psExtAddress);
 	/* these parameters should disable hardware backoff, but still enable autoACK processing and TX CCA */
 	uint8_t u8TxAttempts = 1, /* 1 transmission attempt without ACK */

@@ -81,7 +81,9 @@ int micromac_radio_on(void);
 int micromac_radio_off(void);
 
 void micromac_radio_set_cca_threshold(int value);
+void micromac_get_hw_mac_address(tsExtAddr *psExtAddress);
 
+uint32_t* micromac_get_hw_mac_address_location(void);
 
 
 #endif /* MICROMAC_RADIO_H_ */

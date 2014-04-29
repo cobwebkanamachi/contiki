@@ -69,16 +69,7 @@ SENSORS(&button_sensor);
 
 /*---------------------------------------------------------------------------*/
 #include "MMAC.h"
-static void
-MAC_vReadExtAddress(tsExtAddr *psExtAddress)
-{
-	//WRONG: Does not respect field order. The CPU uses BIG_ENDIAN, and the struct has u32L first.
-	//memcpy(psExtAddress, pvAppApiGetMacAddrLocation(), sizeof(tsExtAddr));
-	// From jennic support:
-	uint32 *pu32Mac = pvAppApiGetMacAddrLocation();
-	psExtAddress->u32H = pu32Mac[0];
-	psExtAddress->u32L = pu32Mac[1];
-}
+
 /*---------------------------------------------------------------------------*/
 
 //static void
@@ -88,7 +79,7 @@ MAC_vReadExtAddress(tsExtAddr *psExtAddress)
 //  uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0, 0, 0, 0);
 //
 //  /* load mac address */
-//  memcpy(uip_lladdr.addr, pvAppApiGetMacAddrLocation(), sizeof(uip_lladdr.addr));
+//  memcpy(uip_lladdr.addr, micromac_get_hw_mac_address_location(), sizeof(uip_lladdr.addr));
 //
 //#if UIP_CONF_ROUTER
 //  uip_ds6_prefix_add(&ipaddr, UIP_DEFAULT_PREFIX_LEN, 0, 0, 0, 0);
@@ -126,10 +117,10 @@ set_rime_addr(void)
 
   memset(&addr, 0, sizeof(addr));
 #if UIP_CONF_IPV6
-  memcpy(addr.u8, pvAppApiGetMacAddrLocation(), sizeof(addr.u8));
+  memcpy(addr.u8, micromac_get_hw_mac_address_location(), sizeof(addr.u8));
 #else
-  memcpy(addr.u8, pvAppApiGetMacAddrLocation(), sizeof(addr.u8));
-  //memcpy(addr.u8, pvAppApiGetMacAddrLocation()+6, sizeof(addr.u8));
+  memcpy(addr.u8, micromac_get_hw_mac_address_location(), sizeof(addr.u8));
+  //memcpy(addr.u8, micromac_get_hw_mac_address_location()+6, sizeof(addr.u8));
 #endif
   rimeaddr_set_node_addr(&addr);
   printf("Rime started with address ");
@@ -140,9 +131,9 @@ set_rime_addr(void)
 
   /** Different ways for reading HW MAC address. All work.
   unsigned char macaddr[8];
-  memcpy(macaddr, pvAppApiGetMacAddrLocation(), sizeof(macaddr));
+  memcpy(macaddr, micromac_get_hw_mac_address_location(), sizeof(macaddr));
 	for(i = 0; i < 8; ++i) {
-		macaddr[i] = ((unsigned char*)pvAppApiGetMacAddrLocation())[i];
+		macaddr[i] = ((unsigned char*)micromac_get_hw_mac_address_location())[i];
 	}
   printf("HW MAC address:\n");
   for(i=0; i<7; i++) {
@@ -151,7 +142,7 @@ set_rime_addr(void)
   printf("%02x\n", macaddr[i]);
   */
   tsExtAddr psExtAddress;
-  MAC_vReadExtAddress(&psExtAddress);
+  micromac_get_hw_mac_address(&psExtAddress);
   printf("HW MAC tsExtAddr: %08x.%08x\n", psExtAddress.u32H, psExtAddress.u32L);
 }
 
@@ -199,7 +190,7 @@ main(void)
   printf("MAC %s RDC %s NETWORK %s\n", NETSTACK_MAC.name, NETSTACK_RDC.name, NETSTACK_NETWORK.name);
 
 #if WITH_UIP6
-  memcpy(&uip_lladdr.addr, pvAppApiGetMacAddrLocation(), sizeof(uip_lladdr.addr));
+  memcpy(&uip_lladdr.addr, micromac_get_hw_mac_address_location(), sizeof(uip_lladdr.addr));
 
   process_start(&tcpip_process, NULL);
   printf("Tentative link-local IPv6 address ");
