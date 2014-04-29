@@ -39,7 +39,7 @@
 #endif
 #include <stdio.h>
 #include <string.h>
-#include "dev/button-sensor.h"
+//#include "dev/button-sensor.h"
 #include "dev/leds.h"
 
 #define UDP_CLIENT_PORT 8765
@@ -47,7 +47,7 @@
 
 #define UDP_EXAMPLE_ID  190
 
-#define DEBUG DEBUG_PRINT
+#define DEBUG DEBUG_NONE
 #include "net/uip-debug.h"
 
 #ifndef PERIOD
@@ -188,10 +188,10 @@ PROCESS_THREAD(udp_client_process, ev, data)
       tcpip_handler();
     }
 
-    if(ev == sensors_event && data == &button_sensor) {
-				leds_toggle(LEDS_ALL);
-				printf("Press %u\n", count++);
-		}
+//    if(ev == sensors_event && data == &button_sensor) {
+//				leds_toggle(LEDS_ALL);
+//				printf("Press %u\n", count++);
+//		}
 
     if(etimer_expired(&periodic)) {
       etimer_reset(&periodic);

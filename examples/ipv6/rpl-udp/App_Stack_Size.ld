@@ -35,5 +35,5 @@
  * file to your apoplication build folder and
  * alter the stack size as required. */
  
-_minimum_heap_size = 10240;
+_minimum_heap_size = 8192;
 _stack_size = 8192;

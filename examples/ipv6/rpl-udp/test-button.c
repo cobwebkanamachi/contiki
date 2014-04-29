@@ -56,7 +56,7 @@ PROCESS_THREAD(test_button_process, ev, data)
   static uint32_t count=0;
   static struct etimer et;
 
-  SENSORS_ACTIVATE(button_sensor);
+//  SENSORS_ACTIVATE(button_sensor);
 
 //	leds_off(LEDS_ALL);
 //	for(count=8; count>=1; count/=2) {
@@ -81,7 +81,7 @@ PROCESS_THREAD(test_button_process, ev, data)
 	leds_off(LEDS_ALL);
 	count=0;
   while(1) {
-    PROCESS_WAIT_EVENT_UNTIL(ev == sensors_event && data == &button_sensor);
+//    PROCESS_WAIT_EVENT_UNTIL(ev == sensors_event && data == &button_sensor);
     leds_toggle(LEDS_ALL);
     printf("Press %u\n", count++);
   }

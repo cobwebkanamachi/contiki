@@ -1,12 +1,13 @@
-all: udp-client udp-server test-button
+all: udp-client udp-server 
+#test-button
 APPS=servreg-hack
 CONTIKI=../../..
 
 WITH_UIP6=1
 UIP_CONF_IPV6=1
-CFLAGS += -DPROJECT_CONF_H=\"project-conf.h\"
+CFLAGS += -lm -DPROJECT_CONF_H=\"project-conf.h\"
 SMALL = 1
-CFLAGS+= -DUIP_CONF_IPV6_RPL -DWITH_UIP6 -DUIP_CONF_IPV6
+CFLAGS+= -DUIP_CONF_IPV6_RPL -DWITH_UIP6 -DUIP_CONF_IPV6 
 CONTIKI_PROJECT = udp-server udp-client
 
 ifdef WITH_COMPOWER
