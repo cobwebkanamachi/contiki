@@ -696,7 +696,7 @@ cc2420_sfd_sync(uint8_t capture_start_sfd, uint8_t capture_end_sfd)
 //#define CM_2                (2<<14) /* Capture mode: 1 - neg. edge */
 //#define CM_3                (3<<14) /* Capture mode: 1 - both edges */
 
-	if(capture_start_sfd & capture_end_sfd) {
+	if(capture_start_sfd && capture_end_sfd) {
 	  TBCCTL1 = CM_3 | CAP | SCS;
 	} else if(capture_start_sfd) {
 	  TBCCTL1 = CM_1 | CAP | SCS;
@@ -705,11 +705,13 @@ cc2420_sfd_sync(uint8_t capture_start_sfd, uint8_t capture_end_sfd)
 	} else { //disabled
 	  TBCCTL1 = CM_0 | CAP | SCS;
 	}
-  /* Disable interrupt */
+  /* Enable interrupt */
+//	TBCCTL1 |= CCIE;
   TBCCTL1 &= ~CCIE;
   /* Start Timer_B in continuous mode. */
-//  TBCTL |= MC1;
   TBR = RTIMER_NOW();
+  TBCTL |= MC1;
+
 }
 /*---------------------------------------------------------------------------*/
 /* Read the timer value when the last SFD edge was captured,
@@ -721,12 +723,13 @@ uint16_t cc2420_read_sfd_timer(void) {
 /*---------------------------------------------------------------------------*/
 //volatile uint8_t ackbuf[1+ACK_LEN + EXTRA_ACK_LEN]={0}; // = {ACK_LEN + EXTRA_ACK_LEN + AUX_LEN, 0x02, 0x00, seqno, 0x02, 0x1e, ack_status_LSB, ack_status_MSB};
 static uint8_t extrabuf[ACK_LEN]={0};
+struct received_frame_s *last_rf;
+
 int
 cc2420_interrupt(void)
 {
 	COOJA_DEBUG_STR("cc2420_interrupt\n");
 	leds_on(LEDS_RED);
-	struct received_frame_s *last_rf;
 	uint8_t need_ack;
 	uint8_t* ackbuf=NULL;
 	uint8_t nack = 0;
@@ -743,6 +746,8 @@ cc2420_interrupt(void)
   TIMETABLE_TIMESTAMP(cc2420_timetable, "interrupt");
 #endif /* CC2420_TIMETABLE_PROFILING */
   cc2420_sfd_start_time = cc2420_read_sfd_timer();
+  last_packet_timestamp = cc2420_sfd_start_time;
+
   /* If the lock is taken, we cannot access the FIFO. */
   if(locked || need_flush || !CC2420_FIFO_IS_1) {
     need_flush = 1;
@@ -774,7 +779,7 @@ cc2420_interrupt(void)
   	}
   	return 0;
   }
-  last_packet_timestamp = cc2420_sfd_start_time;
+//  last_packet_timestamp = cc2420_sfd_start_time;
 
 	len -= AUX_LEN;
 	/* Allocate space to store the received frame */
@@ -808,7 +813,7 @@ cc2420_interrupt(void)
 			softack_make_callback(&ackbuf, seqno, last_packet_timestamp, nack);
 			/* first byte is defines frame length */
 			ackbuf[0] += AUX_LEN;
-		} else { /* construct standard ack */
+		} else if(do_ack){ /* construct standard ack */
 			COOJA_DEBUG_STR("make std ACK");
 			ackbuf = extrabuf;
 			ackbuf[0] = AUX_LEN + 3;
@@ -826,8 +831,6 @@ cc2420_interrupt(void)
 
 	/* Wait for end of reception */
   BUSYWAIT_UNTIL(!CC2420_SFD_IS_1, RTIMER_SECOND / 100);
-
-	COOJA_DEBUG_STR("end CC2420_SFD_IS_1");
 	//read time of down edge of SFD
 	rx_end_time = cc2420_read_sfd_timer();
 	off();
@@ -855,15 +858,14 @@ cc2420_interrupt(void)
 		if(rf) {
 			list_chop(rf_list);
 			memb_free(&rf_memb, rf);
-			rf = NULL;
 		}
-	}
-	if(last_rf) {
-		last_rf->sfd_timestamp = last_packet_timestamp;
+		rf = NULL;
 	}
 	last_rf = (frame_valid) ? rf : NULL;
 	need_ack = (frame_valid && do_ack) ? 1 + nack : 0;
-
+	if(last_rf) {
+		last_rf->sfd_timestamp = last_packet_timestamp;
+	}
   /* Flush rx fifo (because we're doing direct FIFO addressing and
    * we don't want to lose track of where we are in the FIFO) */
   flushrx();

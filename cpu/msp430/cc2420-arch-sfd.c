@@ -52,11 +52,11 @@ ISR(TIMERB1, cc2420_timerb1_interrupt)
   if(CC2420_SFD_IS_1) {
     cc2420_sfd_counter++;
     cc2420_sfd_start_time = TBCCR1;
-    COOJA_DEBUG_STR("ISR CC2420_SFD");
+    COOJA_DEBUG_STR("ISR CC2420_SFD 1");
   } else {
     cc2420_sfd_counter = 0;
     cc2420_sfd_end_time = TBCCR1;
-  	COOJA_DEBUG_STR("ISR CC2420_SFD_IS_0\n");
+  	COOJA_DEBUG_STR("ISR CC2420_SFD 0");
   }
   leds_off(LEDS_BLUE);
   ENERGEST_OFF(ENERGEST_TYPE_IRQ);
