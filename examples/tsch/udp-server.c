@@ -135,7 +135,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
 #if 0
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
-#elif 0
+#elif 1
 /* Mode 2 - 16 bits inline */
   uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
 #else

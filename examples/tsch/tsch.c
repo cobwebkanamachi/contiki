@@ -480,7 +480,7 @@ packet_input(void)
 			COOJA_DEBUG_STR("tsch packet_input, Not duplicate\n");
 		}
 	}
-	COOJA_DEBUG_STR("tsch packet_input end\n");
+//	COOJA_DEBUG_STR("tsch packet_input end\n");
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -567,7 +567,8 @@ schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
 //		ieee154e_vars.asn.asn_4lsb += r;
 //		ref_time = ieee154e_vars.start + duration;
 //		ieee154e_vars.start += duration;
-//		ret = 0;
+		ret = 0;
+		ref_time -= ref_time - now - duration;
 	}
 	r = rtimer_set(tm, ref_time, 1, (void
 	(*)(struct rtimer *, void *)) powercycle, NULL);
@@ -1216,11 +1217,11 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 	}
 	waiting_for_radio_interrupt = 0;
 	if(ieee154e_vars.state == TSCH_ASSOCIATED) {
-		volatile softack_interrupt_exit_callback_f *interrupt_exit = tsch_wait_for_eb;
-		volatile softack_make_callback_f *softack_make = NULL;
-		softack_make = tsch_make_sync_ack;
-		interrupt_exit = tsch_resume_powercycle;
-		NETSTACK_RADIO_softack_subscribe(softack_make, interrupt_exit);
+//		volatile softack_interrupt_exit_callback_f *interrupt_exit;
+//		volatile softack_make_callback_f *softack_make;
+//		softack_make = &tsch_make_sync_ack;
+//		interrupt_exit = &tsch_resume_powercycle;
+		NETSTACK_RADIO_softack_subscribe(&tsch_make_sync_ack, &tsch_resume_powercycle);
 
 		waiting_for_radio_interrupt = 0;
 		we_are_sending = 0;
@@ -1288,9 +1289,9 @@ PROCESS_THREAD(tsch_associate, ev, data)
 	ieee154e_vars.join_priority = 0xff;
 
 	/* setup radio functions for intercepting EB */
-	volatile softack_interrupt_exit_callback_f *interrupt_exit = tsch_wait_for_eb;
-	volatile softack_make_callback_f *softack_make = NULL;
-	NETSTACK_RADIO_softack_subscribe(softack_make, interrupt_exit);
+//	volatile softack_interrupt_exit_callback_f *interrupt_exit = tsch_wait_for_eb;
+//	volatile softack_make_callback_f *softack_make = NULL;
+	NETSTACK_RADIO_softack_subscribe(NULL, &tsch_wait_for_eb);
 
 	while(ieee154e_vars.state == TSCH_SEARCHING) {
 		timer_restart(&periodic);
@@ -1313,6 +1314,7 @@ PROCESS_THREAD(tsch_associate, ev, data)
 			ieee154e_vars.state = TSCH_ASSOCIATED;
 			//make queues and data structures
 			tsch_wait_for_eb(0,0,NULL);
+			NETSTACK_RADIO_softack_subscribe(&tsch_make_sync_ack, &tsch_resume_powercycle);
 			ieee154e_vars.start = RTIMER_NOW();
 			schedule_fixed(&t, ieee154e_vars.start, 5);
 			COOJA_DEBUG_STR("tsch_associate done");

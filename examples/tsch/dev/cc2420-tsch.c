@@ -581,12 +581,12 @@ cc2420_set_pan_addr(unsigned pan,
  * Interrupt leaves frame intact in FIFO. !!! not anymore !!!
  */
 
-volatile softack_make_callback_f *softack_make_callback = NULL;
-volatile softack_interrupt_exit_callback_f *interrupt_exit_callback = NULL;
+volatile softack_make_callback_f softack_make_callback = NULL;
+volatile softack_interrupt_exit_callback_f interrupt_exit_callback = NULL;
 
 /* Subscribe with two callbacks called from FIFOP interrupt */
 void
-cc2420_softack_subscribe(volatile softack_make_callback_f *softack_make, volatile softack_interrupt_exit_callback_f *interrupt_exit)
+cc2420_softack_subscribe(volatile softack_make_callback_f softack_make, volatile softack_interrupt_exit_callback_f interrupt_exit)
 {
 	softack_make_callback = softack_make;
   interrupt_exit_callback = interrupt_exit;
