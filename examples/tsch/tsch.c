@@ -642,12 +642,6 @@ powercycle(struct rtimer *t, void *ptr)
 				if (cell->link_type == LINK_TYPE_ADVERTISING) {
 					//TODO fetch adv/EB packets
 					n = neighbor_queue_from_addr(&EB_CELL_ADDRESS);
-//					if (n != NULL) {
-//						p = read_packet_from_neighbor_queue(n);
-//						if(p) {
-//							COOJA_DEBUG_STR("LINK_TYPE_ADVERTISING EB packet available to send\n");
-//						}
-//					}
 					if(generate_random_byte(8) >= 4) {
 						payload_len = make_eb(ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN+1); //last byte in eb buf is for length
 						payload = ieee154e_vars.eb_buf;
@@ -673,6 +667,7 @@ powercycle(struct rtimer *t, void *ptr)
 				}
 			}
 
+			/* Decide whether it is a TX/RX/IDLE or OFF cell */
 			if(cell->link_options & LINK_OPTION_TX) {
 				if(payload != NULL) {
 					// if dedicated slot or shared slot and BW_value=0, we transmit the packet
@@ -684,15 +679,17 @@ powercycle(struct rtimer *t, void *ptr)
 						n->BW_value--;
 						cell_decison = CELL_TX_BACKOFF;
 					}
+				} else if (cell->link_type == LINK_TYPE_ADVERTISING) {
+					cell_decison = CELL_RX;
 				} else {
 					cell_decison = CELL_TX_IDLE;
 				}
 			}
-
 			if( (cell->link_options & LINK_OPTION_RX) && cell_decison != CELL_TX) {
 				cell_decison = CELL_RX;
 			}
 
+			/* execute the cell */
 			if(cell_decison != CELL_TX && cell_decison != CELL_RX) {
 				COOJA_DEBUG_STR("Nothing to TX or RX --> off CELL\n");
 				off(keep_radio_on);
@@ -966,6 +963,7 @@ powercycle(struct rtimer *t, void *ptr)
 							COOJA_DEBUG_PRINTF("drift seen %d\n", last_drift);
 							// check the source address for potential time-source match
 							n = neighbor_queue_from_addr(&last_rf->source_address);
+							if(n) COOJA_DEBUG_ADDR(&last_rf->source_address);
 							if(n != NULL && n->is_time_source) {
 								// should be the average of drifts to all time sources
 								drift_correction -= last_drift;
@@ -1080,8 +1078,8 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 	//fcf: 2Bytes
 	//b0-2: Frame type=0 - b3: security - b4: pending - b5: AR - b6: PAN ID compression - b7: reserved
 	buf[i++] = 0x00;
-	//b8: seqno suppression - b9:IE-list-present=1 - b10-11: destination address mode - b12-b13:frame version=2 - b14-15: src address mode=2
-	buf[i++] = 2 | 32 | 128;
+	//b8: seqno suppression - b9:IE-list-present=1 - b10-11: destination address mode - b12-b13:frame version=2 - b14-15: src address mode=3
+	buf[i++] = 2 | 32 | 128 | 64;
 	if(!ieee154e_vars.mac_ebsn) ieee154e_vars.mac_ebsn++;
 	buf[i++] = ieee154e_vars.mac_ebsn++;
 
@@ -1091,9 +1089,10 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 	buf[i++] = (IEEE802154_PANID >> 8) & 0xff;
 
   /* Source address */
-  for(k = 8; k > 0; k--) {
-    buf[i++] = rimeaddr_node_addr.u8[k - 1];
+	for(k = 0; k < 8; k++) {
+    buf[i++] = rimeaddr_node_addr.u8[7-k];
   }
+	k=0;
 	/* XXX in 6top: EB length, group ID and type: leave 2 bytes for that */
 	buf[i++] = 0x00;
 	buf[i++] = ((1 << 1)|1)<<3; //b0-2:: left for length MSB, b3-6: GroupID, b7: Type
@@ -1186,7 +1185,7 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 	if (last_rf != NULL && (waiting_for_radio_interrupt || NETSTACK_RADIO_get_rx_end_time() != 0)) {
 		COOJA_DEBUG_STR("EB tsch_wait_for_eb");
 		if ( (FRAME802154_BEACONFRAME == last_rf->buf[0]&7)
-				&& (last_rf->buf[1] & (2 | 32 | 128))) {
+				&& (last_rf->buf[1] & (2 | 32 | 128 | 64))) {
 			if ((last_rf->buf[16] & 0xfe) == 0x34) { //sync IE? (0x1a << 1) ==0 0x34
 				ieee154e_vars.asn.asn_4lsb = last_rf->buf[17] + (last_rf->buf[18] << 8)
 						+ (last_rf->buf[19] << 16) + (last_rf->buf[20] << 24);
@@ -1199,16 +1198,6 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 				/* in case of 16bit SFD timer and 32bit RTimer*/
 				ieee154e_vars.start += RTIMER_NOW() & 0xffff0000;
 
-				/* XXX HACK this should be set in sent schedule
-				 * --Set parent as timesource */
-				struct neighbor_queue *n = neighbor_queue_from_addr(&last_rf->source_address);
-				if (n == NULL) {
-					//add new neighbor to list of neighbors
-					n=add_queue(&last_rf->source_address);
-				}
-				if( n!= NULL ) {
-					n->is_time_source = 1;
-				}
 				//we are in sync
 				ieee154e_vars.is_sync = 1;
 				ieee154e_vars.state = TSCH_ASSOCIATED;
@@ -1253,6 +1242,21 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 					if( n!= NULL ) {
 						n->is_time_source = (links_list[i]->link_options & LINK_OPTION_TIME_KEEPING) ? 1 : n->is_time_source;
 					}
+				}
+			}
+			/* XXX HACK this should be set in sent schedule
+			 * --Set parent as timesource */
+			if(last_rf) {
+				struct neighbor_queue *n = neighbor_queue_from_addr(&last_rf->source_address);
+				if (n == NULL) {
+					//add new neighbor to list of neighbors
+					n=add_queue(&last_rf->source_address);
+					//COOJA_DEBUG_PRINTF("Adding time source %d.%d", last_rf->source_address.u8[6], last_rf->source_address.u8[7]);
+//					COOJA_DEBUG_ADDR(&last_rf->source_address.u8);
+				}
+				if( n!= NULL ) {
+					n->is_time_source = 1;
+					COOJA_DEBUG_STR("Setting time source");
 				}
 			}
 		}

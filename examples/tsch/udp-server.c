@@ -40,12 +40,21 @@
 #include <string.h>
 #include <ctype.h>
 
-//#define DEBUG DEBUG_PRINT
-//#include "net/uip-debug.h"
-
+#if 0
 #include "cooja-debug.h"
 #define PRINTF COOJA_DEBUG_PRINTF
 #define PRINT6ADDR COOJA_DEBUG_ADDR16
+#elif 1
+//#define DEBUG DEBUG_PRINT
+//#include "net/uip-debug.h"
+void uip_debug_ipaddr_print(const uip_ipaddr_t *addr);
+void uip_debug_lladdr_print(const uip_lladdr_t *addr);
+#define PRINTF(...) printf(__VA_ARGS__)
+#define PRINT6ADDR(addr) uip_debug_ipaddr_print(addr)
+#else
+#define PRINTF(...)
+#define PRINT6ADDR(...)
+#endif
 
 #define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
 
@@ -126,7 +135,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
 #if 0
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
-#elif 1
+#elif 0
 /* Mode 2 - 16 bits inline */
   uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
 #else
@@ -143,8 +152,6 @@ PROCESS_THREAD(udp_server_process, ev, data)
     uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
     rpl_set_prefix(dag, &ipaddr, 64);
     PRINTF("created a new RPL dag\n");
-//		#include "tsch.h"
-//    tsch_associate(NULL, dag->rank);
   } else {
     PRINTF("failed to create a new RPL DAG\n");
   }

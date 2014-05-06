@@ -8,7 +8,7 @@
   <project EXPORT="discard">[APPS_DIR]/powertracker</project>
   <simulation>
     <title>tsch_associate</title>
-    <randomseed>123456</randomseed>
+    <randomseed>123570</randomseed>
     <motedelay_us>1000000</motedelay_us>
     <radiomedium>
       se.sics.cooja.radiomediums.UDGM
@@ -66,8 +66,8 @@
       <breakpoints />
       <interface_config>
         se.sics.cooja.interfaces.Position
-        <x>0.18463335182009638</x>
-        <y>3.7626450603219155</y>
+        <x>-0.3752018083312528</x>
+        <y>2.083139579867868</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -94,8 +94,8 @@
       <breakpoints />
       <interface_config>
         se.sics.cooja.interfaces.Position
-        <x>0.18463335182009638</x>
-        <y>98.37478712589993</y>
+        <x>-1.494872128633951</x>
+        <y>98.93462228605128</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -108,7 +108,7 @@
   <plugin>
     se.sics.cooja.plugins.SimControl
     <width>280</width>
-    <z>5</z>
+    <z>2</z>
     <height>160</height>
     <location_x>400</location_x>
     <location_y>0</location_y>
@@ -125,7 +125,7 @@
       <viewport>1.7862400777572707 0.0 0.0 1.7862400777572707 166.67020050728829 72.27901259487757</viewport>
     </plugin_config>
     <width>400</width>
-    <z>4</z>
+    <z>1</z>
     <height>400</height>
     <location_x>1</location_x>
     <location_y>1</location_y>
@@ -133,15 +133,15 @@
   <plugin>
     se.sics.cooja.plugins.LogListener
     <plugin_config>
-      <filter />
+      <filter>time source</filter>
       <formatted_time />
       <coloring />
     </plugin_config>
-    <width>708</width>
-    <z>2</z>
+    <width>743</width>
+    <z>4</z>
     <height>240</height>
     <location_x>402</location_x>
-    <location_y>160</location_y>
+    <location_y>162</location_y>
   </plugin>
   <plugin>
     se.sics.cooja.plugins.TimeLine
@@ -152,13 +152,13 @@
       <showRadioRXTX />
       <showRadioHW />
       <showLEDs />
-      <zoomfactor>90.43289630856115</zoomfactor>
+      <zoomfactor>48.08284520583805</zoomfactor>
     </plugin_config>
-    <width>1920</width>
-    <z>3</z>
+    <width>1610</width>
+    <z>0</z>
     <height>166</height>
-    <location_x>0</location_x>
-    <location_y>954</location_y>
+    <location_x>16</location_x>
+    <location_y>413</location_y>
   </plugin>
   <plugin>
     se.sics.cooja.plugins.Notes
@@ -167,7 +167,7 @@
       <decorations>true</decorations>
     </plugin_config>
     <width>429</width>
-    <z>1</z>
+    <z>8</z>
     <height>160</height>
     <location_x>680</location_x>
     <location_y>-2</location_y>
@@ -179,12 +179,47 @@
       <formatted_time />
       <showdups>false</showdups>
       <hidenodests>false</hidenodests>
+      <analyzers name="6lowpan" />
     </plugin_config>
     <width>500</width>
-    <z>0</z>
+    <z>3</z>
     <height>400</height>
-    <location_x>1110</location_x>
-    <location_y>0</location_y>
+    <location_x>1159</location_x>
+    <location_y>-1</location_y>
+  </plugin>
+  <plugin>
+    se.sics.cooja.plugins.VariableWatcher
+    <mote_arg>1</mote_arg>
+    <plugin_config>
+      <varname>now</varname>
+      <vartype>int</vartype>
+    </plugin_config>
+    <width>448</width>
+    <z>7</z>
+    <height>190</height>
+    <location_x>806</location_x>
+    <location_y>569</location_y>
+  </plugin>
+  <plugin>
+    se.sics.cooja.mspmote.plugins.MspStackWatcher
+    <mote_arg>1</mote_arg>
+    <plugin_config>
+      <monitoring>false</monitoring>
+    </plugin_config>
+    <width>400</width>
+    <z>5</z>
+    <height>304</height>
+    <location_x>441</location_x>
+    <location_y>730</location_y>
+  </plugin>
+  <plugin>
+    se.sics.cooja.plugins.EventListener
+    <plugin_config />
+    <width>279</width>
+    <z>6</z>
+    <height>301</height>
+    <location_x>126</location_x>
+    <location_y>569</location_y>
   </plugin>
 </simconf>
 

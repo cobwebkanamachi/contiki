@@ -45,12 +45,21 @@
 
 #define UDP_EXAMPLE_ID  190
 
-//#define DEBUG DEBUG_PRINT
-//#include "net/uip-debug.h"
-
+#if 0
 #include "cooja-debug.h"
 #define PRINTF COOJA_DEBUG_PRINTF
 #define PRINT6ADDR COOJA_DEBUG_ADDR16
+#elif 1
+//#define DEBUG DEBUG_PRINT
+//#include "net/uip-debug.h"
+void uip_debug_ipaddr_print(const uip_ipaddr_t *addr);
+void uip_debug_lladdr_print(const uip_lladdr_t *addr);
+#define PRINTF(...) printf(__VA_ARGS__)
+#define PRINT6ADDR(addr) uip_debug_ipaddr_print(addr)
+#else
+#define PRINTF(...)
+#define PRINT6ADDR(...)
+#endif
 
 #ifndef PERIOD
 #define PERIOD 60
@@ -145,10 +154,6 @@ set_global_address(void)
 /* Mode 3 - derived from server link-local (MAC) address */
   uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
 #endif
-
-//	#include "tsch.h"
-//  tsch_associate(NULL, 0xffff);
-
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(udp_client_process, ev, data)
