@@ -159,14 +159,14 @@ static const cell_t * links_list[TOTAL_LINKS] = { &generic_eb_cell, &generic_sha
 static const slotframe_t minimum_slotframe = { 0, 101, 6, minimum_cells };
 /*---------------------------------------------------------------------------*/
 /* variable to protect queue structure */
-volatile uint8_t working_on_queue;
+volatile uint8_t working_on_queue = 0;
 static volatile ieee154e_vars_t ieee154e_vars;
 static volatile uint8_t waiting_for_radio_interrupt = 0;
-static volatile uint8_t need_ack;
-static volatile struct received_frame_s *last_rf;
-static volatile int16_t last_drift;
-static volatile struct pt mpt, enhanced_beacon_pt;
-static volatile struct rtimer t, ts;
+static volatile uint8_t need_ack = 0;
+static volatile struct received_frame_s *last_rf = NULL;
+static volatile int16_t last_drift = 0;
+static volatile struct pt mpt;
+static volatile struct rtimer t;
 volatile unsigned char we_are_sending = 0;
 /*---------------------------------------------------------------------------*/
 /* NBR_TABLE_CONF_MAX_NEIGHBORS specifies the size of the table */
@@ -305,8 +305,6 @@ remove_packet_from_queue(const rimeaddr_t *addr)
 			queuebuf_free(n->buffer[n->get_ptr].pkt);
 			n->get_ptr = (n->get_ptr + 1) & (NBR_BUFFER_SIZE - 1);
 			return 1;
-		} else {
-			return 0;
 		}
 	}
 	return 0;
@@ -320,8 +318,6 @@ read_packet_from_queue(const rimeaddr_t *addr)
 	if (n != NULL) {
 		if (((n->put_ptr - n->get_ptr) & (NBR_BUFFER_SIZE - 1)) > 0) {
 			return &(n->buffer[n->get_ptr]);
-		} else {
-			return 0;
 		}
 	}
 	return 0;
@@ -530,7 +526,6 @@ hop_channel(uint8_t offset)
 /*---------------------------------------------------------------------------*/
 PROCESS(tsch_tx_callback_process, "tsch_tx_callback_process");
 PROCESS(tsch_associate, "tsch_associate");
-#define EB_SEND_INTERVAL 8
 /*---------------------------------------------------------------------------*/
 static cell_t *
 get_cell(uint16_t timeslot)
@@ -552,31 +547,29 @@ static uint8_t
 schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
 		rtimer_clock_t duration)
 {
-	int r, ret = 1;
+	/* A non-zero status should signal to powercycle a missed deadline */
+	int r, status = 0;
 	rtimer_clock_t now = RTIMER_NOW() + 1;
 	ref_time += duration;
 	ref=ref_time;
 	if (ref_time - now > duration+1) {
 		COOJA_DEBUG_STR("schedule_fixed: missed deadline!\n");
 		//XXX make it wakeup next slot instead... or add a check for missed deadlines in powercycle
-//		ref_time -= duration;
-//		duration = now - ref_time;
-//		r = 50;
-//		duration = r * TsSlotDuration;
-//		//increase asn
-//		ieee154e_vars.asn.asn_4lsb += r;
-//		ref_time = ieee154e_vars.start + duration;
-//		ieee154e_vars.start += duration;
-		ret = 0;
+		status = 1;
 		ref_time -= ref_time - now - duration;
+		if (ref_time - now > duration+1) {
+			ref_time = ieee154e_vars.start + duration;
+			ieee154e_vars.start += duration;
+			ieee154e_vars.asn.asn_4lsb++;
+		}
 	}
 	r = rtimer_set(tm, ref_time, 1, (void
-	(*)(struct rtimer *, void *)) powercycle, NULL);
+	(*)(struct rtimer *, void *)) powercycle, status);
 	if (r != RTIMER_OK) {
 		COOJA_DEBUG_STR("schedule_fixed: could not set rtimer\n");
-		ret *= 2;
+		status *= 2;
 	}
-	return ret;
+	return status;
 }
 /*---------------------------------------------------------------------------*/
 void

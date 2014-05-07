@@ -721,25 +721,23 @@ uint16_t cc2420_read_sfd_timer(void) {
 	return t;
 }
 /*---------------------------------------------------------------------------*/
-//volatile uint8_t ackbuf[1+ACK_LEN + EXTRA_ACK_LEN]={0}; // = {ACK_LEN + EXTRA_ACK_LEN + AUX_LEN, 0x02, 0x00, seqno, 0x02, 0x1e, ack_status_LSB, ack_status_MSB};
 static uint8_t extrabuf[ACK_LEN]={0};
-struct received_frame_s *last_rf;
+struct received_frame_s *last_rf=NULL;
 
 int
 cc2420_interrupt(void)
 {
 	COOJA_DEBUG_STR("cc2420_interrupt\n");
 	leds_on(LEDS_RED);
-	uint8_t need_ack;
+	uint8_t need_ack=0;
 	uint8_t* ackbuf=NULL;
 	uint8_t nack = 0;
-  uint8_t len, fcf, seqno=0, footer1, is_ack=0, ret = 0;
-  uint8_t len_a, len_b;
+  uint8_t len=0, fcf=0, seqno=0, footer1=0, is_ack=0, ret = 0;
+  uint8_t len_a=0, len_b=0;
   uint8_t do_ack = 0;
   uint8_t frame_valid = 0;
   struct received_frame_s *rf = NULL;
   unsigned char* buf_ptr = NULL;
-  need_ack=0;
 
 #if CC2420_TIMETABLE_PROFILING
   timetable_clear(&cc2420_timetable);
@@ -747,15 +745,17 @@ cc2420_interrupt(void)
 #endif /* CC2420_TIMETABLE_PROFILING */
   cc2420_sfd_start_time = cc2420_read_sfd_timer();
   last_packet_timestamp = cc2420_sfd_start_time;
-
+  process_poll(&cc2420_process);
   /* If the lock is taken, we cannot access the FIFO. */
   if(locked || need_flush || !CC2420_FIFO_IS_1) {
     need_flush = 1;
     /* Wait for end of reception */
     BUSYWAIT_UNTIL(!CC2420_SFD_IS_1, RTIMER_SECOND / 100);
 		COOJA_DEBUG_STR("! locked || need_flush || !CC2420_FIFO_IS_1 end CC2420_SFD_IS_1");
-		rx_end_time = cc2420_read_sfd_timer();
-		off();
+		rx_end_time = RTIMER_NOW();
+		//XXX disable theses to see what's causing restarts
+//		rx_end_time = cc2420_read_sfd_timer();
+//		off();
     CC2420_CLEAR_FIFOP_INT();
   	if(interrupt_exit_callback != NULL) {
   		interrupt_exit_callback(is_ack, need_ack, last_rf);
@@ -771,7 +771,7 @@ cc2420_interrupt(void)
     CC2420_CLEAR_FIFOP_INT();
     /* Wait for end of reception */
     BUSYWAIT_UNTIL(!CC2420_SFD_IS_1, RTIMER_SECOND / 100);
-		rx_end_time = cc2420_read_sfd_timer(); //RTIMER_NOW();
+		rx_end_time = cc2420_read_sfd_timer();
 		off();
     RELEASE_LOCK();
   	if(interrupt_exit_callback != NULL) {
@@ -779,7 +779,6 @@ cc2420_interrupt(void)
   	}
   	return 0;
   }
-//  last_packet_timestamp = cc2420_sfd_start_time;
 
 	len -= AUX_LEN;
 	/* Allocate space to store the received frame */
@@ -807,8 +806,7 @@ cc2420_interrupt(void)
 	is_ack = ret & IS_ACK;
 
 	if(!is_ack) {
-	  process_poll(&cc2420_process);
-		if(softack_make_callback != NULL) { //softack_make_callback
+		if(softack_make_callback != NULL) {
 			COOJA_DEBUG_STR("softACK_make_callback");
 			softack_make_callback(&ackbuf, seqno, last_packet_timestamp, nack);
 			/* first byte is defines frame length */
@@ -871,7 +869,6 @@ cc2420_interrupt(void)
   flushrx();
   CC2420_CLEAR_FIFOP_INT();
   RELEASE_LOCK();
-//  COOJA_DEBUG_STR("cc2420_interrupt end\n");
 	if(interrupt_exit_callback != NULL) {
 	  COOJA_DEBUG_STR("cc2420_interrupt end interrupt_exit_callback not null\n");
 		interrupt_exit_callback(is_ack, need_ack, last_rf);
