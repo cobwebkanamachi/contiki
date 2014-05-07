@@ -1,7 +1,7 @@
 #ifndef PROJECT_H_
 #define PROJECT_H_
 
-#define DISABLE_COOJA_DEBUG 0
+#define DISABLE_COOJA_DEBUG 1
 //#undef WITH_UIP6
 //#define WITH_UIP6 0
 

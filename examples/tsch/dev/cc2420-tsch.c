@@ -483,6 +483,7 @@ cc2420_off(void)
 //  } else {
 //		off();
 //  }
+//  while(status() & BV(CC2420_TX_ACTIVE));
   off();
   RELEASE_LOCK();
   return 1;

@@ -69,6 +69,9 @@
 #define False (0)
 #endif
 
+
+#define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
+
 /* TSCH queue size: is it non-zero and a power of two? */
 #if ( QUEUEBUF_CONF_NUM && !(QUEUEBUF_CONF_NUM & (QUEUEBUF_CONF_NUM-1)) )
 #define NBR_BUFFER_SIZE QUEUEBUF_CONF_NUM // POWER OF 2 -- queue size
@@ -604,6 +607,7 @@ powercycle(struct rtimer *t, void *ptr)
 	static struct neighbor_queue *n = NULL;
 	static void * payload = NULL;
 	static unsigned short payload_len = 0;
+	static uint8_t is_broadcast = 0, len=0, seqno=0, ret=0;
 
 	timeslot = ieee154e_vars.asn.asn_4lsb % ieee154e_vars.current_slotframe->length;
 	if(1||ieee154e_vars.join_priority==0) {
@@ -668,6 +672,11 @@ powercycle(struct rtimer *t, void *ptr)
 					if(!(cell->link_options & LINK_OPTION_SHARED)
 						|| n->BW_value == 0) {
 						cell_decison = CELL_TX;
+						if (cell->link_type == LINK_TYPE_ADVERTISING) {
+							is_broadcast = 1;
+						} else {
+							is_broadcast = rimeaddr_cmp(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER), &rimeaddr_null);
+						}
 					} else if(n->BW_value != 0) {
 						// packet to transmit but we cannot use shared slot due to backoff counter
 						n->BW_value--;
@@ -683,6 +692,25 @@ powercycle(struct rtimer *t, void *ptr)
 				cell_decison = CELL_RX;
 			}
 
+			switch (cell_decison) {
+			case CELL_TX:
+				PUTCHAR('T');
+				break;
+			case CELL_TX_BACKOFF:
+				PUTCHAR('B');
+				break;
+			case CELL_TX_IDLE:
+				PUTCHAR('I');
+				break;
+			case CELL_RX:
+				PUTCHAR('R');
+				break;
+			case CELL_OFF:
+			default:
+				PUTCHAR('F');
+				break;
+			}
+
 			/* execute the cell */
 			if(cell_decison != CELL_TX && cell_decison != CELL_RX) {
 				COOJA_DEBUG_STR("Nothing to TX or RX --> off CELL\n");
@@ -691,10 +719,9 @@ powercycle(struct rtimer *t, void *ptr)
 				COOJA_DEBUG_STR("CELL_TX");
 				//timeslot_tx(t, ieee154e_vars.start, packet, packet_len);
 				//TODO There are small timing variations visible in cooja, which needs tuning
-				static uint8_t is_broadcast = 0, len, seqno, ret;
+
 				uint16_t ack_sfd_time = 0;
 				rtimer_clock_t ack_sfd_rtime = 0;
-				is_broadcast = rimeaddr_cmp(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER), &rimeaddr_null);
 				we_are_sending = 1;
 				char* payload_ptr = payload;
 				//read seqno from payload!
@@ -730,7 +757,6 @@ powercycle(struct rtimer *t, void *ptr)
 					//limit tx_time in case of something wrong
 					tx_time = MIN(tx_time, wdDataDuration);
 					off(keep_radio_on);
-
 					if (success == RADIO_TX_OK) {
 						if (!is_broadcast) {
 							//wait for ack: after tx
@@ -740,6 +766,7 @@ powercycle(struct rtimer *t, void *ptr)
 							/* disable capturing sfd */
 							NETSTACK_RADIO_sfd_sync(0, 0);
 							PT_YIELD(&mpt);
+
 							waiting_for_radio_interrupt = 1;
 							on();
 							cca_status = NETSTACK_RADIO.receiving_packet()
@@ -822,81 +849,81 @@ powercycle(struct rtimer *t, void *ptr)
 					}
 				}
 				/* post TX: Update CSMA control variables */
-				if (success == RADIO_TX_NOACK) {
-					p->transmissions++;
-					if (p->transmissions == macMaxFrameRetries) {
-						remove_packet_from_queue(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
-						n->BE_value = macMinBE;
-						n->BW_value = 0;
-					}
-					if ((cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
-						uint8_t window = 1 << n->BE_value;
-						n->BW_value = generate_random_byte(window - 1);
-						n->BE_value++;
-						if (n->BE_value > macMaxBE) {
-							n->BE_value = macMaxBE;
+				//if it was EB then p is null and anyway there is no need to update anything
+				if(p != NULL) {
+					if (success == RADIO_TX_NOACK) {
+						p->transmissions++;
+						if (p->transmissions == macMaxFrameRetries) {
+							remove_packet_from_queue(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
+							n->BE_value = macMinBE;
+							n->BW_value = 0;
+						} else if ((cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
+							uint8_t window = 1 << n->BE_value;
+							n->BW_value = generate_random_byte(window - 1);
+							n->BE_value++;
+							if (n->BE_value > macMaxBE) {
+								n->BE_value = macMaxBE;
+							}
 						}
-					}
-					ret = MAC_TX_NOACK;
-				} else if (success == RADIO_TX_OK) {
-					remove_packet_from_queue(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
-					if (!read_packet_from_queue(cell->node_address)) {
-						// if no more packets in the queue
-						n->BW_value = 0;
-						n->BE_value = macMinBE;
+						ret = MAC_TX_NOACK;
+					} else if (success == RADIO_TX_OK) {
+						remove_packet_from_queue(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
+						if (!read_packet_from_queue(cell->node_address)) {
+							// if no more packets in the queue
+							n->BW_value = 0;
+							n->BE_value = macMinBE;
+						} else {
+							// if queue is not empty
+							n->BW_value = 0;
+						}
+						ret = MAC_TX_OK;
+					} else if (success == RADIO_TX_COLLISION) {
+						p->transmissions++;
+						if (p->transmissions == macMaxFrameRetries) {
+							remove_packet_from_queue(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
+							n->BE_value = macMinBE;
+							n->BW_value = 0;
+						} else if ((cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
+							uint8_t window = 1 << n->BE_value;
+							n->BW_value = generate_random_byte(window - 1);
+							n->BE_value++;
+							if (n->BE_value > macMaxBE) {
+								n->BE_value = macMaxBE;
+							}
+						}
+						ret = MAC_TX_COLLISION;
+					} else if (success == RADIO_TX_ERR) {
+						p->transmissions++;
+						if (p->transmissions == macMaxFrameRetries) {
+							remove_packet_from_queue(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
+							n->BE_value = macMinBE;
+							n->BW_value = 0;
+						}else if ((cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
+							uint8_t window = 1 << n->BE_value;
+							n->BW_value = generate_random_byte(window - 1);
+							n->BE_value++;
+							if (n->BE_value > macMaxBE) {
+								n->BE_value = macMaxBE;
+							}
+						}
+						ret = MAC_TX_ERR;
 					} else {
-						// if queue is not empty
-						n->BW_value = 0;
-					}
-					ret = MAC_TX_OK;
-				} else if (success == RADIO_TX_COLLISION) {
-					p->transmissions++;
-					if (p->transmissions == macMaxFrameRetries) {
+						// successful transmission
 						remove_packet_from_queue(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
-						n->BE_value = macMinBE;
-						n->BW_value = 0;
-					}
-					if ((cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
-						uint8_t window = 1 << n->BE_value;
-						n->BW_value = generate_random_byte(window - 1);
-						n->BE_value++;
-						if (n->BE_value > macMaxBE) {
-							n->BE_value = macMaxBE;
+						if (!read_packet_from_queue(cell->node_address)) {
+							// if no more packets in the queue
+							n->BW_value = 0;
+							n->BE_value = macMinBE;
+						} else {
+							// if queue is not empty
+							n->BW_value = 0;
 						}
+						ret = MAC_TX_OK;
 					}
-					ret = MAC_TX_COLLISION;
-				} else if (success == RADIO_TX_ERR) {
-					p->transmissions++;
-					if (p->transmissions == macMaxFrameRetries) {
-						remove_packet_from_queue(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
-						n->BE_value = macMinBE;
-						n->BW_value = 0;
-					}
-					if ((cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
-						uint8_t window = 1 << n->BE_value;
-						n->BW_value = generate_random_byte(window - 1);
-						n->BE_value++;
-						if (n->BE_value > macMaxBE) {
-							n->BE_value = macMaxBE;
-						}
-					}
-					ret = MAC_TX_ERR;
-				} else {
-					// successful transmission
-					remove_packet_from_queue(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
-					if (!read_packet_from_queue(cell->node_address)) {
-						// if no more packets in the queue
-						n->BW_value = 0;
-						n->BE_value = macMinBE;
-					} else {
-						// if queue is not empty
-						n->BW_value = 0;
-					}
-					ret = MAC_TX_OK;
+					/* poll MAC TX callback */
+					p->ret=ret;
+					process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, p);
 				}
-				/* poll MAC TX callback */
-				p->ret=ret;
-				process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, p);
 			} else if (cell_decison == CELL_RX) {
 				/* this cell is RX cell. Check if it is used for keep alive as well*/
 				if (cell->link_options & LINK_OPTION_TIME_KEEPING) {
@@ -1176,7 +1203,7 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 	rtimer_clock_t duration=0;
 	need_ack = need_ack_irq;
 	last_rf = last_rf_irq;
-	if (last_rf != NULL && (waiting_for_radio_interrupt || NETSTACK_RADIO_get_rx_end_time() != 0)) {
+	if (last_rf_irq != NULL && (waiting_for_radio_interrupt || NETSTACK_RADIO_get_rx_end_time() != 0)) {
 		COOJA_DEBUG_STR("EB tsch_wait_for_eb");
 		if ( (FRAME802154_BEACONFRAME == last_rf->buf[0]&7)
 				&& (last_rf->buf[1] & (2 | 32 | 128 | 64))) {
@@ -1245,8 +1272,6 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 				if (n == NULL) {
 					//add new neighbor to list of neighbors
 					n=add_queue(&last_rf->source_address);
-					//COOJA_DEBUG_PRINTF("Adding time source %d.%d", last_rf->source_address.u8[6], last_rf->source_address.u8[7]);
-//					COOJA_DEBUG_ADDR(&last_rf->source_address.u8);
 				}
 				if( n!= NULL ) {
 					n->is_time_source = 1;
