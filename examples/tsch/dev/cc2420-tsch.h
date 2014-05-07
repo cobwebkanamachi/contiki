@@ -47,6 +47,9 @@
 #include "dev/cc2420_const.h"
 #include "rimeaddr.h"
 
+#undef PUTCHAR(X)
+#define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
+
 int cc2420_init(void);
 //Timesync IE length with header = 4
 #if CC2420_CONF_CHECKSUM

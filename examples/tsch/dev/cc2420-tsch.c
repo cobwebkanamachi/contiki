@@ -708,6 +708,7 @@ cc2420_sfd_sync(uint8_t capture_start_sfd, uint8_t capture_end_sfd)
 	}
   /* Enable interrupt */
 //	TBCCTL1 |= CCIE;
+  /* Disable interrupt */
   TBCCTL1 &= ~CCIE;
   /* Start Timer_B in continuous mode. */
   TBR = RTIMER_NOW();
@@ -729,6 +730,7 @@ int
 cc2420_interrupt(void)
 {
 	COOJA_DEBUG_STR("cc2420_interrupt\n");
+
 	leds_on(LEDS_RED);
 	uint8_t need_ack=0;
 	uint8_t* ackbuf=NULL;
@@ -753,10 +755,8 @@ cc2420_interrupt(void)
     /* Wait for end of reception */
     BUSYWAIT_UNTIL(!CC2420_SFD_IS_1, RTIMER_SECOND / 100);
 		COOJA_DEBUG_STR("! locked || need_flush || !CC2420_FIFO_IS_1 end CC2420_SFD_IS_1");
-		rx_end_time = RTIMER_NOW();
-		//XXX disable theses to see what's causing restarts
-//		rx_end_time = cc2420_read_sfd_timer();
-//		off();
+		rx_end_time = cc2420_read_sfd_timer();
+		off();
     CC2420_CLEAR_FIFOP_INT();
   	if(interrupt_exit_callback != NULL) {
   		interrupt_exit_callback(is_ack, need_ack, last_rf);
