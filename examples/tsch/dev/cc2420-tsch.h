@@ -117,7 +117,7 @@ typedef void(*softack_make_callback_f)(uint8_t **ackbuf, uint8_t seqno, rtimer_c
 typedef void(*softack_interrupt_exit_callback_f)(uint8_t is_ack, uint8_t need_ack, struct received_frame_s * last_rf);
 
 /* Subscribe with two callbacks called from FIFOP interrupt */
-void cc2420_softack_subscribe(volatile softack_make_callback_f softack_make, volatile softack_interrupt_exit_callback_f interrupt_exit);
+void cc2420_softack_subscribe(softack_make_callback_f softack_make, softack_interrupt_exit_callback_f interrupt_exit);
 rtimer_clock_t cc2420_get_rx_end_time(void);
 void cc2420_arch_init(void);
 void cc2420_send_ack(void);
@@ -125,19 +125,18 @@ int cc2420_read_ack(void *buf, int);
 int cc2420_pending_irq(void);
 void cc2420_address_decode(uint8_t enable);
 //to initialize radio sfd counter and synchronize it with rtimer
-void cc2420_sfd_sync(uint8_t capture_start_sfd,
-		uint8_t capture_end_sfd);
+void cc2420_sfd_sync(uint8_t capture_start_sfd, uint8_t capture_end_sfd);
 uint16_t cc2420_read_sfd_timer(void);
 
-#define NETSTACK_RADIO_softack_subscribe 	cc2420_softack_subscribe
-#define NETSTACK_RADIO_get_rx_end_time 		cc2420_get_rx_end_time
-#define NETSTACK_RADIO_send_ack 					cc2420_send_ack
-#define NETSTACK_RADIO_read_ack 					cc2420_read_ack
-#define NETSTACK_RADIO_pending_irq 				cc2420_pending_irq
-#define NETSTACK_RADIO_address_decode 		cc2420_address_decode
-#define NETSTACK_RADIO_sfd_sync 					cc2420_sfd_sync
-#define NETSTACK_RADIO_read_sfd_timer 		cc2420_read_sfd_timer
-#define NETSTACK_RADIO_set_channel 				cc2420_set_channel
+#define NETSTACK_RADIO_softack_subscribe(A,E) 	cc2420_softack_subscribe(A,E)
+#define NETSTACK_RADIO_get_rx_end_time() 				cc2420_get_rx_end_time()
+#define NETSTACK_RADIO_send_ack() 							cc2420_send_ack()
+#define NETSTACK_RADIO_read_ack(B,I)						cc2420_read_ack(B,I)
+#define NETSTACK_RADIO_pending_irq() 						cc2420_pending_irq()
+#define NETSTACK_RADIO_address_decode(E) 				cc2420_address_decode(E)
+#define NETSTACK_RADIO_sfd_sync(S,E) 						cc2420_sfd_sync(S,E)
+#define NETSTACK_RADIO_read_sfd_timer() 				cc2420_read_sfd_timer()
+#define NETSTACK_RADIO_set_channel(C)						cc2420_set_channel(C)
 
 /************************************************************************/
 /* Additional SPI Macros for the CC2420 */

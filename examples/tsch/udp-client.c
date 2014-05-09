@@ -62,7 +62,7 @@ void uip_debug_lladdr_print(const uip_lladdr_t *addr);
 #endif
 
 #ifndef PERIOD
-#define PERIOD 30
+#define PERIOD 10
 #endif
 
 #define START_INTERVAL		(15 * CLOCK_SECOND)

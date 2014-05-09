@@ -236,7 +236,7 @@ off(void)
   receive_on = 0;
 
   /* Wait for transmission to end before turning radio off. */
-//  BUSYWAIT_UNTIL(!(status() & BV(CC2420_TX_ACTIVE)), RTIMER_SECOND / 100);
+  BUSYWAIT_UNTIL(!(status() & BV(CC2420_TX_ACTIVE)), RTIMER_SECOND / 100);
 
   ENERGEST_OFF(ENERGEST_TYPE_LISTEN);
   strobe(CC2420_SRFOFF);
@@ -350,6 +350,7 @@ cc2420_init(void)
   cc2420_set_pan_addr(0xffff, 0x0000, NULL);
   cc2420_set_channel(CC2420_CONF_CHANNEL);
   cc2420_set_cca_threshold(CC2420_CONF_CCA_THRESH);
+  cc2420_set_txpower(CC2420_CONF_TX_POWER);
 
   flushrx();
   memb_init(&rf_memb);
@@ -582,15 +583,20 @@ cc2420_set_pan_addr(unsigned pan,
  * Interrupt leaves frame intact in FIFO. !!! not anymore !!!
  */
 
-volatile softack_make_callback_f softack_make_callback = NULL;
-volatile softack_interrupt_exit_callback_f interrupt_exit_callback = NULL;
+static volatile softack_make_callback_f softack_make_callback = NULL;
+static volatile softack_interrupt_exit_callback_f interrupt_exit_callback = NULL;
 
 /* Subscribe with two callbacks called from FIFOP interrupt */
 void
-cc2420_softack_subscribe(volatile softack_make_callback_f softack_make, volatile softack_interrupt_exit_callback_f interrupt_exit)
+cc2420_softack_subscribe(softack_make_callback_f softack_make, softack_interrupt_exit_callback_f interrupt_exit)
 {
 	softack_make_callback = softack_make;
   interrupt_exit_callback = interrupt_exit;
+  if(interrupt_exit_callback) {
+  	COOJA_DEBUG_STR("set irq_exit_callback");
+  } else {
+  	COOJA_DEBUG_STR("NULLifiyng irq_exit_callback");
+  }
 }
 
 volatile rtimer_clock_t rx_end_time=0;
@@ -759,7 +765,7 @@ cc2420_interrupt(void)
 		off();
     CC2420_CLEAR_FIFOP_INT();
   	if(interrupt_exit_callback != NULL) {
-  		interrupt_exit_callback(is_ack, need_ack, last_rf);
+  		interrupt_exit_callback(0, 0, NULL);
   	}
   	return 0;
   }
@@ -776,7 +782,7 @@ cc2420_interrupt(void)
 		off();
     RELEASE_LOCK();
   	if(interrupt_exit_callback != NULL) {
-  		interrupt_exit_callback(is_ack, need_ack, last_rf);
+  		interrupt_exit_callback(0, 0, NULL);
   	}
   	return 0;
   }
@@ -785,7 +791,7 @@ cc2420_interrupt(void)
 	/* Allocate space to store the received frame */
 	rf=memb_alloc(&rf_memb);
   if(rf != NULL) {
-  	COOJA_DEBUG_STR("irq rf!=NULL memb_alloc ok");
+  	COOJA_DEBUG_STR("irq rf!=NULL");
   	nack = 0;
   	len_a = len > FIFOP_THRESHOLD ? FIFOP_THRESHOLD : len;
   	buf_ptr = rf->buf;
@@ -808,7 +814,6 @@ cc2420_interrupt(void)
 
 	if(!is_ack) {
 		if(softack_make_callback != NULL) {
-			COOJA_DEBUG_STR("softACK_make_callback");
 			softack_make_callback(&ackbuf, seqno, last_packet_timestamp, nack);
 			/* first byte is defines frame length */
 			ackbuf[0] += AUX_LEN;
@@ -836,7 +841,7 @@ cc2420_interrupt(void)
 	/* XXX rx_end_time should not be 0 */
 	if(!rx_end_time) {
 		rx_end_time++;
-		COOJA_DEBUG_STR("end CC2420_SFD_IS_1 rx_end_time=0++");
+		COOJA_DEBUG_STR("rx_end_time=0++");
 	}
 
 	int overflow = CC2420_FIFOP_IS_1 && !CC2420_FIFO_IS_1;
@@ -871,8 +876,11 @@ cc2420_interrupt(void)
   CC2420_CLEAR_FIFOP_INT();
   RELEASE_LOCK();
 	if(interrupt_exit_callback != NULL) {
-	  COOJA_DEBUG_STR("cc2420_interrupt end interrupt_exit_callback not null\n");
+	  COOJA_DEBUG_STR("interrupt_exit_callback not null");
 		interrupt_exit_callback(is_ack, need_ack, last_rf);
+	} else {
+		COOJA_DEBUG_STR("interrupt_exit_callback==null");
+
 	}
 	return 1;
 }
