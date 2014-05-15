@@ -205,8 +205,17 @@ static void tsch_resynchronize(void);
  * while the MSB appears more random.
  * window is the upper limit of the number. It should be a power of two - 1
  **/
+#include "sys/node-id.h"
+
+uint32_t seed_newg;
+void srand_newg(uint32_t x){
+     seed_newg=x;
+}
+
 static uint8_t generate_random_byte(uint8_t window) {
-	return (random_rand() >> 8) & window;
+	// XXX this is not good enough // return (random_rand() >> 8) & window;
+  seed_newg = seed_newg * 1103515245 + 12345;
+  return (uint32_t)(seed_newg / 65536) % 32768;
 }
 /*---------------------------------------------------------------------------*/
 // This function returns a pointer to the queue of neighbor whose address is equal to addr
@@ -1412,6 +1421,8 @@ static void
 tsch_init(void)
 {
 	COOJA_DEBUG_STR("tsch_init");
+	//setting seed for the random generator
+	srand_newg(node_id * node_id * node_id);
 	NETSTACK_RADIO_softack_subscribe(NULL, NULL);
 	//look for a root to sync with
 	ieee154e_vars.current_slotframe = &minimum_slotframe;

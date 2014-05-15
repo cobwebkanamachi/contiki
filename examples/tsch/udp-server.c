@@ -63,6 +63,8 @@ void uip_debug_lladdr_print(const uip_lladdr_t *addr);
 
 #define UDP_EXAMPLE_ID  190
 #define SERVER_REPLY 1
+#define MAX_PAYLOAD_LEN		30
+
 static struct uip_udp_conn *server_conn;
 
 PROCESS(udp_server_process, "UDP server process");
@@ -72,18 +74,21 @@ static void
 tcpip_handler(void)
 {
   char *appdata;
+  char buf[MAX_PAYLOAD_LEN];
 
   if(uip_newdata()) {
     appdata = (char *)uip_appdata;
     appdata[uip_datalen()] = 0;
-    PRINTF("DATA recv '%s' from ", appdata);
-    PRINTF("%d",
-           UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 1]);
-    PRINTF("\n");
+    PRINTF("DATA recv '%s' from %d\n", appdata, UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 1]);
 #if SERVER_REPLY
-    PRINTF("DATA sending reply\n");
+    if(uip_datalen()>MAX_PAYLOAD_LEN/2) {
+    	appdata[MAX_PAYLOAD_LEN/2] = 0;
+    }
+    sprintf(buf, "%d::Reply::%s", rimeaddr_node_addr.u8[RIMEADDR_SIZE-1], appdata);
+    PRINTF("DATA sending '%s'\n", buf);
+
     uip_ipaddr_copy(&server_conn->ripaddr, &UIP_IP_BUF->srcipaddr);
-    uip_udp_packet_send(server_conn, "Reply", sizeof("Reply"));
+    uip_udp_packet_send(server_conn, buf, strlen(buf));
     uip_create_unspecified(&server_conn->ripaddr);
 #endif
   }

@@ -62,7 +62,7 @@ void uip_debug_lladdr_print(const uip_lladdr_t *addr);
 #endif
 
 #ifndef PERIOD
-#define PERIOD 10
+#define PERIOD 15
 #endif
 
 #define START_INTERVAL		(15 * CLOCK_SECOND)
@@ -96,9 +96,9 @@ send_packet(void *ptr)
   char buf[MAX_PAYLOAD_LEN];
 
   seq_id++;
-  PRINTF("DATA send to %d 'Hello %d from %d'\n",
-         server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1], seq_id, rimeaddr_node_addr.u8[RIMEADDR_SIZE-1]);
-  sprintf(buf, "Hello %d from the client %d", seq_id, rimeaddr_node_addr.u8[RIMEADDR_SIZE-1]);
+  sprintf(buf, "%d::Hello %d", seq_id, rimeaddr_node_addr.u8[RIMEADDR_SIZE-1]);
+  PRINTF("DATA send to %d '%s'\n",
+           server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1], buf);
   uip_udp_packet_sendto(client_conn, buf, strlen(buf),
                         &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
 }

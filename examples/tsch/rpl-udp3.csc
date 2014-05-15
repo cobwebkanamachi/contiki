@@ -66,8 +66,8 @@
       <breakpoints />
       <interface_config>
         se.sics.cooja.interfaces.Position
-        <x>-0.3752018083312528</x>
-        <y>2.083139579867868</y>
+        <x>-0.32383823941629586</x>
+        <y>-0.2686802347096175</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -81,7 +81,7 @@
       <interface_config>
         se.sics.cooja.interfaces.Position
         <x>0.18463335182009638</x>
-        <y>50.788798513035246</y>
+        <y>15.519183423500248</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -94,8 +94,8 @@
       <breakpoints />
       <interface_config>
         se.sics.cooja.interfaces.Position
-        <x>-1.494872128633951</x>
-        <y>96.69528164544587</y>
+        <x>0.06560302884221841</x>
+        <y>29.328856152937465</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -108,7 +108,7 @@
   <plugin>
     se.sics.cooja.plugins.SimControl
     <width>280</width>
-    <z>1</z>
+    <z>2</z>
     <height>160</height>
     <location_x>400</location_x>
     <location_y>0</location_y>
@@ -122,10 +122,10 @@
       <skin>se.sics.cooja.plugins.skins.UDGMVisualizerSkin</skin>
       <skin>se.sics.cooja.plugins.skins.TrafficVisualizerSkin</skin>
       <skin>se.sics.cooja.plugins.skins.GridVisualizerSkin</skin>
-      <viewport>1.7862400777572707 0.0 0.0 1.7862400777572707 166.67020050728829 72.27901259487757</viewport>
+      <viewport>5.135562568762959 0.0 0.0 5.135562568762959 151.66309154068043 61.37982415634116</viewport>
     </plugin_config>
     <width>400</width>
-    <z>4</z>
+    <z>0</z>
     <height>400</height>
     <location_x>1</location_x>
     <location_y>1</location_y>
@@ -138,7 +138,7 @@
       <coloring />
     </plugin_config>
     <width>743</width>
-    <z>3</z>
+    <z>4</z>
     <height>240</height>
     <location_x>402</location_x>
     <location_y>162</location_y>
@@ -152,10 +152,10 @@
       <showRadioRXTX />
       <showRadioHW />
       <showLEDs />
-      <zoomfactor>47711.39155210344</zoomfactor>
+      <zoomfactor>100000.0</zoomfactor>
     </plugin_config>
     <width>1610</width>
-    <z>0</z>
+    <z>1</z>
     <height>166</height>
     <location_x>16</location_x>
     <location_y>413</location_y>
@@ -182,7 +182,7 @@
       <analyzers name="6lowpan" />
     </plugin_config>
     <width>500</width>
-    <z>2</z>
+    <z>3</z>
     <height>400</height>
     <location_x>1159</location_x>
     <location_y>-1</location_y>
