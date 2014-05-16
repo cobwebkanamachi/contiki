@@ -215,7 +215,7 @@ void srand_newg(uint32_t x){
 static uint8_t generate_random_byte(uint8_t window) {
 	// XXX this is not good enough // return (random_rand() >> 8) & window;
   seed_newg = seed_newg * 1103515245 + 12345;
-  return (uint32_t)(seed_newg / 65536) % 32768;
+  return ((uint32_t)(seed_newg / 65536) % 32768) & window;
 }
 /*---------------------------------------------------------------------------*/
 // This function returns a pointer to the queue of neighbor whose address is equal to addr
