@@ -1364,13 +1364,12 @@ PROCESS_THREAD(tsch_associate, ev, data)
 			rpl_instance_t* rpl = rpl_get_instance(RPL_DEFAULT_INSTANCE);
 			if(rpl != NULL) {
 				my_rpl_dag = rpl->current_dag;
-				if(my_rpl_dag == NULL) {
-					COOJA_DEBUG_STR("dag NULL");
-				}
-				ieee154e_vars.join_priority = (my_rpl_dag->rank) >> 16;
-				/* to make sure that this is a root and not just a low ranked node */
-				if(ieee154e_vars.join_priority == 0 && my_rpl_dag->rank != 0) {
-					ieee154e_vars.join_priority = my_rpl_dag->rank & 0xff;
+				if(my_rpl_dag != NULL) {
+					ieee154e_vars.join_priority = (my_rpl_dag->rank) >> 16;
+					/* to make sure that this is a root and not just a low ranked node */
+					if(ieee154e_vars.join_priority == 0 && my_rpl_dag->rank != 0) {
+						ieee154e_vars.join_priority = my_rpl_dag->rank & 0xff;
+					}
 				}
 			}
 			//if this is root start now

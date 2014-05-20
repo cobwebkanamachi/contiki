@@ -15,10 +15,10 @@
 #include "net/packetbuf.h"
 #include "net/rime/rimestats.h"
 #include "net/netstack.h"
-#include "JPT.h"
-#include <AppHardwareApi.h>
-#include <AppApi.h>
-#include <MMAC.h>
+#include "Utilities/include/JPT.h"
+#include <HardwareApi/include/AppHardwareApi.h>
+#include <AppApi/include/AppApi.h>
+#include <MMAC/include/MMAC.h>
 #include "micromac-radio.h"
 
 #if MMAC_CONF_AUTOACK
@@ -59,7 +59,7 @@
 #define PRINTF(...) do {} while (0)
 #endif
 
-#define DEBUG_LEDS DEBUG
+#define DEBUG_LEDS 1
 #undef LEDS_ON
 #undef LEDS_OFF
 #if DEBUG_LEDS
@@ -204,7 +204,6 @@ micromac_radio_interrupt(uint32 mac_event)
 		} else if (!rx_state) {
 			switch_rx_receive_buffer();
 			uint8_t ack_needed = (rx_frame_buffer_recent_ptr->u16FCF >> 5) & 1;
-			process_poll(&micromac_radio_process);
 			last_packet_timestamp = u32MMAC_GetRxTime();
 			micromac_radio_time_of_arrival = last_packet_timestamp;
 			pending++;
