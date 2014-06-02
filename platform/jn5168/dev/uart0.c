@@ -65,9 +65,6 @@ vUartISR(uint32 u32DeviceId, uint32 u32ItemBitmap)
 	case E_AHI_DEVICE_UART0:
 		u8UartL = E_AHI_UART_0;
 		break;
-	case E_AHI_DEVICE_UART1:
-		u8UartL = E_AHI_UART_1;
-		break;
 	default:
 		return;
 	}
@@ -164,14 +161,3 @@ UART_vClose(void)
 		vAHI_UartDisable(u8Uart);
 	}
 }
-
-//#include <stdio.h>
-//#include <string.h>
-//
-//int puts(const char *str)
-//{
-//  dbg_send_bytes((unsigned char*)str, strlen(str));
-//  dbg_putchar('\n');
-//  return 0;
-//}
-

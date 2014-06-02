@@ -161,6 +161,9 @@ main(void)
   queuebuf_init();
   serial_line_init();
   uart0_init(E_AHI_UART_RATE_115200); /* Must come before first printf */
+#if USE_SLIP_UART1
+  uart1_init(E_AHI_UART_RATE_115200);
+#endif /* USE_SLIP_UART1 */
 
   //check for reset source
   if (bAHI_WatchdogResetEvent()) {

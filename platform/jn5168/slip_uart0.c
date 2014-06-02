@@ -34,12 +34,20 @@
 
 #include "contiki-conf.h"
 #include "dev/slip.h"
+#if USE_SLIP_UART1
+#include "dev/uart1.h"
+#else
 #include "dev/uart0.h"
+#endif /* USE_SLIP_UART1 */
 /*---------------------------------------------------------------------------*/
 void
 slip_arch_writeb(unsigned char c)
 {
+#if USE_SLIP_UART1
+  uart1_writeb(c);
+#else
   uart0_writeb(c);
+#endif /* USE_SLIP_UART1 */
 }
 /*---------------------------------------------------------------------------*/
 /*
@@ -85,6 +93,10 @@ putchar(int c)
 void
 slip_arch_init(unsigned long ubr)
 {
+#if USE_SLIP_UART1
+  uart1_set_input(slip_input_byte);
+#else
   uart0_set_input(slip_input_byte);
+#endif /* USE_SLIP_UART1 */
 }
 /*---------------------------------------------------------------------------*/
