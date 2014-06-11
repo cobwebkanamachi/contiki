@@ -4,6 +4,9 @@
 
 #define NACK_FLAG 0x8000
 
+#define RESYNCH_TIMEOUT ieee154e_vars.current_slotframe->length * 20
+#define KEEPALIVE_TIMEOUT ieee154e_vars.current_slotframe->length * 3
+
 // Atomic durations
 // expressed in 32kHz ticks:
 //    - ticks = duration_in_seconds * 32768
@@ -13,19 +16,19 @@
 //164*3 as PORT_TsSlotDuration causes 147.9448us drift every slotframe ==4.51 ticks
 // 15000us
 #define PORT_TsSlotDuration (164*3)
+//   1200us
+#define PORT_maxTxDataPrepare (38)
 //   600us
-#define PORT_maxTxDataPrepare (19)
-//   500us
-#define PORT_maxRxAckPrepare (16)
-//   500us
-#define PORT_maxRxDataPrepare (16)
+#define PORT_maxRxAckPrepare (19)
+//   600us
+#define PORT_maxRxDataPrepare (19)
 
-#define PORT_maxTxAckPrepare (16)
+#define PORT_maxTxAckPrepare (21)
 
 // ~327us+129preample
-#define PORT_delayTx (11)
+#define PORT_delayTx (15)
 //~50us delay + 129preample + ??
-#define PORT_delayRx (9)
+#define PORT_delayRx (7)
 
 enum ieee154e_atomicdurations_enum {
 	// time-slot related
@@ -34,8 +37,10 @@ enum ieee154e_atomicdurations_enum {
 	TsRxTx=16,												//500us
 	TsTxOffset = 131,                  //  4000us
 	TsLongGT = 43,                  //  1300us
-	TsTxAckDelay = 131,                  //  4000us
-	TsShortGT = 16,                  //   500us
+//	TsTxAckDelay = 131,                  //  4000us
+	TsTxAckDelay = 99,                  //  3000us
+//	TsShortGT = 16,                  //   500us
+	TsShortGT = 43,                  //  1300us
 	TsSlotDuration = PORT_TsSlotDuration,  // 15000us
 	// execution speed related
 	maxTxDataPrepare = PORT_maxTxDataPrepare,
@@ -48,7 +53,7 @@ enum ieee154e_atomicdurations_enum {
 	// radio watchdog
 	wdRadioTx = 33,                  //  1000us (needs to be >delayTx)
 	wdDataDuration = 148,            //  4500us (measured 4280us with max payload)
-	wdAckDuration = 25,                  //  750us (measured 1000us me: 440us)
+	wdAckDuration = 21,                  //  600us (measured 1000us me: 440us)
 };
 
 enum ieee154e_states_enum {

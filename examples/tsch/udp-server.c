@@ -62,7 +62,7 @@ void uip_debug_lladdr_print(const uip_lladdr_t *addr);
 #define UDP_SERVER_PORT	5678
 
 #define UDP_EXAMPLE_ID  190
-#define SERVER_REPLY 1
+#define SERVER_REPLY 0
 #define MAX_PAYLOAD_LEN		30
 
 static struct uip_udp_conn *server_conn;

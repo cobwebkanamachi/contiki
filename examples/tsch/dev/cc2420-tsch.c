@@ -41,6 +41,8 @@
 #include <avr/io.h>
 #endif
 
+#include "project-conf.h"
+
 #include "dev/leds.h"
 #include "dev/spi.h"
 #include "dev/cc2420-tsch.h"
@@ -64,13 +66,20 @@ volatile int need_flush=0;
 
 #define WITH_SEND_CCA 0
 
-#define FIFOP_THRESHOLD (ACK_LEN+EXTRA_ACK_LEN)
+#define FIFOP_THRESHOLD (ACK_LEN+EXTRA_ACK_LEN+2)
+//#define FIFOP_THRESHOLD (ACK_LEN)
+
 #undef CC2420_CONF_AUTOACK
 #define CC2420_CONF_AUTOACK 0
 
 #ifndef CC2420_CONF_CHANNEL
-#define CC2420_CONF_CHANNEL 26
+#define CC2420_CONF_CHANNEL 20
 #endif /* CC2420_CONF_CHANNEL */
+
+#ifndef CC2420_CONF_TX_POWER
+#define CC2420_CONF_TX_POWER 15
+#endif /* CC2420_CONF_TX_POWER */
+
 
 #ifndef CC2420_CONF_CCA_THRESH
 #define CC2420_CONF_CCA_THRESH (RSSI_THR-32)
@@ -221,7 +230,6 @@ on(void)
   strobe(CC2420_SRXON);
 
   BUSYWAIT_UNTIL(status() & (BV(CC2420_XOSC16M_STABLE)), RTIMER_SECOND / 10);
-
   ENERGEST_ON(ENERGEST_TYPE_LISTEN);
   receive_on = 1;
   COOJA_DEBUG_STR("cc2420_on2\n");
@@ -236,7 +244,7 @@ off(void)
   receive_on = 0;
 
   /* Wait for transmission to end before turning radio off. */
-  BUSYWAIT_UNTIL(!(status() & BV(CC2420_TX_ACTIVE)), RTIMER_SECOND / 100);
+//  BUSYWAIT_UNTIL(!(status() & BV(CC2420_TX_ACTIVE)), RTIMER_SECOND / 10);
 
   ENERGEST_OFF(ENERGEST_TYPE_LISTEN);
   strobe(CC2420_SRFOFF);
@@ -283,8 +291,8 @@ set_txpower(uint8_t power)
   setreg(CC2420_TXCTRL, reg);
 }
 /*---------------------------------------------------------------------------*/
-#define AUTOACK (1 << 4)
-#define ADR_DECODE (1 << 11)
+#define AUTOACK ((unsigned)(1 << 4))
+#define ADR_DECODE ((unsigned)(1 << 11))
 #define RXFIFO_PROTECTION (1 << 9)
 #define CORR_THR(n) (((n) & 0x1f) << 6)
 #define FIFOP_THR(n) ((n) & 0x7f)
@@ -322,7 +330,9 @@ cc2420_init(void)
 
   /* Turn on/off automatic packet acknowledgment and address decoding. */
   reg = getreg(CC2420_MDMCTRL0);
-  reg = (reg & ~AUTOACK) | ADR_DECODE;
+  reg = ((reg & ~AUTOACK) | ADR_DECODE);
+//  reg = ((reg & ~AUTOACK) & ~ADR_DECODE);
+
   setreg(CC2420_MDMCTRL0, reg);
 
   /* Set transmission turnaround time to the lower setting (8 symbols
@@ -352,7 +362,9 @@ cc2420_init(void)
   cc2420_set_cca_threshold(CC2420_CONF_CCA_THRESH);
   cc2420_set_txpower(CC2420_CONF_TX_POWER);
 
-  flushrx();
+	flushrx();
+  CC2420_CLEAR_FIFOP_INT();
+
   memb_init(&rf_memb);
   list_init(rf_list);
   process_start(&cc2420_process, NULL);
@@ -403,7 +415,6 @@ cc2420_transmit(unsigned short payload_len)
 			/* We need to explicitly turn off the radio,
 			 * since STXON[CCA] -> TX_ACTIVE -> RX_ACTIVE */
 			off();
-
       RELEASE_LOCK();
       return RADIO_TX_OK;
     }
@@ -479,11 +490,11 @@ cc2420_off(void)
      we don't actually switch the radio off now, but signal that the
      driver should switch off the radio once the packet has been
      received and processed, by setting the 'lock_off' variable. */
-//  if(status() & BV(CC2420_TX_ACTIVE)) {
-//    lock_off = 1;
-//  } else {
-//		off();
-//  }
+  if(status() & BV(CC2420_TX_ACTIVE)) {
+    lock_off = 1;
+  } else {
+		off();
+  }
 //  while(status() & BV(CC2420_TX_ACTIVE));
   off();
   RELEASE_LOCK();
@@ -532,7 +543,7 @@ cc2420_set_channel(int c)
   BUSYWAIT_UNTIL((status() & (BV(CC2420_XOSC16M_STABLE))), RTIMER_SECOND / 10);
 
   /* Wait for any transmission to end. */
-//  BUSYWAIT_UNTIL(!(status() & BV(CC2420_TX_ACTIVE)), RTIMER_SECOND / 10);
+  BUSYWAIT_UNTIL(!(status() & BV(CC2420_TX_ACTIVE)), RTIMER_SECOND / 10);
 
   setreg(CC2420_FSCTRL, f);
 
@@ -718,7 +729,7 @@ cc2420_sfd_sync(uint8_t capture_start_sfd, uint8_t capture_end_sfd)
   TBCCTL1 &= ~CCIE;
   /* Start Timer_B in continuous mode. */
   TBR = RTIMER_NOW();
-  TBCTL |= MC1;
+//  TBCTL |= MC1;
 
 }
 /*---------------------------------------------------------------------------*/
@@ -730,7 +741,7 @@ uint16_t cc2420_read_sfd_timer(void) {
 }
 /*---------------------------------------------------------------------------*/
 static uint8_t extrabuf[ACK_LEN]={0};
-struct received_frame_s *last_rf=NULL;
+volatile struct received_frame_s *last_rf=NULL;
 
 int
 cc2420_interrupt(void)
@@ -747,6 +758,7 @@ cc2420_interrupt(void)
   uint8_t frame_valid = 0;
   struct received_frame_s *rf = NULL;
   unsigned char* buf_ptr = NULL;
+  need_ack=0;
 
 #if CC2420_TIMETABLE_PROFILING
   timetable_clear(&cc2420_timetable);
@@ -756,14 +768,11 @@ cc2420_interrupt(void)
   last_packet_timestamp = cc2420_sfd_start_time;
   process_poll(&cc2420_process);
   /* If the lock is taken, we cannot access the FIFO. */
-  if(locked || need_flush || !CC2420_FIFO_IS_1) {
+
+  if(locked || need_flush) {
     need_flush = 1;
-    /* Wait for end of reception */
-    BUSYWAIT_UNTIL(!CC2420_SFD_IS_1, RTIMER_SECOND / 100);
-		COOJA_DEBUG_STR("! locked || need_flush || !CC2420_FIFO_IS_1 end CC2420_SFD_IS_1");
-		rx_end_time = cc2420_read_sfd_timer();
-		off();
-    CC2420_CLEAR_FIFOP_INT();
+    rx_end_time = 0;
+		CC2420_CLEAR_FIFOP_INT();
   	if(interrupt_exit_callback != NULL) {
   		interrupt_exit_callback(0, 0, NULL);
   	}
@@ -771,20 +780,28 @@ cc2420_interrupt(void)
   }
 
   GET_LOCK();
-  CC2420_READ_FIFO_BYTE(len);
-  if(len > CC2420_MAX_PACKET_LEN || len <= AUX_LEN) {
-  	COOJA_DEBUG_STR("! len > CC2420_MAX_PACKET_LEN || len <= AUX_LEN");
+
+  if(!CC2420_FIFO_IS_1) {
+  	rx_end_time = 0;
     flushrx();
     CC2420_CLEAR_FIFOP_INT();
-    /* Wait for end of reception */
-    BUSYWAIT_UNTIL(!CC2420_SFD_IS_1, RTIMER_SECOND / 100);
-		rx_end_time = cc2420_read_sfd_timer();
-		off();
     RELEASE_LOCK();
-  	if(interrupt_exit_callback != NULL) {
-  		interrupt_exit_callback(0, 0, NULL);
-  	}
-  	return 0;
+    if(interrupt_exit_callback != NULL) {
+    	interrupt_exit_callback(0, 0, NULL);
+    }
+    return 0;
+  }
+
+  CC2420_READ_FIFO_BYTE(len);
+  if(len > CC2420_MAX_PACKET_LEN || len <= AUX_LEN) {
+  	rx_end_time = 0;
+    flushrx();
+    CC2420_CLEAR_FIFOP_INT();
+    RELEASE_LOCK();
+    if(interrupt_exit_callback != NULL) {
+    	interrupt_exit_callback(0, 0, NULL);
+    }
+    return 0;
   }
 
 	len -= AUX_LEN;
@@ -887,37 +904,46 @@ cc2420_interrupt(void)
 /*---------------------------------------------------------------------------*/
 void
 cc2420_send_ack(void) {
-	COOJA_DEBUG_STR("Send ACK");
-	on();
-	strobe(CC2420_STXON); /* Send ACK */
-  /* Wait for transmission to end before turning radio off. */
-  BUSYWAIT_UNTIL(!(status() & BV(CC2420_TX_ACTIVE)), RTIMER_SECOND / 100);
-  off();
-	CC2420_STROBE(CC2420_SFLUSHTX); /* Flush Tx fifo */
-	rx_end_time = 0;
+  if(!locked) {
+		GET_LOCK();
+		COOJA_DEBUG_STR("Send ACK");
+		on();
+	  BUSYWAIT_UNTIL(!(status() & BV(CC2420_TX_ACTIVE)), delayRx);
+//		strobe(CC2420_SACK); /* Send standard ACK */
+		strobe(CC2420_STXON); /* Send ACK */
+		/* Wait for transmission to end before turning radio off. */
+		BUSYWAIT_UNTIL(!(status() & BV(CC2420_TX_ACTIVE)), 2*wdAckDuration);
+		off();
+		CC2420_STROBE(CC2420_SFLUSHTX); /* Flush Tx fifo */
+		RELEASE_LOCK();
+  }
+  rx_end_time = 0;
 }
 /*---------------------------------------------------------------------------*/
 int
 cc2420_read_ack(void *buf, int alen) {
-  GET_LOCK();
-  BUSYWAIT_UNTIL(!CC2420_SFD_IS_1, RTIMER_SECOND / 100);
-  int len, footer1;
-  CC2420_READ_FIFO_BYTE(len);
-  if(buf && len>0) {
-  	alen = (len > alen) ? alen : len ;
-  	COOJA_DEBUG_STR("ACK len>0");
-		int overflow = CC2420_FIFOP_IS_1 && !CC2420_FIFO_IS_1;
-		CC2420_READ_RAM_BYTE(footer1, RXFIFO_ADDR(len + AUX_LEN));
-		if(!overflow && (footer1 & FOOTER1_CRC_OK)) { /* CRC is correct */
-	  	COOJA_DEBUG_STR("ACK !overflow && (footer1 & FOOTER1_CRC_OK)");
-			CC2420_READ_FIFO_BUF(buf, len);
-			len = (((uint8_t*)buf)[0] & 7) == FRAME802154_ACKFRAME ? len : -1;
-		} else {
-			len = 0;
+  uint8_t len=0, footer1=0, overflow=0;
+	if (!locked) {
+		GET_LOCK();
+		BUSYWAIT_UNTIL(!CC2420_SFD_IS_1, delayRx);
+		CC2420_READ_FIFO_BYTE(len);
+		if (buf && len > AUX_LEN) {
+			len -= AUX_LEN;
+			alen = (len > alen) ? alen : len;
+			overflow = CC2420_FIFOP_IS_1 && !CC2420_FIFO_IS_1;
+			if (!overflow) {
+				CC2420_READ_RAM_BYTE(footer1, RXFIFO_ADDR(len + AUX_LEN));
+				/* CRC is correct */
+				if ((footer1 & FOOTER1_CRC_OK)) {
+					CC2420_READ_FIFO_BUF(buf, alen);
+//				len = ( ((uint8_t*)buf)[0] & 7 == FRAME802154_ACKFRAME ) ? len : 0;
+				}
+			}
 		}
+		flushrx();
+		CC2420_CLEAR_FIFOP_INT();
+		RELEASE_LOCK();
   }
-  CC2420_CLEAR_FIFOP_INT();
-  RELEASE_LOCK();
   return len;
 }
 /*---------------------------------------------------------------------------*/
@@ -941,6 +967,7 @@ PROCESS_THREAD(cc2420_process, ev, data)
       need_flush = 0;
       GET_LOCK();
       flushrx();
+      CC2420_CLEAR_FIFOP_INT();
       RELEASE_LOCK();
       COOJA_DEBUG_STR("cc2420_process: need_flush\n");
     }
@@ -1142,5 +1169,12 @@ cc2420_address_decode(uint8_t enable)
 int
 cc2420_pending_irq(void)
 {
-  return CC2420_FIFO_IS_1;
+  return CC2420_FIFOP_IS_1;
+}
+/*---------------------------------------------------------------------------*/
+void
+cc2420_flush(void)
+{
+	flushrx();
+	CC2420_CLEAR_FIFOP_INT();
 }
