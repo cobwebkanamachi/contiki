@@ -32,13 +32,13 @@
 
 enum ieee154e_atomicdurations_enum {
 	// time-slot related
-	TsCCAOffset=98,										//3000us
+	TsCCAOffset= 33, //1000us //98,										//3000us
 	TsCCA=14,												//~500us
 	TsRxTx=16,												//500us
-	TsTxOffset = 131,                  //  4000us
+	TsTxOffset = 98,//3000us //131,                  //  4000us
 	TsLongGT = 43,                  //  1300us
-//	TsTxAckDelay = 131,                  //  4000us
-	TsTxAckDelay = 99,                  //  3000us
+	TsTxAckDelay = 160, //131,                  //  4000us
+//	TsTxAckDelay = 99,                  //  3000us
 //	TsShortGT = 16,                  //   500us
 	TsShortGT = 43,                  //  1300us
 	TsSlotDuration = PORT_TsSlotDuration,  // 15000us

@@ -931,7 +931,8 @@ cc2420_read_ack(void *buf, int alen) {
 			len -= AUX_LEN;
 			alen = (len > alen) ? alen : len;
 			overflow = CC2420_FIFOP_IS_1 && !CC2420_FIFO_IS_1;
-			if (!overflow) {
+//			if (!overflow)
+			{
 				CC2420_READ_RAM_BYTE(footer1, RXFIFO_ADDR(len + AUX_LEN));
 				/* CRC is correct */
 				if ((footer1 & FOOTER1_CRC_OK)) {
