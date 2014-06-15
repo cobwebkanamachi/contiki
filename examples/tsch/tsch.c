@@ -1429,13 +1429,14 @@ PROCESS_THREAD(tsch_associate, ev, data)
 						//XXX choose something else?
 						if(!first_associate /* || my_rpl_dag->rank == 256 ??*/) {
 							ieee154e_vars.join_priority = 0;
-							first_associate = 1;
 						} else {
 							ieee154e_vars.join_priority = 0xf0;
 						}
 					}
 				}
 			}
+			//XXX there should be a better way of handling rpl, and erasing rank, dag etc. on resync
+			first_associate = 1;
 			//if this is root start now
 			if(ieee154e_vars.join_priority == 0) {
 				COOJA_DEBUG_STR("rpl root");
