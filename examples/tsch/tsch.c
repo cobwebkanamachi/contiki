@@ -565,7 +565,7 @@ schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
 {
 	/* A non-zero status should signal to powercycle a missed deadline */
 	int r, status = 0;
-	rtimer_clock_t now = RTIMER_NOW() + 1;
+	rtimer_clock_t now = RTIMER_NOW() + 2;
 	ref_time += duration;
 	if (ref_time - now > duration+5) {
 		COOJA_DEBUG_STR("schedule_fixed: missed deadline!\n");
@@ -985,30 +985,43 @@ SEND_METHOD:
 						rtimer_clock_t ack_sfd_rtime = 0;
 						is_broadcast = rimeaddr_cmp(cell->node_address, &rimeaddr_null);
 						//wait before RX
-						schedule_fixed(t, ieee154e_vars.start, TsTxOffset - TsLongGT);
+						schedule_fixed(t, ieee154e_vars.start, TsTxOffset - TsLongGT - delayRx);
 						COOJA_DEBUG_STR("schedule RX on guard time - TsLongGT");
 						PT_YIELD(&mpt);
 						//Start radio for at least guard time
 						on();
 						COOJA_DEBUG_STR("RX on -TsLongGT");
 						uint8_t cca_status = 0;
-						cca_status = (!NETSTACK_RADIO.channel_clear()
-								|| NETSTACK_RADIO.pending_packet()
-								|| NETSTACK_RADIO.receiving_packet());
 						//Check if receiving within guard time
-						schedule_fixed(t, ieee154e_vars.start, TsTxOffset + TsLongGT);
-						PT_YIELD(&mpt);
-						COOJA_DEBUG_STR("RX on +TsLongGT");
+//						schedule_fixed(t, ieee154e_vars.start, TsTxOffset + TsLongGT);
+//						PT_YIELD(&mpt);
+//						COOJA_DEBUG_STR("RX on +TsLongGT");
+//
+//						if (!(NETSTACK_RADIO_get_rx_end_time() || cca_status || NETSTACK_RADIO.pending_packet()
+//								|| !NETSTACK_RADIO.channel_clear()
+//								|| NETSTACK_RADIO.receiving_packet())) {
+//							off(keep_radio_on);
+//							//no packets on air
+//							ret = 0;
+//						} else
 
-						if (!(NETSTACK_RADIO_get_rx_end_time() || cca_status || NETSTACK_RADIO.pending_packet()
-								|| !NETSTACK_RADIO.channel_clear()
-								|| NETSTACK_RADIO.receiving_packet())) {
+						waiting_for_radio_interrupt = 1;
+
+						BUSYWAIT_UNTIL_ABS(NETSTACK_RADIO.receiving_packet(),
+								ieee154e_vars.start, TsTxOffset + TsLongGT);
+//						BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
+//								ieee154e_vars.start, TsTxOffset + TsLongGT + wdAckDuration);
+//						off(keep_radio_on);
+						int	cc2420_pending_irq(void);
+						if(!NETSTACK_RADIO.receiving_packet() && !cc2420_pending_irq()) {
 							off(keep_radio_on);
 							//no packets on air
 							ret = 0;
 						} else {
-							uint16_t expected_rx = ieee154e_vars.start + TsTxOffset;
-							uint16_t rx_duration = NETSTACK_RADIO_get_rx_end_time() - (ieee154e_vars.start + TsTxOffset);
+							int cc2420_read_fifo(void);
+							cc2420_read_fifo();
+//							uint16_t expected_rx = ieee154e_vars.start + TsTxOffset;
+//							uint16_t rx_duration = NETSTACK_RADIO_get_rx_end_time() - (ieee154e_vars.start + TsTxOffset);
 							off(keep_radio_on);
 							/* wait until ack time */
 							if (need_ack) {
@@ -1027,7 +1040,7 @@ SEND_METHOD:
 								COOJA_DEBUG_PRINTF("drift seen %d\n", last_drift);
 								// check the source address for potential time-source match
 								n = neighbor_queue_from_addr(&last_rf->source_address);
-								if(n) COOJA_DEBUG_ADDR(&last_rf->source_address);
+								if(n) {COOJA_DEBUG_ADDR(&last_rf->source_address);}
 								if(n != NULL && n->is_time_source) {
 									// should be the average of drifts to all time sources
 									drift_correction -= last_drift;
@@ -1044,7 +1057,7 @@ SEND_METHOD:
 					}
 				}
 			}
-			COOJA_DEBUG_PRINTF("ASN %lu TS %u", ieee154e_vars.asn.asn_4lsb, timeslot);
+//			COOJA_DEBUG_PRINTF("ASN %lu TS %u", ieee154e_vars.asn.asn_4lsb, timeslot);
 
 			uint16_t dt, duration, next_timeslot;
 			next_timeslot = get_next_on_timeslot(timeslot);

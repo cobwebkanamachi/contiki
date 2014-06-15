@@ -35,12 +35,12 @@ enum ieee154e_atomicdurations_enum {
 	TsCCAOffset= 33, //1000us //98,										//3000us
 	TsCCA=14,												//~500us
 	TsRxTx=16,												//500us
-	TsTxOffset = 98,//3000us //131,                  //  4000us
+	TsTxOffset = 131,                  //  4000us
 	TsLongGT = 43,                  //  1300us
 	TsTxAckDelay = 131,                  //  4000us
 //	TsTxAckDelay = 99,                  //  3000us
 //	TsShortGT = 16,                  //   500us
-	TsShortGT = 43,                  //  1300us
+	TsShortGT = 32,                  //  1000us
 	TsSlotDuration = PORT_TsSlotDuration,  // 15000us
 	// execution speed related
 	maxTxDataPrepare = PORT_maxTxDataPrepare,
