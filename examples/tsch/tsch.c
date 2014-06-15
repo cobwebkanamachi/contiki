@@ -1288,9 +1288,10 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 				&& ((last_rf->buf[1] & (2 | 32 | 128 | 64)) == (2 | 32 | 128 | 64))) {
 			if ((last_rf->buf[16] & 0xfe) == 0x34) { //sync IE? (0x1a << 1) ==0 0x34
 //				COOJA_DEBUG_STR("EB");
-				ieee154e_vars.asn.asn_4lsb = 0;
-				ieee154e_vars.asn.asn_4lsb = last_rf->buf[17] + (uint32_t)(last_rf->buf[18] << 8)
-						+ (uint32_t)(last_rf->buf[19] << 16) + (uint32_t)(last_rf->buf[20] << 24);
+				ieee154e_vars.asn.asn_4lsb = (uint32_t)last_rf->buf[17];
+				ieee154e_vars.asn.asn_4lsb += ((uint32_t)last_rf->buf[18] << (uint32_t)8);
+				ieee154e_vars.asn.asn_4lsb += ((uint32_t)last_rf->buf[19] << (uint32_t)16);
+				ieee154e_vars.asn.asn_4lsb += ((uint32_t)last_rf->buf[20] << (uint32_t)24);
 				ieee154e_vars.asn.asn_msb = last_rf->buf[21];
 				ieee154e_vars.join_priority = last_rf->buf[22]+1;
 				//XXX to disable reading the packet
@@ -1376,6 +1377,8 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 }
 /*---------------------------------------------------------------------------*/
 #include "net/rpl/rpl.h"
+/* on resynchronization, the node already has joined a rpl network and it is mistaking it with root */
+static volatile uint8_t first_associate =0;
 PROCESS_THREAD(tsch_associate, ev, data)
 {
 	PROCESS_BEGIN();
@@ -1393,10 +1396,10 @@ PROCESS_THREAD(tsch_associate, ev, data)
   	my_rpl_dag = NULL;
 		/* setup radio functions for intercepting EB */
 		NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
-		etimer_set(&periodic, CLOCK_SECOND);
+		etimer_set(&periodic, CLOCK_SECOND/10);
 		while(ieee154e_vars.state == TSCH_SEARCHING) {
-			timer_reset(&periodic);
 			PROCESS_YIELD();
+			timer_reset(&periodic);
 			NETSTACK_RADIO_sfd_sync(1, 1);
 //			COOJA_DEBUG_STR("waiting for RPL dag");
 
@@ -1405,10 +1408,18 @@ PROCESS_THREAD(tsch_associate, ev, data)
 			if(rpl != NULL) {
 				my_rpl_dag = rpl->current_dag;
 				if(my_rpl_dag != NULL) {
+					COOJA_DEBUG_PRINTF("rank %d", my_rpl_dag->rank);
+
 					ieee154e_vars.join_priority = (my_rpl_dag->rank) >> 16;
 					/* to make sure that this is a root and not just a low ranked node */
-					if(ieee154e_vars.join_priority == 0 && my_rpl_dag->rank != 0) {
-						ieee154e_vars.join_priority = my_rpl_dag->rank & 0xff;
+					if(ieee154e_vars.join_priority == 0 && my_rpl_dag->rank > 1) {
+						//XXX choose something else?
+						if(!first_associate /* || my_rpl_dag->rank == 256 ??*/) {
+							ieee154e_vars.join_priority = 0;
+							first_associate = 1;
+						} else {
+							ieee154e_vars.join_priority = 0xf0;
+						}
 					}
 				}
 			}
@@ -1425,6 +1436,8 @@ PROCESS_THREAD(tsch_associate, ev, data)
 				ieee154e_vars.start = RTIMER_NOW();
 				schedule_fixed(&t, ieee154e_vars.start, 5);
 				COOJA_DEBUG_STR("associate done");
+				// XXX for debugging
+				ieee154e_vars.asn.asn_4lsb = 0;
 			} else {
 				waiting_for_radio_interrupt = 1;
 				NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);

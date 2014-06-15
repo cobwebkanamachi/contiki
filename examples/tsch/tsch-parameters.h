@@ -4,7 +4,7 @@
 
 #define NACK_FLAG 0x8000
 
-#define RESYNCH_TIMEOUT ieee154e_vars.current_slotframe->length * 20
+#define RESYNCH_TIMEOUT ieee154e_vars.current_slotframe->length * 10
 #define KEEPALIVE_TIMEOUT ieee154e_vars.current_slotframe->length * 3
 
 // Atomic durations
@@ -37,7 +37,7 @@ enum ieee154e_atomicdurations_enum {
 	TsRxTx=16,												//500us
 	TsTxOffset = 98,//3000us //131,                  //  4000us
 	TsLongGT = 43,                  //  1300us
-	TsTxAckDelay = 160, //131,                  //  4000us
+	TsTxAckDelay = 131,                  //  4000us
 //	TsTxAckDelay = 99,                  //  3000us
 //	TsShortGT = 16,                  //   500us
 	TsShortGT = 43,                  //  1300us

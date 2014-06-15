@@ -374,12 +374,9 @@ cc2420_init(void)
 static int
 cc2420_transmit(unsigned short payload_len)
 {
-  int i, txpower;
-  uint8_t total_len;
+  int i;
 
   GET_LOCK();
-
-  total_len = payload_len + AUX_LEN;
 
   /* The TX FIFO can only hold one packet. Make sure to not overrun
    * FIFO by waiting for transmission to start here and synchronizing
@@ -910,10 +907,11 @@ cc2420_send_ack(void) {
 		on();
 	  BUSYWAIT_UNTIL(!(status() & BV(CC2420_TX_ACTIVE)), delayRx);
 //		strobe(CC2420_SACK); /* Send standard ACK */
-		strobe(CC2420_STXON); /* Send ACK */
-		/* Wait for transmission to end before turning radio off. */
-		BUSYWAIT_UNTIL(!(status() & BV(CC2420_TX_ACTIVE)), 2*wdAckDuration);
-		off();
+//		strobe(CC2420_STXON); /* Send ACK */
+//		/* Wait for transmission to end before turning radio off. */
+//		BUSYWAIT_UNTIL(!(status() & BV(CC2420_TX_ACTIVE)), 2*wdAckDuration);
+//		off();
+	  cc2420_transmit(0);
 		CC2420_STROBE(CC2420_SFLUSHTX); /* Flush Tx fifo */
 		RELEASE_LOCK();
   }
