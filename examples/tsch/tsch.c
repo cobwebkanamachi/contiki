@@ -823,6 +823,9 @@ SEND_METHOD:
 								NETSTACK_RADIO_sfd_sync(0, 0);
 								schedule_fixed(t, ieee154e_vars.start,
 										TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayTx);
+								void
+								cc2420_address_decode(uint8_t enable);
+								cc2420_address_decode(0);
 								PT_YIELD(&mpt);
 //								BUSYWAIT_UNTIL_ABS(False,
 //										ieee154e_vars.start, TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayRx);
@@ -834,7 +837,7 @@ SEND_METHOD:
 								BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
 										ieee154e_vars.start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT + wdAckDuration);
 								len = NETSTACK_RADIO_read_ack(ackbuf, ACK_LEN + EXTRA_ACK_LEN);
-
+								cc2420_address_decode(1);
 								waiting_for_radio_interrupt = 0;
 								if (2 == ackbuf[0] && len >= ACK_LEN && seqno == ackbuf[2]) {
 									success = RADIO_TX_OK;
@@ -987,6 +990,7 @@ SEND_METHOD:
 						//wait before RX
 						schedule_fixed(t, ieee154e_vars.start, TsTxOffset - TsLongGT - delayRx);
 						COOJA_DEBUG_STR("schedule RX on guard time - TsLongGT");
+						NETSTACK_RADIO_sfd_sync(1, 1);
 						PT_YIELD(&mpt);
 						//Start radio for at least guard time
 						on();
@@ -1021,11 +1025,12 @@ SEND_METHOD:
 							int cc2420_read_fifo(void);
 							cc2420_read_fifo();
 //							uint16_t expected_rx = ieee154e_vars.start + TsTxOffset;
-//							uint16_t rx_duration = NETSTACK_RADIO_get_rx_end_time() - (ieee154e_vars.start + TsTxOffset);
+							uint16_t rx_duration = NETSTACK_RADIO_get_rx_end_time() - last_rf->sfd_timestamp;
 							off(keep_radio_on);
 							/* wait until ack time */
 							if (need_ack) {
-								schedule_fixed(t, NETSTACK_RADIO_get_rx_end_time(), TsTxAckDelay - delayTx);
+//								schedule_fixed(t, NETSTACK_RADIO_get_rx_end_time(), TsTxAckDelay - delayTx);
+								schedule_fixed(t, last_rf->sfd_timestamp, rx_duration + TsTxAckDelay - delayTx);
 								PT_YIELD(&mpt);
 								NETSTACK_RADIO_send_ack();
 							}
@@ -1477,8 +1482,8 @@ void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet
 	/* ackbuf[1+ACK_LEN + EXTRA_ACK_LEN] = {ACK_LEN + EXTRA_ACK_LEN + AUX_LEN, 0x02, 0x00, seqno, 0x02, 0x1e, ack_status_LSB, ack_status_MSB}; */
 	ackbuf[1] = 0x02; /* ACK frame */
 	ackbuf[3] = seqno;
-//	ackbuf[2] = 0x00; /* b9:IE-list-present=1 - b12-b13:frame version=2 */
-//	ackbuf[0] = 3; /*length*/
+	ackbuf[2] = 0x00; /* b9:IE-list-present=1 - b12-b13:frame version=2 */
+	ackbuf[0] = 3; /*length*/
 	/* Append IE timesync */
 	ackbuf[2] = 0x22; /* b9:IE-list-present=1 - b12-b13:frame version=2 */
 	add_sync_IE(&ackbuf[4], time_difference_32, nack);

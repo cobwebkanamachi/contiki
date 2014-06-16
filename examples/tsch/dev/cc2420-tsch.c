@@ -1030,6 +1030,8 @@ cc2420_read_fifo(void)
 
 	/* Wait for end of reception */
   BUSYWAIT_UNTIL(!CC2420_SFD_IS_1, wdDataDuration);
+  //XXX arbitrary delay to get SFD capture timer stable (does it work?)
+  BUSYWAIT_UNTIL(0, 5);
 
 	//read time of down edge of SFD
 	rx_end_time = cc2420_read_sfd_timer();
