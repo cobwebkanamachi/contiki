@@ -45,7 +45,7 @@
 #include <string.h>
 
 #define UDP_PORT 4000
-#define REMOTE_UDP_PORT 4001
+#define REMOTE_UDP_PORT 0
 
 #define SEND_INTERVAL		(CLOCK_SECOND/2)
 #define SEND_TIME		(/*random_rand() %*/ (SEND_INTERVAL))
@@ -66,7 +66,7 @@ receiver(struct simple_udp_connection *c,
          const uint8_t *data,
          uint16_t datalen)
 {
-  printf("Data %d received on port %d from port %d with length %d\n",
+  printf("Data %d received on port %d from port %u with length %d\n",
          data[0], receiver_port, sender_port, datalen);
   leds_arch_set(data[0]);
 }
@@ -114,8 +114,8 @@ PROCESS_THREAD(broadcast_example_process, ev, data)
   leds_init();
   int
   cc2420_set_channel(int c);
+  cc2420_set_channel(20);
 
-  cc2420_set_channel(CC2420_CONF_CHANNEL);
   set_global_address();
 
   simple_udp_register(&broadcast_connection, UDP_PORT,
@@ -129,10 +129,15 @@ PROCESS_THREAD(broadcast_example_process, ev, data)
 //    etimer_set(&send_timer, SEND_TIME);
 //
 //    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&send_timer));
-    printf("Sending broadcast\n");
+
     uip_create_linklocal_allnodes_mcast(&addr);
     i++;
-    simple_udp_sendto(&broadcast_connection, &i, 1, &addr);
+    //simple_udp_sendto(&broadcast_connection, &i, 1, &addr);
+    {
+    	printf("Sending broadcast %d port %d\n", i, UDP_PORT);
+      uip_udp_packet_sendto(broadcast_connection.udp_conn, &i, 1,
+      		&addr, UIP_HTONS(UDP_PORT));
+    }
     leds_blink();
   }
 

@@ -1,4 +1,5 @@
 APP_BASE ?= $(abspath .)
+TARGET ?= sky
 UIP_CONF_IPV6=1
 CFLAGS += -DPROJECT_CONF_H=\"project-conf.h\"
 SMALL = 1
