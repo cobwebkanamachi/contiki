@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2011, Swedish Institute of Computer Science.
+ * All rights reserved.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -30,98 +33,42 @@
 #include "contiki.h"
 #include "lib/random.h"
 #include "sys/ctimer.h"
+#include "sys/etimer.h"
 #include "net/uip.h"
 #include "net/uip-ds6.h"
-#include "net/uip-udp-packet.h"
-#include "sys/ctimer.h"
-#ifdef WITH_COMPOWER
-#include "powertrace.h"
-#endif
+
+#include "simple-udp.h"
+
+#include "leds.h"
+
 #include <stdio.h>
 #include <string.h>
 
-#define UDP_CLIENT_PORT 4000
-#define UDP_SERVER_PORT 5678
+#define UDP_PORT 4000
+#define REMOTE_UDP_PORT 4001
 
-#define UDP_EXAMPLE_ID  190
+#define SEND_INTERVAL		(CLOCK_SECOND/2)
+#define SEND_TIME		(/*random_rand() %*/ (SEND_INTERVAL))
 
-#if 0
-#include "cooja-debug.h"
-#define PRINTF COOJA_DEBUG_PRINTF
-#define PRINT6ADDR COOJA_DEBUG_ADDR16
-#elif 1
-//#define DEBUG DEBUG_PRINT
-//#include "net/uip-debug.h"
-void uip_debug_ipaddr_print(const uip_ipaddr_t *addr);
-void uip_debug_lladdr_print(const uip_lladdr_t *addr);
-#define PRINTF(...) printf(__VA_ARGS__)
-#define PRINT6ADDR(addr) uip_debug_ipaddr_print(addr)
-#else
-#define PRINTF(...)
-#define PRINT6ADDR(...)
-#endif
-
-#ifndef PERIOD
-#define PERIOD 15
-#endif
-
-#define START_INTERVAL		(15 * CLOCK_SECOND)
-#define SEND_INTERVAL		(PERIOD * CLOCK_SECOND)
-#define SEND_TIME		(random_rand() % (SEND_INTERVAL))
-#define MAX_PAYLOAD_LEN		30
-
-static struct uip_udp_conn *client_conn;
+static struct simple_udp_connection broadcast_connection;
 static uip_ipaddr_t server_ipaddr;
 
 /*---------------------------------------------------------------------------*/
-PROCESS(udp_client_process, "UDP client process");
-AUTOSTART_PROCESSES(&udp_client_process);
+PROCESS(broadcast_example_process, "UDP broadcast example process");
+AUTOSTART_PROCESSES(&broadcast_example_process);
 /*---------------------------------------------------------------------------*/
 static void
-tcpip_handler(void)
+receiver(struct simple_udp_connection *c,
+         const uip_ipaddr_t *sender_addr,
+         uint16_t sender_port,
+         const uip_ipaddr_t *receiver_addr,
+         uint16_t receiver_port,
+         const uint8_t *data,
+         uint16_t datalen)
 {
-  char *str;
-
-  if(uip_newdata()) {
-    str = uip_appdata;
-    str[uip_datalen()] = '\0';
-    PRINTF("DATA recv '%s'\n", str);
-  }
-}
-/*---------------------------------------------------------------------------*/
-static void
-send_packet(void *ptr)
-{
-  static int seq_id;
-  char buf[MAX_PAYLOAD_LEN];
-
-  seq_id++;
-  sprintf(buf, "%d::Hello %d", seq_id, rimeaddr_node_addr.u8[RIMEADDR_SIZE-1]);
-  PRINTF("DATA send to %d '%s'\n",
-           server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1], buf);
-  uip_udp_packet_sendto(client_conn, buf, strlen(buf),
-                        &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
-}
-/*---------------------------------------------------------------------------*/
-static void
-print_local_addresses(void)
-{
-  int i;
-  uint8_t state;
-
-  PRINTF("Client IPv6 addresses: ");
-  for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
-    state = uip_ds6_if.addr_list[i].state;
-    if(uip_ds6_if.addr_list[i].isused &&
-       (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
-      PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
-      PRINTF("\n");
-      /* hack to make address "final" */
-      if (state == ADDR_TENTATIVE) {
-      	uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
-      }
-    }
-  }
+  printf("Data %d received on port %d from port %d with length %d\n",
+         data[0], receiver_port, sender_port, datalen);
+  leds_arch_set(data[0]);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -143,11 +90,11 @@ set_global_address(void)
  *
  * Note the IPCMV6 checksum verification depends on the correct uncompressed addresses.
  */
- 
-#if 0
+
+#if 1
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
-#elif 1
+#elif 0
 /* Mode 2 - 16 bits inline */
   uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
 #else
@@ -156,62 +103,37 @@ set_global_address(void)
 #endif
 }
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(udp_client_process, ev, data)
+PROCESS_THREAD(broadcast_example_process, ev, data)
 {
-  static struct etimer periodic;
-  static struct ctimer backoff_timer;
-#if WITH_COMPOWER
-  static int print = 0;
-#endif
+  static struct etimer periodic_timer;
+  static struct etimer send_timer;
+  static uint8_t i =0;
+  uip_ipaddr_t addr;
 
   PROCESS_BEGIN();
+  leds_init();
+  int
+  cc2420_set_channel(int c);
 
-  PROCESS_PAUSE();
-
+  cc2420_set_channel(CC2420_CONF_CHANNEL);
   set_global_address();
-  
-  PRINTF("UDP client process started\n");
 
-  print_local_addresses();
+  simple_udp_register(&broadcast_connection, UDP_PORT,
+                      NULL, REMOTE_UDP_PORT,
+                      receiver);
 
-  /* new connection with remote host */
-  client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL); 
-  if(client_conn == NULL) {
-    PRINTF("No UDP connection available, exiting the process!\n");
-    PROCESS_EXIT();
-  }
-  udp_bind(client_conn, UIP_HTONS(UDP_CLIENT_PORT)); 
-
-  PRINTF("Created a connection with the server ");
-  PRINT6ADDR(&client_conn->ripaddr);
-  PRINTF(" local/remote port %u/%u\n",
-	UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
-
-#if WITH_COMPOWER
-  powertrace_sniff(POWERTRACE_ON);
-#endif
-
-  etimer_set(&periodic, SEND_INTERVAL);
+  etimer_set(&periodic_timer, SEND_INTERVAL);
   while(1) {
-    PROCESS_YIELD();
-    if(ev == tcpip_event) {
-      tcpip_handler();
-    }
-    
-    if(etimer_expired(&periodic)) {
-      etimer_reset(&periodic);
-      ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);
-
-#if WITH_COMPOWER
-      if (print == 0) {
-	powertrace_print("#P");
-      }
-      if (++print == 3) {
-	print = 0;
-      }
-#endif
-
-    }
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
+    etimer_reset(&periodic_timer);
+//    etimer_set(&send_timer, SEND_TIME);
+//
+//    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&send_timer));
+    printf("Sending broadcast\n");
+    uip_create_linklocal_allnodes_mcast(&addr);
+    i++;
+    simple_udp_sendto(&broadcast_connection, &i, 1, &addr);
+    leds_blink();
   }
 
   PROCESS_END();

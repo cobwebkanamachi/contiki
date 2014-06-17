@@ -28,17 +28,22 @@
  */
 
 #include "contiki.h"
-#include "contiki-lib.h"
-#include "contiki-net.h"
+#include "lib/random.h"
+#include "sys/ctimer.h"
 #include "net/uip.h"
-#include "net/rpl/rpl.h"
-
-#include "net/netstack.h"
-#include "dev/button-sensor.h"
+#include "net/uip-ds6.h"
+#include "net/uip-udp-packet.h"
+#include "sys/ctimer.h"
+#ifdef WITH_COMPOWER
+#include "powertrace.h"
+#endif
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
+
+#define UDP_CLIENT_PORT 4000
+#define UDP_SERVER_PORT 0
+
+#define UDP_EXAMPLE_ID  190
 
 #if 0
 #include "cooja-debug.h"
@@ -56,42 +61,46 @@ void uip_debug_lladdr_print(const uip_lladdr_t *addr);
 #define PRINT6ADDR(...)
 #endif
 
-#define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
+#ifndef PERIOD
+#define PERIOD 15
+#endif
 
-#define UDP_CLIENT_PORT	4000
-#define UDP_SERVER_PORT	5678
-
-#define UDP_EXAMPLE_ID  190
-#define SERVER_REPLY 0
+#define START_INTERVAL		(15 * CLOCK_SECOND)
+#define SEND_INTERVAL		(PERIOD * CLOCK_SECOND)
+#define SEND_TIME		(random_rand() % (SEND_INTERVAL))
 #define MAX_PAYLOAD_LEN		30
 
-static struct uip_udp_conn *server_conn;
+static struct uip_udp_conn *client_conn;
+static uip_ipaddr_t server_ipaddr;
 
-PROCESS(udp_server_process, "UDP server process");
-AUTOSTART_PROCESSES(&udp_server_process);
+/*---------------------------------------------------------------------------*/
+PROCESS(udp_client_process, "UDP client process");
+AUTOSTART_PROCESSES(&udp_client_process);
 /*---------------------------------------------------------------------------*/
 static void
 tcpip_handler(void)
 {
-  char *appdata;
-  char buf[MAX_PAYLOAD_LEN];
+  char *str;
 
   if(uip_newdata()) {
-    appdata = (char *)uip_appdata;
-    appdata[uip_datalen()] = 0;
-    PRINTF("DATA recv '%s' from %d\n", appdata, UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 1]);
-#if SERVER_REPLY
-    if(uip_datalen()>MAX_PAYLOAD_LEN/2) {
-    	appdata[MAX_PAYLOAD_LEN/2] = 0;
-    }
-    sprintf(buf, "%d::Reply::%s", rimeaddr_node_addr.u8[RIMEADDR_SIZE-1], appdata);
-    PRINTF("DATA sending '%s'\n", buf);
-
-    uip_ipaddr_copy(&server_conn->ripaddr, &UIP_IP_BUF->srcipaddr);
-    uip_udp_packet_send(server_conn, buf, strlen(buf));
-    uip_create_unspecified(&server_conn->ripaddr);
-#endif
+    str = uip_appdata;
+    str[uip_datalen()] = '\0';
+    PRINTF("DATA recv '%s'\n", str);
   }
+}
+/*---------------------------------------------------------------------------*/
+static void
+send_packet(void *ptr)
+{
+  static int seq_id;
+  char buf[MAX_PAYLOAD_LEN];
+
+  seq_id++;
+  sprintf(buf, "%d::Hello %d", seq_id, rimeaddr_node_addr.u8[RIMEADDR_SIZE-1]);
+  PRINTF("DATA send to %d '%s'\n",
+           server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1], buf);
+  uip_udp_packet_sendto(client_conn, buf, strlen(buf),
+                        &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -100,10 +109,11 @@ print_local_addresses(void)
   int i;
   uint8_t state;
 
-  PRINTF("Server IPv6 addresses: ");
+  PRINTF("Client IPv6 addresses: ");
   for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
     state = uip_ds6_if.addr_list[i].state;
-    if(state == ADDR_TENTATIVE || state == ADDR_PREFERRED) {
+    if(uip_ds6_if.addr_list[i].isused &&
+       (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
       PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
       PRINTF("\n");
       /* hack to make address "final" */
@@ -114,79 +124,96 @@ print_local_addresses(void)
   }
 }
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(udp_server_process, ev, data)
+static void
+set_global_address(void)
 {
   uip_ipaddr_t ipaddr;
-  struct uip_ds6_addr *root_if;
 
-  PROCESS_BEGIN();
+  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
+  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
+  uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
 
-  PROCESS_PAUSE();
-
-  SENSORS_ACTIVATE(button_sensor);
-
-  PRINTF("UDP server started\n");
-
-#if UIP_CONF_ROUTER
 /* The choice of server address determines its 6LoPAN header compression.
- * Obviously the choice made here must also be selected in udp-client.c.
+ * (Our address will be compressed Mode 3 since it is derived from our link-local address)
+ * Obviously the choice made here must also be selected in udp-server.c.
  *
  * For correct Wireshark decoding using a sniffer, add the /64 prefix to the 6LowPAN protocol preferences,
  * e.g. set Context 0 to aaaa::.  At present Wireshark copies Context/128 and then overwrites it.
  * (Setting Context 0 to aaaa::1111:2222:3333:4444 will report a 16 bit compressed address of aaaa::1111:22ff:fe33:xxxx)
- * Note Wireshark's IPCMV6 checksum verification depends on the correct uncompressed addresses.
+ *
+ * Note the IPCMV6 checksum verification depends on the correct uncompressed addresses.
  */
- 
+
 #if 0
 /* Mode 1 - 64 bits inline */
-   uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
+   uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
 /* Mode 2 - 16 bits inline */
-  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
+  uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
 #else
-/* Mode 3 - derived from link local (MAC) address */
-  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
-  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
+/* Mode 3 - derived from server link-local (MAC) address */
+  uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
+#endif
+}
+/*---------------------------------------------------------------------------*/
+PROCESS_THREAD(udp_client_process, ev, data)
+{
+  static struct etimer periodic;
+  static struct ctimer backoff_timer;
+#if WITH_COMPOWER
+  static int print = 0;
 #endif
 
-  uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
-  root_if = uip_ds6_addr_lookup(&ipaddr);
-  if(root_if != NULL) {
-    rpl_dag_t *dag;
-    dag = rpl_set_root(RPL_DEFAULT_INSTANCE,(uip_ip6addr_t *)&ipaddr);
-    uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
-    rpl_set_prefix(dag, &ipaddr, 64);
-    PRINTF("created a new RPL dag\n");
-  } else {
-    PRINTF("failed to create a new RPL DAG\n");
-  }
-#endif /* UIP_CONF_ROUTER */
-  
+  PROCESS_BEGIN();
+
+  PROCESS_PAUSE();
+  int
+  cc2420_set_channel(int c);
+
+  cc2420_set_channel(CC2420_CONF_CHANNEL);
+  set_global_address();
+
+  PRINTF("UDP client process started\n");
+
   print_local_addresses();
 
-  /* The data sink runs with a 100% duty cycle in order to ensure high 
-     packet reception rates. */
-  //NETSTACK_MAC.off(1);
-
-  server_conn = udp_new(NULL, UIP_HTONS(UDP_CLIENT_PORT), NULL);
-  if(server_conn == NULL) {
+  /* new connection with remote host */
+  client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL);
+  if(client_conn == NULL) {
     PRINTF("No UDP connection available, exiting the process!\n");
     PROCESS_EXIT();
   }
-  udp_bind(server_conn, UIP_HTONS(UDP_SERVER_PORT));
+  udp_bind(client_conn, UIP_HTONS(UDP_CLIENT_PORT));
 
-  PRINTF("Created a server connection with remote address ");
-  PRINT6ADDR(&server_conn->ripaddr);
-  PRINTF(" local/remote port %u/%u\n", UIP_HTONS(server_conn->lport),
-         UIP_HTONS(server_conn->rport));
+  PRINTF("Created a connection with the server ");
+  PRINT6ADDR(&client_conn->ripaddr);
+  PRINTF(" local/remote port %u/%u\n",
+	UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
 
+#if WITH_COMPOWER
+  powertrace_sniff(POWERTRACE_ON);
+#endif
+
+  etimer_set(&periodic, SEND_INTERVAL);
   while(1) {
     PROCESS_YIELD();
     if(ev == tcpip_event) {
       tcpip_handler();
-    } else if (ev == sensors_event && data == &button_sensor) {
-      PRINTF("Initiaing global repair\n");
-      rpl_repair_root(RPL_DEFAULT_INSTANCE);
+    }
+
+    if(etimer_expired(&periodic)) {
+      etimer_reset(&periodic);
+      ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);
+
+#if WITH_COMPOWER
+      if (print == 0) {
+	powertrace_print("#P");
+      }
+      if (++print == 3) {
+	print = 0;
+      }
+#endif
+
     }
   }
 
