@@ -44,6 +44,14 @@
  *
  */
 
+#define DEBUG 1
+#if DEBUG
+#include <stdio.h>
+#define PRINTF(...) printf(__VA_ARGS__)
+#else
+#define PRINTF(...)
+#endif
+
 #include "contiki-conf.h"
 
 #include "sys/etimer.h"
@@ -131,6 +139,7 @@ PROCESS_THREAD(etimer_process, ev, data)
 	  goto again;
 	} else {
 	  etimer_request_poll();
+	  PRINTF("etimer_process process_post not OK");
 	}
       }
       u = t;

@@ -127,6 +127,7 @@ void cc2420_address_decode(uint8_t enable);
 //to initialize radio sfd counter and synchronize it with rtimer
 void cc2420_sfd_sync(uint8_t capture_start_sfd, uint8_t capture_end_sfd);
 uint16_t cc2420_read_sfd_timer(void);
+int cc2420_interrupt(void);
 
 #define NETSTACK_RADIO_softack_subscribe(A,E) 	cc2420_softack_subscribe(A,E)
 #define NETSTACK_RADIO_get_rx_end_time() 				cc2420_get_rx_end_time()
@@ -137,6 +138,8 @@ uint16_t cc2420_read_sfd_timer(void);
 #define NETSTACK_RADIO_sfd_sync(S,E) 						cc2420_sfd_sync(S,E)
 #define NETSTACK_RADIO_read_sfd_timer() 				cc2420_read_sfd_timer()
 #define NETSTACK_RADIO_set_channel(C)						cc2420_set_channel(C)
+#define NETSTACK_RADIO_process_packet()					cc2420_interrupt()
+#define NETSTACK_RADIO_pending_irq()						cc2420_pending_irq()
 
 /************************************************************************/
 /* Additional SPI Macros for the CC2420 */

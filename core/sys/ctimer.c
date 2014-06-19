@@ -50,7 +50,7 @@ LIST(ctimer_list);
 
 static char initialized;
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -78,6 +78,8 @@ PROCESS_THREAD(ctimer_process, ev, data)
 	PROCESS_CONTEXT_BEGIN(c->p);
 	if(c->f != NULL) {
 	  c->f(c->ptr);
+	} else {
+		PRINTF("ctimer_process: c->f == NULL\n");
 	}
 	PROCESS_CONTEXT_END(c->p);
 	break;
@@ -109,9 +111,11 @@ ctimer_set(struct ctimer *c, clock_time_t t,
     PROCESS_CONTEXT_END(&ctimer_process);
   } else {
     c->etimer.timer.interval = t;
+    PRINTF("ctimer_set: not initialized\n");
   }
 
-  list_remove(ctimer_list, c);
+  //XXX: add includes remove already
+//  list_remove(ctimer_list, c);
   list_add(ctimer_list, c);
 }
 /*---------------------------------------------------------------------------*/

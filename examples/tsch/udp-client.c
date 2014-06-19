@@ -33,7 +33,6 @@
 #include "net/uip.h"
 #include "net/uip-ds6.h"
 #include "net/uip-udp-packet.h"
-#include "sys/ctimer.h"
 #ifdef WITH_COMPOWER
 #include "powertrace.h"
 #endif
@@ -201,6 +200,8 @@ PROCESS_THREAD(udp_client_process, ev, data)
     if(etimer_expired(&periodic)) {
       etimer_reset(&periodic);
       ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);
+//      etimer_set(&periodic, SEND_INTERVAL+SEND_TIME);
+//      send_packet(NULL);
 
 #if WITH_COMPOWER
       if (print == 0) {

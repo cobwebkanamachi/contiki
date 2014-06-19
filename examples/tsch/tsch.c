@@ -198,7 +198,7 @@ static void tsch_timer(void *ptr);
 static int make_eb(uint8_t * buf, uint8_t buf_size);
 void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack);
 static void tsch_init(void);
-static void tsch_resynchronize(void);
+static void tsch_resynchronize(struct rtimer *, void *);
 /*---------------------------------------------------------------------------*/
 /** This function takes the MSB of gcc generated random number
  * because the LSB alone has very bad random characteristics,
@@ -596,7 +596,7 @@ schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 	rtimer_clock_t now = RTIMER_NOW() + 1;
 	ref_time += duration;
 	if (ref_time - now > duration+5) {
-		COOJA_DEBUG_STR("schedule_fixed: missed deadline!\n");
+		COOJA_DEBUG_STR("schedule_strict: missed deadline!\n");
 		//XXX make it wakeup next slot instead... or add a check for missed deadlines in powercycle
 		status = 1;
 		ref_time -= ref_time - now - duration;
@@ -607,7 +607,7 @@ schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 		r = rtimer_set(tm, ref_time, 1, (void
 		(*)(struct rtimer *, void *)) powercycle, status);
 		if (r != RTIMER_OK) {
-			COOJA_DEBUG_STR("schedule_fixed: could not set rtimer\n");
+			COOJA_DEBUG_STR("schedule_strict: could not set rtimer\n");
 			status *= 2;
 		}
 	}
@@ -622,6 +622,7 @@ tsch_resume_powercycle(uint8_t is_ack, uint8_t need_ack_irq, struct received_fra
 	last_rf = last_rf_irq;
 	if (waiting_for_radio_interrupt || NETSTACK_RADIO_get_rx_end_time() != 0) {
 		waiting_for_radio_interrupt = 0;
+		//no need for this
 //		schedule_fixed(&t, RTIMER_NOW(), 5);
 	}
 	leds_off(LEDS_RED);
@@ -823,12 +824,9 @@ SEND_METHOD:
 								NETSTACK_RADIO_sfd_sync(0, 0);
 								schedule_fixed(t, ieee154e_vars.start,
 										TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayTx);
-								void
-								cc2420_address_decode(uint8_t enable);
-								cc2420_address_decode(0);
+								/* Disabling address decoding so the radio accepts the enhanced ACK */
+								NETSTACK_RADIO_address_decode(0);
 								PT_YIELD(&mpt);
-//								BUSYWAIT_UNTIL_ABS(False,
-//										ieee154e_vars.start, TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayRx);
 								waiting_for_radio_interrupt = 0;
 								cca_status=0;
 								on();
@@ -837,14 +835,14 @@ SEND_METHOD:
 								BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
 										ieee154e_vars.start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT + wdAckDuration);
 								len = NETSTACK_RADIO_read_ack(ackbuf, ACK_LEN + EXTRA_ACK_LEN);
-								cc2420_address_decode(1);
+								/* Enabling address decoding again so the radio filter data packets */
+								NETSTACK_RADIO_address_decode(1);
 								waiting_for_radio_interrupt = 0;
 								if (2 == ackbuf[0] && len >= ACK_LEN && seqno == ackbuf[2]) {
 									success = RADIO_TX_OK;
 									ieee154e_vars.sync_timeout=0;
 									uint16_t ack_status = 0;
 									if (ackbuf[1] & 2) { //IE-list present?
-										COOJA_DEBUG_STR("ACK IE-list present");
 										if (len == ACK_LEN + EXTRA_ACK_LEN) {
 											if (ackbuf[3] == 0x02 && ackbuf[4] == 0x1e) {
 												ack_status = ackbuf[5];
@@ -854,7 +852,6 @@ SEND_METHOD:
 												 * 	implementation dependent. If the receiver is not a clock source, the time correction is ignored.
 												 */
 												if (n->is_time_source) {
-													COOJA_DEBUG_STR("ACK from time_source");
 													/* extract time correction */
 													int16_t d=0;
 													//is it a negative correction?
@@ -994,37 +991,17 @@ SEND_METHOD:
 						PT_YIELD(&mpt);
 						//Start radio for at least guard time
 						on();
-						COOJA_DEBUG_STR("RX on -TsLongGT");
 						uint8_t cca_status = 0;
 						//Check if receiving within guard time
-//						schedule_fixed(t, ieee154e_vars.start, TsTxOffset + TsLongGT);
-//						PT_YIELD(&mpt);
-//						COOJA_DEBUG_STR("RX on +TsLongGT");
-//
-//						if (!(NETSTACK_RADIO_get_rx_end_time() || cca_status || NETSTACK_RADIO.pending_packet()
-//								|| !NETSTACK_RADIO.channel_clear()
-//								|| NETSTACK_RADIO.receiving_packet())) {
-//							off(keep_radio_on);
-//							//no packets on air
-//							ret = 0;
-//						} else
-
 						waiting_for_radio_interrupt = 1;
-
 						BUSYWAIT_UNTIL_ABS(NETSTACK_RADIO.receiving_packet(),
 								ieee154e_vars.start, TsTxOffset + TsLongGT);
-//						BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
-//								ieee154e_vars.start, TsTxOffset + TsLongGT + wdAckDuration);
-//						off(keep_radio_on);
-						int	cc2420_pending_irq(void);
-						if(!NETSTACK_RADIO.receiving_packet() && !cc2420_pending_irq()) {
+						if(!NETSTACK_RADIO.receiving_packet() && !NETSTACK_RADIO_pending_irq()) {
 							off(keep_radio_on);
 							//no packets on air
 							ret = 0;
 						} else {
-							int cc2420_read_fifo(void);
-							cc2420_read_fifo();
-//							uint16_t expected_rx = ieee154e_vars.start + TsTxOffset;
+							NETSTACK_RADIO_process_packet();
 							uint16_t rx_duration = NETSTACK_RADIO_get_rx_end_time() - last_rf->sfd_timestamp;
 							off(keep_radio_on);
 							/* wait until ack time */
@@ -1041,11 +1018,10 @@ SEND_METHOD:
 							//drift calculated in radio_interrupt
 							if (last_drift) {
 								ieee154e_vars.sync_timeout=0;
-
 								COOJA_DEBUG_PRINTF("drift seen %d\n", last_drift);
 								// check the source address for potential time-source match
 								n = neighbor_queue_from_addr(&last_rf->source_address);
-								if(n) {COOJA_DEBUG_ADDR(&last_rf->source_address);}
+//								if(n) {COOJA_DEBUG_ADDR(&last_rf->source_address);}
 								if(n != NULL && n->is_time_source) {
 									// should be the average of drifts to all time sources
 									drift_correction -= last_drift;
@@ -1126,8 +1102,14 @@ SEND_METHOD:
 				ieee154e_vars.state = TSCH_SEARCHING;
 				timeslot = 0;
 				/* schedule init function to run again */
-				ctimer_set(&sync_ctimer, CLOCK_SECOND, &tsch_resynchronize, NULL);
-				PUTCHAR('S');
+				//XXX ctimer is not firing sometimes after running for a long time (some times after an hour of simulated time in cooja)
+//				ctimer_set(&sync_ctimer, CLOCK_SECOND, &tsch_resynchronize, NULL);
+				int r = rtimer_set(t, RTIMER_NOW(), RTIMER_SECOND, (void
+				(*)(struct rtimer *, void *)) tsch_resynchronize, NULL);
+				if (r != RTIMER_OK) {
+					COOJA_DEBUG_STR("schedule_strict: could not set rtimer\n");
+				}
+//				PUTCHAR('S');
 			} else {
 				/* skip slot if missed the deadline */
 				while ( schedule_strict(t, ieee154e_vars.start, duration) ) {
@@ -1145,7 +1127,6 @@ SEND_METHOD:
 					}
 					PUTCHAR('!');
 				}
-//				schedule_fixed(t, ieee154e_vars.start, duration);
 				ieee154e_vars.start += duration;
 				leds_off(LEDS_GREEN);
 				PT_YIELD(&mpt);
@@ -1467,6 +1448,8 @@ PROCESS_THREAD(tsch_associate, ev, data)
 			}
 		}
 		PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
+		COOJA_DEBUG_STR("tsch_associate\n");
+
   }
 	PROCESS_END();
 }
@@ -1545,8 +1528,10 @@ PROCESS_THREAD(tsch_tx_callback_process, ev, data)
 }
 /*---------------------------------------------------------------------------*/
 static void
-tsch_resynchronize(void) {
+tsch_resynchronize(struct rtimer * tm, void * ptr) {
 	off(keep_radio_on);
+	COOJA_DEBUG_STR("tsch_resynchronize\n");
+
 	NETSTACK_RADIO_softack_subscribe(NULL, NULL);
 	//look for a root to sync with
 	ieee154e_vars.current_slotframe = &minimum_slotframe;
