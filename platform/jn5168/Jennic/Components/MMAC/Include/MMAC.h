@@ -99,6 +99,11 @@ typedef enum
     E_MMAC_RX_START_NOW        = 0x0002,
     E_MMAC_RX_DELAY_START      = 0x0003,
 
+    /* Timing alignment for auto ack transmission: normal or aligned to
+       backoff clock (used in CAP period in beacon networks) */
+    E_MMAC_RX_ALIGN_NORMAL     = 0x0000,
+    E_MMAC_RX_ALIGNED          = 0x0004,
+
     /* Wait for auto ack and retry: don't use or use */
     E_MMAC_RX_NO_AUTO_ACK      = 0x0000,
     E_MMAC_RX_USE_AUTO_ACK     = 0x0008,
@@ -118,21 +123,23 @@ typedef enum
 } teRxOption;
 
 /* Options for transmission, to pass to vMMAC_StartMacTransmit or
-   vMMAC_StartPhyTransmit. User should select one from each pair of options,
+   vMMAC_StartPhyTransmit. User should select one from each set of options,
    and logical OR the options together */
 typedef enum
 {
     /* Transmit start time: now or delayed */
-    E_MMAC_TX_START_NOW    = 0x02,
-    E_MMAC_TX_DELAY_START  = 0x03,
+    E_MMAC_TX_START_NOW       = 0x02,
+    E_MMAC_TX_DELAY_START     = 0x03,
 
     /* Wait for auto ack and retry: don't use or use */
-    E_MMAC_TX_NO_AUTO_ACK  = 0x00,
-    E_MMAC_TX_USE_AUTO_ACK = 0x08,
+    E_MMAC_TX_NO_AUTO_ACK     = 0x00,
+    E_MMAC_TX_USE_AUTO_ACK    = 0x08,
 
-    /* Clear channel assessment: don't use or use */
-    E_MMAC_TX_NO_CCA       = 0x00,
-    E_MMAC_TX_USE_CCA      = 0x10
+    /* Clear channel assessment: don't use or use, plus option to align to
+       backoff clock */
+    E_MMAC_TX_NO_CCA          = 0x00,
+    E_MMAC_TX_USE_CCA         = 0x10,
+    E_MMAC_TX_USE_CCA_ALIGNED = 0x20
 
 } teTxOption;
 
@@ -153,7 +160,9 @@ typedef enum
 } teTxStatus;
 
 /* Flags for interrupt status, as returned to handler registered with
-   vMMAC_EnableInterrupts */
+   vMMAC_EnableInterrupts and as used in the mask passed to
+   vMMAC_ConfigureInterruptSources, u32MMAC_PollInterruptSource,
+   u32MMAC_PollInterruptSourceUntilFired */
 typedef enum
 {
     E_MMAC_INT_TX_COMPLETE  = 0x01, /* Transmission attempt has finished */
@@ -166,13 +175,21 @@ typedef enum
 /****************************************************************************/
 /* Initialisation */
 PUBLIC void vMMAC_Enable(void);
-PUBLIC void vMMAC_EnableInterrupts(void (*prHandler)(uint32));
 PUBLIC void vMMAC_ConfigureRadio(void);
 PUBLIC void vMMAC_SetChannel(uint8 u8Channel);
+
+/* Interrupt control */
+PUBLIC void vMMAC_EnableInterrupts(void (*prHandler)(uint32));
+PUBLIC void vMMAC_ConfigureInterruptSources(uint32 u32Mask);
+PUBLIC uint32 u32MMAC_PollInterruptSource(uint32 u32Mask);
+PUBLIC uint32 u32MMAC_PollInterruptSourceUntilFired(uint32 u32Mask);
 
 /* Miscellaneous */
 PUBLIC uint32 u32MMAC_GetTime(void);
 PUBLIC void vMMAC_RadioOff(void);
+PUBLIC void vMMAC_SetCutOffTimer(uint32 u32CutOffTime, bool_t bEnable);
+PUBLIC void vMMAC_SynchroniseBackoffClock(bool_t bEnable);
+PUBLIC void vMMAC_GetMacAddress(tsExtAddr *psMacAddr);
 
 /* Receive */
 PUBLIC void vMMAC_SetRxAddress(uint32 u32PanId, uint16 u16Short,
@@ -180,6 +197,7 @@ PUBLIC void vMMAC_SetRxAddress(uint32 u32PanId, uint16 u16Short,
 PUBLIC void vMMAC_SetRxStartTime(uint32 u32Time);
 PUBLIC void vMMAC_StartMacReceive(tsMacFrame *psFrame, teRxOption eOptions);
 PUBLIC void vMMAC_StartPhyReceive(tsPhyFrame *psFrame, teRxOption eOptions);
+PUBLIC bool_t bMMAC_RxDetected(void);
 PUBLIC uint32 u32MMAC_GetRxErrors(void);
 PUBLIC uint32 u32MMAC_GetRxTime(void);
 
