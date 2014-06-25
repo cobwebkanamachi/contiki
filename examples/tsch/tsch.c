@@ -549,20 +549,18 @@ get_next_on_timeslot(uint16_t timeslot)
 }
 /*---------------------------------------------------------------------------*/
 /* Schedule a wakeup from a reference time for a specific duration.
- * Provides basic protection against missed deadlines and timer overflows */
+ * Provides basic protection against missed deadlines and timer overflows
+ * A non-zero return value signals to powercycle a missed deadline */
 static uint8_t
 schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
 		rtimer_clock_t duration)
 {
-	/* A non-zero status should signal to powercycle a missed deadline */
 	int r, status = 0;
 	rtimer_clock_t now = RTIMER_NOW() + 2;
 	ref_time += duration;
 	if (ref_time - now > duration+5) {
 		COOJA_DEBUG_STR("schedule_fixed: missed deadline!\n");
-		//XXX make it wakeup next slot instead... or add a check for missed deadlines in powercycle
 		status = 1;
-//		ref_time -= ref_time - now - duration;
 		ref_time = now + duration + 5;
 		if (ref_time - now > duration +5) {
 			ref_time = now + 5;
@@ -572,34 +570,28 @@ schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
 	(*)(struct rtimer *, void *)) powercycle, status);
 	if (r != RTIMER_OK) {
 		COOJA_DEBUG_STR("schedule_fixed: could not set rtimer\n");
-		status *= 2;
+		status = 2;
 	}
 	return status;
 }
 /*---------------------------------------------------------------------------*/
-/* schedule only if deadline not passed */
+/* schedule only if deadline not passed.
+ * A non-zero return value signals to powercycle a missed deadline */
 static uint8_t
 schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 		rtimer_clock_t duration)
 {
-	/* A non-zero status should signal to powercycle a missed deadline */
 	int r, status = 0;
 	rtimer_clock_t now = RTIMER_NOW() + 1;
 	ref_time += duration;
 	if (ref_time - now > duration+5) {
-		COOJA_DEBUG_STR("schedule_strict: missed deadline!\n");
-		//XXX make it wakeup next slot instead... or add a check for missed deadlines in powercycle
 		status = 1;
-		ref_time -= ref_time - now - duration;
-		if (ref_time - now > duration+5) {
-			ref_time = now + 5;
-		}
 	} else {
 		r = rtimer_set(tm, ref_time, 1, (void
 		(*)(struct rtimer *, void *)) powercycle, status);
 		if (r != RTIMER_OK) {
 			COOJA_DEBUG_STR("schedule_strict: could not set rtimer\n");
-			status *= 2;
+			status = 2;
 		}
 	}
 	return status;
@@ -621,10 +613,13 @@ powercycle(struct rtimer *t, void *ptr)
 	 * otherwise, schedule next wakeup
 	 */
 	PT_BEGIN(&ieee154e_vars.mpt);
-	uint16_t dt, duration, next_timeslot;
+	uint16_t dt, duration, duration2, next_timeslot;
 	uint16_t ack_sfd_time = 0;
+	uint16_t ack_status = 0, rx_duration;
+
 	rtimer_clock_t ack_sfd_rtime = 0;
 	static uint8_t is_broadcast = 0, len=0, seqno=0, ret=0;
+	uint8_t success=0, cca_status=1, window=0;
 
 	while (ieee154e_vars.state != TSCH_OFF) {
 		ieee154e_vars.timeslot = 0;
@@ -723,30 +718,32 @@ powercycle(struct rtimer *t, void *ptr)
 					ieee154e_vars.cell_decison = CELL_RX;
 				}
 
-//				switch (ieee154e_vars.cell_decison) {
-//				case CELL_TX:
-//					if(ieee154e_vars.cell->link_type == LINK_TYPE_ADVERTISING) {
-////						PUTCHAR('E');
-//					} else if(is_broadcast) {
-////						PUTCHAR('B');
-//					} else {
-////						PUTCHAR('T');
-//					}
-//					break;
-////				case CELL_TX_BACKOFF:
-////					PUTCHAR('F');
-////					break;
-////				case CELL_TX_IDLE:
-////					PUTCHAR('I');
-////					break;
-////				case CELL_RX:
-////					PUTCHAR('R');
-////					break;
-////				case CELL_OFF:
-////				default:
-////					PUTCHAR('O');
-////					break;
-//				}
+#if DEBUG
+				switch (ieee154e_vars.cell_decison) {
+				case CELL_TX:
+					if(ieee154e_vars.cell->link_type == LINK_TYPE_ADVERTISING) {
+						PUTCHAR('E');
+					} else if(is_broadcast) {
+						PUTCHAR('B');
+					} else {
+						PUTCHAR('T');
+					}
+					break;
+				case CELL_TX_BACKOFF:
+					PUTCHAR('F');
+					break;
+				case CELL_TX_IDLE:
+					PUTCHAR('I');
+					break;
+				case CELL_RX:
+					PUTCHAR('R');
+					break;
+				case CELL_OFF:
+				default:
+					PUTCHAR('O');
+					break;
+				}
+#endif /* DEBUG */
 
 				/* execute the cell */
 				if(ieee154e_vars.cell_decison != CELL_TX && ieee154e_vars.cell_decison != CELL_RX) {
@@ -762,8 +759,8 @@ SEND_METHOD:
 					//read seqno from payload!
 					seqno = ((uint8_t*)(ieee154e_vars.payload))[2];
 					//prepare packet to send
-					uint8_t success = !NETSTACK_RADIO.prepare(ieee154e_vars.payload, ieee154e_vars.payload_len);
-					uint8_t cca_status = 1;
+					success = !NETSTACK_RADIO.prepare(ieee154e_vars.payload, ieee154e_vars.payload_len);
+					cca_status = 1;
 	#if CCA_ENABLED
 					//delay before CCA
 					schedule_fixed(t, ieee154e_vars.start, TsCCAOffset);
@@ -815,7 +812,7 @@ SEND_METHOD:
 								if (2 == ieee154e_vars.ackbuf[0] && len >= ACK_LEN && seqno == ieee154e_vars.ackbuf[2]) {
 									success = RADIO_TX_OK;
 									ieee154e_vars.sync_timeout=0;
-									uint16_t ack_status = 0;
+									ack_status = 0;
 									if (ieee154e_vars.ackbuf[1] & 2) { //IE-list present?
 										if (len == ACK_LEN + EXTRA_ACK_LEN) {
 											if (ieee154e_vars.ackbuf[3] == 0x02 && ieee154e_vars.ackbuf[4] == 0x1e) {
@@ -868,7 +865,7 @@ SEND_METHOD:
 								ieee154e_vars.n->BE_value = macMinBE;
 								ieee154e_vars.n->BW_value = 0;
 							} else if ((ieee154e_vars.cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
-								uint8_t window = 1 << ieee154e_vars.n->BE_value;
+								window = 1 << ieee154e_vars.n->BE_value;
 								ieee154e_vars.n->BW_value = generate_random_byte(window - 1);
 								ieee154e_vars.n->BE_value++;
 								if (ieee154e_vars.n->BE_value > macMaxBE) {
@@ -894,7 +891,7 @@ SEND_METHOD:
 								ieee154e_vars.n->BE_value = macMinBE;
 								ieee154e_vars.n->BW_value = 0;
 							} else if ((ieee154e_vars.cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
-								uint8_t window = 1 << ieee154e_vars.n->BE_value;
+								window = 1 << ieee154e_vars.n->BE_value;
 								ieee154e_vars.n->BW_value = generate_random_byte(window - 1);
 								ieee154e_vars.n->BE_value++;
 								if (ieee154e_vars.n->BE_value > macMaxBE) {
@@ -909,7 +906,7 @@ SEND_METHOD:
 								ieee154e_vars.n->BE_value = macMinBE;
 								ieee154e_vars.n->BW_value = 0;
 							}else if ((ieee154e_vars.cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
-								uint8_t window = 1 << ieee154e_vars.n->BE_value;
+								window = 1 << ieee154e_vars.n->BE_value;
 								ieee154e_vars.n->BW_value = generate_random_byte(window - 1);
 								ieee154e_vars.n->BE_value++;
 								if (ieee154e_vars.n->BE_value > macMaxBE) {
@@ -935,7 +932,7 @@ SEND_METHOD:
 						process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, ieee154e_vars.p);
 					}
 				} else if (ieee154e_vars.cell_decison == CELL_RX) {
-					/* this ieee154e_vars.cell is RX ieee154e_vars.cell. Check if it is used for keep alive as well*/
+					/* this cell is RX ieee154e_vars.cell. Check if it is used for keep alive as well*/
 					if ((ieee154e_vars.cell->link_options & LINK_OPTION_TIME_KEEPING) &&
 							(	ieee154e_vars.join_priority != 0
 								&& ieee154e_vars.sync_timeout > KEEPALIVE_TIMEOUT )) {
@@ -952,10 +949,8 @@ SEND_METHOD:
 //						goto SEND_METHOD;
 						//prepare keep-alive msg to be sent later...
 					} {
-						//TODO There are small timing variations visible in cooja, which needs tuning
-						static uint8_t is_broadcast = 0, len, seqno, ret;
-						uint16_t ack_sfd_time = 0;
-						rtimer_clock_t ack_sfd_rtime = 0;
+						ack_sfd_time = 0;
+						ack_sfd_rtime = 0;
 						is_broadcast = rimeaddr_cmp(ieee154e_vars.cell->node_address, &rimeaddr_null);
 						//wait before RX
 						schedule_fixed(t, ieee154e_vars.start, TsTxOffset - TsLongGT - delayRx);
@@ -964,7 +959,7 @@ SEND_METHOD:
 						PT_YIELD(&ieee154e_vars.mpt);
 						//Start radio for at least guard time
 						on();
-						uint8_t cca_status = 0;
+						cca_status = 0;
 						//Check if receiving within guard time
 						BUSYWAIT_UNTIL_ABS(NETSTACK_RADIO.receiving_packet(),
 								ieee154e_vars.start, TsTxOffset + TsLongGT);
@@ -974,7 +969,7 @@ SEND_METHOD:
 							ret = 0;
 						} else {
 							NETSTACK_RADIO_process_packet();
-							uint16_t rx_duration = NETSTACK_RADIO_get_rx_end_time() - ieee154e_vars.last_rf->sfd_timestamp;
+							rx_duration = NETSTACK_RADIO_get_rx_end_time() - ieee154e_vars.last_rf->sfd_timestamp;
 							off(keep_radio_on);
 							/* wait until ack time */
 							if (ieee154e_vars.need_ack) {
@@ -1053,7 +1048,7 @@ SEND_METHOD:
 				dt =
 						next_timeslot ? next_timeslot - ieee154e_vars.timeslot :
 								ieee154e_vars.current_slotframe->length - ieee154e_vars.timeslot;
-				uint16_t duration2 = dt * TsSlotDuration;
+				duration2 = dt * TsSlotDuration;
 				ieee154e_vars.sync_timeout += dt;
 				ieee154e_vars.timeslot = next_timeslot;
 				//increase asn
@@ -1073,8 +1068,6 @@ SEND_METHOD:
 				ieee154e_vars.state = TSCH_SEARCHING;
 				ieee154e_vars.timeslot = 0;
 				/* schedule init function to run again */
-				//XXX ctimer is not firing sometimes after running for a long time (some times after an hour of simulated time in cooja)
-//				ctimer_set(&sync_ctimer, CLOCK_SECOND, &tsch_resynchronize, NULL);
 				int r = rtimer_set(t, RTIMER_NOW(), RTIMER_SECOND, (void
 				(*)(struct rtimer *, void *)) tsch_resynchronize, NULL);
 				if (r != RTIMER_OK) {

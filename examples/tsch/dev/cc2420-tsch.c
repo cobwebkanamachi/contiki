@@ -66,7 +66,7 @@ volatile int need_flush=0;
 
 #define WITH_SEND_CCA 0
 
-#define FIFOP_THRESHOLD (ACK_LEN+EXTRA_ACK_LEN+2)
+#define FIFOP_THRESHOLD (ACK_LEN)
 //#define FIFOP_THRESHOLD (ACK_LEN)
 
 #undef CC2420_CONF_AUTOACK
@@ -1144,14 +1144,17 @@ cc2420_set_cca_threshold(int value)
 void
 cc2420_address_decode(uint8_t enable)
 {
+	GET_LOCK();
 	/* Turn on/off automatic packet acknowledgment and address decoding. */
-	uint8_t reg = getreg(CC2420_MDMCTRL0);
+	uint16_t reg = getreg(CC2420_MDMCTRL0);
 	if(enable) {
-		reg = (reg & ~AUTOACK) | ADR_DECODE;
+	  reg = ((reg & ~AUTOACK) | ADR_DECODE);
 	} else {
-		reg &= (~AUTOACK) & ~ADR_DECODE;
+		reg = ((reg & ~AUTOACK) & ~ADR_DECODE);
 	}
+  BUSYWAIT_UNTIL((status() & (BV(CC2420_XOSC16M_STABLE))), RTIMER_SECOND / 10);
 	setreg(CC2420_MDMCTRL0, reg);
+	RELEASE_LOCK();
 }
 /*---------------------------------------------------------------------------*/
 int
