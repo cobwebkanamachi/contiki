@@ -118,6 +118,9 @@ typedef struct {
 	uint32_t asn_4lsb;
 } asn_t;
 
+#define STD_ACK_LEN 3
+#define SYNC_IE_LEN 4
+
 typedef struct {
 	asn_t asn;                // current absolute slot number
 	uint8_t state;              // state of the FSM
@@ -131,7 +134,27 @@ typedef struct {
 	rtimer_clock_t start; //cell start time
 	uint8_t slot_template_id;
 	uint8_t hop_sequence_id;
+	volatile uint16_t timeslot;
+	volatile int16_t registered_drift;
+	volatile struct received_frame_s *last_rf;
+	volatile struct rtimer t;
+	volatile struct pt mpt;
+	volatile unsigned char we_are_sending;
+	volatile uint8_t need_ack;
+	volatile uint8_t working_on_queue;
 	uint8_t eb_buf[TSCH_MAX_PACKET_LEN+1]; /* a buffer for EB packets, last byte for length */
+
+	volatile int32_t drift_correction;
+	volatile int32_t drift; //estimated drift to all time source neighbors
+	volatile uint16_t drift_counter; //number of received drift corrections source neighbors
+	uint8_t cell_decison;
+	cell_t * cell;
+	struct TSCH_packet* p;
+	struct neighbor_queue *n;
+	void * payload;
+	unsigned short payload_len;
+	//1 byte for length if needed as dictated by the radio driver
+	volatile uint8_t ackbuf[STD_ACK_LEN + SYNC_IE_LEN +1];
 } ieee154e_vars_t;
 
 #endif /* __TSCH_PARAMETERS_H__ */
