@@ -26,6 +26,11 @@
 #undef NETSTACK_CONF_RDC
 #define NETSTACK_CONF_RDC     tschrdc_driver
 
+//#if TMOTE_SKY
+//#undef NETSTACK_CONF_RADIO
+//#define NETSTACK_CONF_RADIO     tschrdc_driver
+//#endif
+
 #undef UIP_CONF_ND6_SEND_NA
 #define UIP_CONF_ND6_SEND_NA 0
 
