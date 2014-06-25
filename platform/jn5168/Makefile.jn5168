@@ -39,6 +39,7 @@ DEVICE_NAME ?= DR1174
 .SUFFIXES:
 
 SDK_BASE_DIR ?= $(abspath $(CONTIKI)/platform/jn5168/Jennic)
+CONTIKIDIRS += $(SDK_BASE_DIR)/Components
 ### Define the CPU directory
 CONTIKI_CPU=$(CONTIKI)/cpu/jn516x
 include $(CONTIKI)/cpu/jn516x/Makefile.jn51xx
