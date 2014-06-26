@@ -163,7 +163,6 @@ static const cell_t * links_list[TOTAL_LINKS] = { &generic_eb_cell, &generic_sha
 		&cell_to_1, &cell_to_2, &cell_to_3, &cell_3_to_2 };
 static const slotframe_t minimum_slotframe = { 0, 101, 6, minimum_cells };
 /*---------------------------------------------------------------------------*/
-/* variable to protect queue structure */
 static volatile ieee154e_vars_t ieee154e_vars;
 /*---------------------------------------------------------------------------*/
 /* NBR_TABLE_CONF_MAX_NEIGHBORS specifies the size of the table */
@@ -556,15 +555,18 @@ schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
 		rtimer_clock_t duration)
 {
 	int r, status = 0;
-	rtimer_clock_t now = RTIMER_NOW() + 2;
+	rtimer_clock_t now = RTIMER_NOW()+2;
 	ref_time += duration;
-	if (ref_time - now > duration+5) {
-		COOJA_DEBUG_STR("schedule_fixed: missed deadline!\n");
-		status = 1;
-		ref_time = now + duration + 5;
-		if (ref_time - now > duration +5) {
-			ref_time = now + 5;
-		}
+//	RTIMER_CLOCK_LT(ref_time - now > duration+5)
+	if (!RTIMER_CLOCK_LT(now,ref_time)) {
+//		ref_time -= duration;
+//		COOJA_DEBUG_STR("schedule_fixed: missed deadline!\n");
+//		status = 1;
+//		ref_time = now + duration + 3;
+//		if (ref_time - now > duration +3) {
+//			ref_time = now + 5;
+//		}
+		ref_time = now + 5;
 	}
 	r = rtimer_set(tm, ref_time, 1, (void
 	(*)(struct rtimer *, void *)) powercycle, status);
@@ -905,7 +907,7 @@ SEND_METHOD:
 								remove_packet_from_queue(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
 								ieee154e_vars.n->BE_value = macMinBE;
 								ieee154e_vars.n->BW_value = 0;
-							}else if ((ieee154e_vars.cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
+							} else if ((ieee154e_vars.cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
 								window = 1 << ieee154e_vars.n->BE_value;
 								ieee154e_vars.n->BW_value = generate_random_byte(window - 1);
 								ieee154e_vars.n->BE_value++;
@@ -969,38 +971,40 @@ SEND_METHOD:
 							ret = 0;
 						} else {
 							NETSTACK_RADIO_process_packet();
-							rx_duration = NETSTACK_RADIO_get_rx_end_time() - ieee154e_vars.last_rf->sfd_timestamp;
 							off(keep_radio_on);
-							/* wait until ack time */
-							if (ieee154e_vars.need_ack) {
-//								schedule_fixed(t, NETSTACK_RADIO_get_rx_end_time(), TsTxAckDelay - delayTx);
-								schedule_fixed(t, ieee154e_vars.last_rf->sfd_timestamp, rx_duration + TsTxAckDelay - delayTx);
-								PT_YIELD(&ieee154e_vars.mpt);
-								NETSTACK_RADIO_send_ack();
-							}
-							/* If the originator was a time source neighbor, the receiver adjusts its own clock by incorporating the
-							 * 	difference into an average of the drift to all its time source neighbors. The averaging method is
-							 * 	implementation dependent. If the receiver is not a clock source, the time correction is ignored.
-							 */
-							//drift calculated in radio_interrupt
-							if (ieee154e_vars.registered_drift) {
-								ieee154e_vars.sync_timeout=0;
-								COOJA_DEBUG_PRINTF("ieee154e_vars.drift seen %d\n", ieee154e_vars.registered_drift);
-								// check the source address for potential time-source match
-								ieee154e_vars.n = neighbor_queue_from_addr(&(ieee154e_vars.last_rf)->source_address);
-//								if(n) {COOJA_DEBUG_ADDR(&(ieee154e_vars.last_rf)->source_address);}
-								if(ieee154e_vars.n != NULL && ieee154e_vars.n->is_time_source) {
-									// should be the average of drifts to all time sources
-									ieee154e_vars.drift_correction -= ieee154e_vars.registered_drift;
-									++ieee154e_vars.drift_counter;
-									COOJA_DEBUG_STR("ieee154e_vars.drift recorded");
+							if(ieee154e_vars.last_rf != NULL) {
+								rx_duration = NETSTACK_RADIO_get_rx_end_time() - ieee154e_vars.last_rf->sfd_timestamp;
+								/* wait until ack time */
+								if (ieee154e_vars.need_ack) {
+	//								schedule_fixed(t, NETSTACK_RADIO_get_rx_end_time(), TsTxAckDelay - delayTx);
+									schedule_fixed(t, ieee154e_vars.last_rf->sfd_timestamp, rx_duration + TsTxAckDelay - delayTx);
+									PT_YIELD(&ieee154e_vars.mpt);
+									NETSTACK_RADIO_send_ack();
 								}
+								/* If the originator was a time source neighbor, the receiver adjusts its own clock by incorporating the
+								 * 	difference into an average of the drift to all its time source neighbors. The averaging method is
+								 * 	implementation dependent. If the receiver is not a clock source, the time correction is ignored.
+								 */
+								//drift calculated in radio_interrupt
+								if (ieee154e_vars.registered_drift) {
+									ieee154e_vars.sync_timeout=0;
+									COOJA_DEBUG_PRINTF("ieee154e_vars.drift seen %d\n", ieee154e_vars.registered_drift);
+									// check the source address for potential time-source match
+									ieee154e_vars.n = neighbor_queue_from_addr(&(ieee154e_vars.last_rf)->source_address);
+	//								if(n) {COOJA_DEBUG_ADDR(&(ieee154e_vars.last_rf)->source_address);}
+									if(ieee154e_vars.n != NULL && ieee154e_vars.n->is_time_source) {
+										// should be the average of drifts to all time sources
+										ieee154e_vars.drift_correction -= ieee154e_vars.registered_drift;
+										++ieee154e_vars.drift_counter;
+										COOJA_DEBUG_STR("ieee154e_vars.drift recorded");
+									}
+								}
+	//							if((ieee154e_vars.last_rf)) {
+	//								PUTCHAR('C');
+	//							}
+								//XXX return length instead? or status? or something?
+								ret = 1;
 							}
-//							if((ieee154e_vars.last_rf)) {
-//								PUTCHAR('C');
-//							}
-							//XXX return length instead? or status? or something?
-							ret = 1;
 						}
 					}
 				}

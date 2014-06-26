@@ -8,7 +8,7 @@
   <project EXPORT="discard">[APPS_DIR]/powertracker</project>
   <simulation>
     <title>tsch_associate</title>
-    <randomseed>123584</randomseed>
+    <randomseed>123588</randomseed>
     <motedelay_us>1000000</motedelay_us>
     <radiomedium>
       se.sics.cooja.radiomediums.UDGM
@@ -66,8 +66,8 @@
       <breakpoints />
       <interface_config>
         se.sics.cooja.interfaces.Position
-        <x>-0.32383823941629586</x>
-        <y>-0.2686802347096175</y>
+        <x>-0.518558873545553</x>
+        <y>0.12076103354889675</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -94,8 +94,8 @@
       <breakpoints />
       <interface_config>
         se.sics.cooja.interfaces.Position
-        <x>0.06560302884221841</x>
-        <y>29.328856152937465</y>
+        <x>8.82803156465879</x>
+        <y>9.077910203494724</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -108,7 +108,7 @@
   <plugin>
     se.sics.cooja.plugins.SimControl
     <width>280</width>
-    <z>2</z>
+    <z>0</z>
     <height>160</height>
     <location_x>400</location_x>
     <location_y>0</location_y>
@@ -125,7 +125,7 @@
       <viewport>5.135562568762959 0.0 0.0 5.135562568762959 151.66309154068043 61.37982415634116</viewport>
     </plugin_config>
     <width>400</width>
-    <z>0</z>
+    <z>4</z>
     <height>400</height>
     <location_x>1</location_x>
     <location_y>1</location_y>
@@ -136,9 +136,10 @@
       <filter />
       <formatted_time />
       <coloring />
+      <hidedebug />
     </plugin_config>
     <width>743</width>
-    <z>4</z>
+    <z>1</z>
     <height>240</height>
     <location_x>402</location_x>
     <location_y>162</location_y>
@@ -152,10 +153,10 @@
       <showRadioRXTX />
       <showRadioHW />
       <showLEDs />
-      <zoomfactor>100000.0</zoomfactor>
+      <zoomfactor>5613.476283413378</zoomfactor>
     </plugin_config>
     <width>1610</width>
-    <z>1</z>
+    <z>2</z>
     <height>166</height>
     <location_x>16</location_x>
     <location_y>413</location_y>

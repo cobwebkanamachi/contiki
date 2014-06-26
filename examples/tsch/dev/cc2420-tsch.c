@@ -748,6 +748,7 @@ cc2420_interrupt(void)
   struct received_frame_s *rf = NULL;
   unsigned char* buf_ptr = NULL;
   need_ack=0;
+  last_rf=NULL;
 
 #if CC2420_TIMETABLE_PROFILING
   timetable_clear(&cc2420_timetable);
@@ -793,8 +794,19 @@ cc2420_interrupt(void)
     return 0;
   }
 
-	/* Wait for half maximum packet */
+	/* Wait for a quarter maximum packet */
   BUSYWAIT_UNTIL(!CC2420_SFD_IS_1, wdDataDuration/4);
+  /* if frame is not for us, flush and exit */
+  if(!CC2420_FIFOP_IS_1) {
+  	rx_end_time = 0;
+    flushrx();
+    CC2420_CLEAR_FIFOP_INT();
+    RELEASE_LOCK();
+    if(interrupt_exit_callback != NULL) {
+    	interrupt_exit_callback(0, 0, NULL);
+    }
+    return 0;
+  }
 
 	len -= AUX_LEN;
 	/* Allocate space to store the received frame */

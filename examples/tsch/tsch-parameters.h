@@ -141,6 +141,7 @@ typedef struct {
 	volatile struct pt mpt;
 	volatile unsigned char we_are_sending;
 	volatile uint8_t need_ack;
+	/* variable to protect queue structure */
 	volatile uint8_t working_on_queue;
 	uint8_t eb_buf[TSCH_MAX_PACKET_LEN+1]; /* a buffer for EB packets, last byte for length */
 
