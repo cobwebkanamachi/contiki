@@ -125,9 +125,7 @@ typedef struct {
 	asn_t asn;                // current absolute slot number
 	uint8_t state;              // state of the FSM
 	uint8_t dsn;                // data sequence number
-	uint16_t captured_time;       // last captures time
 	uint16_t sync_timeout;        // how many slots left before looses sync
-	uint8_t is_sync;             // TRUE iff mote synchronized to network
 	uint8_t mac_ebsn;						//EB sequence number
 	uint8_t join_priority;			//inherit from RPL - for PAN coordinator: 0 -- lower is better
 	slotframe_t * current_slotframe;
@@ -139,7 +137,6 @@ typedef struct {
 	volatile struct received_frame_s *last_rf;
 	volatile struct rtimer t;
 	volatile struct pt mpt;
-	volatile unsigned char we_are_sending;
 	volatile uint8_t need_ack;
 	/* variable to protect queue structure */
 	volatile uint8_t working_on_queue;

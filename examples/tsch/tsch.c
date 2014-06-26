@@ -203,7 +203,7 @@ void srand_newg(uint32_t x){
 }
 
 static uint8_t generate_random_byte(uint8_t window) {
-	// XXX this is not good enough // return (random_rand() >> 8) & window;
+	// XXX this is not good enough --> return (random_rand() >> 8) & window;
   seed_newg = seed_newg * 1103515245 + 12345;
   return ((uint32_t)(seed_newg / 65536) % 32768) & window;
 }
@@ -616,10 +616,8 @@ powercycle(struct rtimer *t, void *ptr)
 	 */
 	PT_BEGIN(&ieee154e_vars.mpt);
 	uint16_t dt, duration, duration2, next_timeslot;
-	uint16_t ack_sfd_time = 0;
 	uint16_t ack_status = 0, rx_duration;
 
-	rtimer_clock_t ack_sfd_rtime = 0;
 	static uint8_t is_broadcast = 0, len=0, seqno=0, ret=0;
 	uint8_t success=0, cca_status=1, window=0;
 
@@ -643,7 +641,7 @@ powercycle(struct rtimer *t, void *ptr)
 			ieee154e_vars.start = RTIMER_NOW();
 		}
 		//while MAC-RDC is not disabled, and while its synchronized
-		while (ieee154e_vars.is_sync && ieee154e_vars.state == TSCH_ASSOCIATED) {
+		while (ieee154e_vars.state == TSCH_ASSOCIATED) {
 			/* sync with cycle start and enable capturing start & end sfd*/
 			NETSTACK_RADIO_sfd_sync(1, 1);
 			leds_on(LEDS_GREEN);
@@ -755,9 +753,6 @@ powercycle(struct rtimer *t, void *ptr)
 SEND_METHOD:
 					COOJA_DEBUG_STR("CELL_TX");
 					//TODO There are small timing variations visible in cooja, which needs tuning
-					ack_sfd_time = 0;
-					ack_sfd_rtime = 0;
-					ieee154e_vars.we_are_sending = 1;
 					//read seqno from payload!
 					seqno = ((uint8_t*)(ieee154e_vars.payload))[2];
 					//prepare packet to send
@@ -852,7 +847,6 @@ SEND_METHOD:
 									COOJA_DEBUG_STR("ACK not ok!\n");
 								}
 							}
-							ieee154e_vars.we_are_sending = 0;
 							off(keep_radio_on);
 							COOJA_DEBUG_STR("end tx slot\n");
 						}
@@ -951,8 +945,6 @@ SEND_METHOD:
 //						goto SEND_METHOD;
 						//prepare keep-alive msg to be sent later...
 					} {
-						ack_sfd_time = 0;
-						ack_sfd_rtime = 0;
 						is_broadcast = rimeaddr_cmp(ieee154e_vars.cell->node_address, &rimeaddr_null);
 						//wait before RX
 						schedule_fixed(t, ieee154e_vars.start, TsTxOffset - TsLongGT - delayRx);
@@ -1068,7 +1060,6 @@ SEND_METHOD:
 			/* Check if we need to resynchronize */
 			if(	ieee154e_vars.join_priority != 0
 					&& ieee154e_vars.sync_timeout > RESYNCH_TIMEOUT ) {
-				ieee154e_vars.is_sync = False;
 				ieee154e_vars.state = TSCH_SEARCHING;
 				ieee154e_vars.timeslot = 0;
 				/* schedule init function to run again */
@@ -1269,7 +1260,6 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 				ieee154e_vars.start += RTIMER_NOW() & 0xffff0000;
 
 				//we are in sync
-				ieee154e_vars.is_sync = 1;
 				ieee154e_vars.state = TSCH_ASSOCIATED;
 
 				//XXX schedule to run after sometime
@@ -1300,7 +1290,6 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 		softack_make = tsch_make_sync_ack;
 		NETSTACK_RADIO_softack_subscribe(softack_make, interrupt_exit);
 
-		ieee154e_vars.we_are_sending = 0;
 		//process the schedule, to create queues and find time-sources (time-keeping)
 		if(!ieee154e_vars.working_on_queue) {
 			struct neighbor_queue *n;
@@ -1392,8 +1381,6 @@ PROCESS_THREAD(tsch_associate, ev, data)
 			//if this is root start now
 			if(ieee154e_vars.join_priority == 0) {
 				COOJA_DEBUG_STR("rpl root");
-				//for now assume we are in sync
-				ieee154e_vars.is_sync = 1;
 				//something other than 0 for now
 				ieee154e_vars.state = TSCH_ASSOCIATED;
 				//make queues and data structures
@@ -1440,7 +1427,7 @@ void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet
 static void tsch_init_variables(void)
 {
 	//setting seed for the random generator
-	srand_newg(node_id * node_id * node_id);
+	srand_newg(node_id * node_id * RTIMER_NOW());
 	NETSTACK_RADIO_softack_subscribe(NULL, NULL);
 	//look for a root to sync with
 	ieee154e_vars.current_slotframe = &minimum_slotframe;
@@ -1448,11 +1435,9 @@ static void tsch_init_variables(void)
 	ieee154e_vars.hop_sequence_id = 1;
 	ieee154e_vars.asn.asn_4lsb = 0;
 	ieee154e_vars.asn.asn_msb = 0;
-	ieee154e_vars.captured_time = 0;
 	ieee154e_vars.dsn = 0;
 	ieee154e_vars.state = TSCH_SEARCHING;
 	//we need to sync
-	ieee154e_vars.is_sync = 0;
 	ieee154e_vars.sync_timeout = 0; //30sec/slotDuration - (asn-asn0)*slotDuration
 	ieee154e_vars.mac_ebsn = 0;
 	ieee154e_vars.join_priority = 0xff; /* inherit from RPL - PAN coordinator: 0 -- lower is better */
@@ -1460,7 +1445,6 @@ static void tsch_init_variables(void)
 	ieee154e_vars.need_ack = 0;
 	ieee154e_vars.last_rf = NULL;
 	ieee154e_vars.registered_drift = 0;
-	ieee154e_vars.we_are_sending = 0;
 	ieee154e_vars.timeslot = 0;
 	NETSTACK_RADIO_sfd_sync(True, True);
 }
