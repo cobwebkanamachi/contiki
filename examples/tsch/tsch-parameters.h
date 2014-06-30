@@ -125,7 +125,7 @@ typedef struct {
 	asn_t asn;                // current absolute slot number
 	uint8_t state;              // state of the FSM
 	uint8_t dsn;                // data sequence number
-	uint16_t sync_timeout;        // how many slots left before looses sync
+	uint16_t sync_timeout;        // how many slots left before loosing sync
 	uint8_t mac_ebsn;						//EB sequence number
 	uint8_t join_priority;			//inherit from RPL - for PAN coordinator: 0 -- lower is better
 	slotframe_t * current_slotframe;
@@ -142,6 +142,9 @@ typedef struct {
 	volatile uint8_t working_on_queue;
 	uint8_t eb_buf[TSCH_MAX_PACKET_LEN+1]; /* a buffer for EB packets, last byte for length */
 
+	/* on resynchronization, the node has already joined a RPL network and it is mistaking it with root
+	 * this flag is used to prevent this */
+	volatile uint8_t first_associate;
 	volatile int32_t drift_correction;
 	volatile int32_t drift; //estimated drift to all time source neighbors
 	volatile uint16_t drift_counter; //number of received drift corrections source neighbors

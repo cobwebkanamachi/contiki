@@ -559,14 +559,8 @@ schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
 	ref_time += duration;
 //	RTIMER_CLOCK_LT(ref_time - now > duration+5)
 	if (!RTIMER_CLOCK_LT(now,ref_time)) {
-//		ref_time -= duration;
-//		COOJA_DEBUG_STR("schedule_fixed: missed deadline!\n");
-//		status = 1;
-//		ref_time = now + duration + 3;
-//		if (ref_time - now > duration +3) {
-//			ref_time = now + 5;
-//		}
 		ref_time = now + 5;
+		COOJA_DEBUG_STR("schedule_fixed: missed deadline");
 	}
 	r = rtimer_set(tm, ref_time, 1, (void
 	(*)(struct rtimer *, void *)) powercycle, status);
@@ -587,6 +581,7 @@ schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 	rtimer_clock_t now = RTIMER_NOW() + 1;
 	ref_time += duration;
 	if (ref_time - now > duration+5) {
+		COOJA_DEBUG_STR("schedule_strict: missed deadline");
 		status = 1;
 	} else {
 		r = rtimer_set(tm, ref_time, 1, (void
@@ -600,7 +595,7 @@ schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 }
 /*---------------------------------------------------------------------------*/
 void
-tsch_resume_powercycle(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s * last_rf_irq)
+tsch_resume_powercycle(uint8_t need_ack_irq, struct received_frame_s * last_rf_irq)
 {
 	ieee154e_vars.need_ack = need_ack_irq;
 	ieee154e_vars.last_rf = last_rf_irq;
@@ -616,9 +611,11 @@ powercycle(struct rtimer *t, void *ptr)
 	 */
 	PT_BEGIN(&ieee154e_vars.mpt);
 	uint16_t dt, duration, duration2, next_timeslot;
-	uint16_t ack_status = 0, rx_duration;
-
+	uint16_t ack_status = 0;
 	static uint8_t is_broadcast = 0, len=0, seqno=0, ret=0;
+	//to record the duration of packet tx
+	static rtimer_clock_t tx_time;
+
 	uint8_t success=0, cca_status=1, window=0;
 
 	while (ieee154e_vars.state != TSCH_OFF) {
@@ -747,9 +744,20 @@ powercycle(struct rtimer *t, void *ptr)
 
 				/* execute the cell */
 				if(ieee154e_vars.cell_decison != CELL_TX && ieee154e_vars.cell_decison != CELL_RX) {
+					/* Nothing to do --> Off cell */
 					COOJA_DEBUG_STR("Nothing to TX or RX --> off CELL\n");
 					off(keep_radio_on);
 				} else if (ieee154e_vars.cell_decison == CELL_TX) {
+					/**
+					 * TX cell:
+					 * 1. Copy packet to radio buffer
+					 * 2. Perform CCA if enabled
+					 * 3. Sleep until it is time to transmit
+					 * 4. Wait for ACK if it is a unicast packet
+					 * 5. Extract drift if we received an E-ACK from a time source neighbor
+					 * 6. Update CSMA parameters according to TX status
+					 * 7. Schedule mac_call_sent_callback
+					 **/
 SEND_METHOD:
 					COOJA_DEBUG_STR("CELL_TX");
 					//TODO There are small timing variations visible in cooja, which needs tuning
@@ -772,13 +780,13 @@ SEND_METHOD:
 					if (cca_status == 0) {
 						success = RADIO_TX_COLLISION;
 					} else {
-						//delay before TX
 						/* do not capture start SFD, we are only interested in SFD end which equals TX end time */
-						NETSTACK_RADIO_sfd_sync(0, 1);
+						//I do it in transmit function now
+//						NETSTACK_RADIO_sfd_sync(0, 1);
+						//delay before TX
 						schedule_fixed(t, ieee154e_vars.start, TsTxOffset - delayTx);
 						PT_YIELD(&ieee154e_vars.mpt);
-						//to record the duration of packet tx
-						static rtimer_clock_t tx_time;
+
 						tx_time = RTIMER_NOW();
 						//send packet already in radio tx buffer
 						success = NETSTACK_RADIO.transmit(ieee154e_vars.payload_len);
@@ -786,12 +794,13 @@ SEND_METHOD:
 						//limit tx_time in case of something wrong
 						tx_time = MIN(tx_time, wdDataDuration);
 						off(keep_radio_on);
+
 						if (success == RADIO_TX_OK) {
 							if (!is_broadcast) {
 								//wait for ack: after tx
 								COOJA_DEBUG_STR("wait for ACK\n");
 								/* disable capturing sfd */
-								NETSTACK_RADIO_sfd_sync(0, 0);
+//								NETSTACK_RADIO_sfd_sync(0, 0);
 								schedule_fixed(t, ieee154e_vars.start,
 										TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayTx);
 								/* Disabling address decoding so the radio accepts the enhanced ACK */
@@ -810,7 +819,8 @@ SEND_METHOD:
 									success = RADIO_TX_OK;
 									ieee154e_vars.sync_timeout=0;
 									ack_status = 0;
-									if (ieee154e_vars.ackbuf[1] & 2) { //IE-list present?
+									/* IE-list present? */
+									if (ieee154e_vars.ackbuf[1] & 2) {
 										if (len == ACK_LEN + EXTRA_ACK_LEN) {
 											if (ieee154e_vars.ackbuf[3] == 0x02 && ieee154e_vars.ackbuf[4] == 0x1e) {
 												ack_status = ieee154e_vars.ackbuf[5];
@@ -822,7 +832,7 @@ SEND_METHOD:
 												if (ieee154e_vars.n->is_time_source) {
 													/* extract time correction */
 													int16_t d=0;
-													//is it a negative correction?
+													/*is it a negative correction?*/
 													if(ack_status & 0x0800) {
 														d = -(ack_status & 0x0fff & ~0x0800);
 													} else {
@@ -853,7 +863,7 @@ SEND_METHOD:
 					}
 					/* post TX: Update CSMA control variables */
 					//if it was EB then p is null and anyway there is no need to update anything
-					if(ieee154e_vars.p != NULL) {
+					if(ieee154e_vars.p != NULL && ieee154e_vars.n != NULL) {
 						if (success == RADIO_TX_NOACK) {
 							ieee154e_vars.p->transmissions++;
 							if (ieee154e_vars.p->transmissions == macMaxFrameRetries) {
@@ -928,6 +938,15 @@ SEND_METHOD:
 						process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, ieee154e_vars.p);
 					}
 				} else if (ieee154e_vars.cell_decison == CELL_RX) {
+					/**
+					 * RX cell:
+					 * 1. Check if it is used for TIME_KEEPING
+					 * 2. Sleep and wake up just before expected RX time (with a guard time: TsLongGT)
+					 * 3. Check for radio activity for the guard time: TsLongGT
+					 * 4. Prepare and send ACK if needed
+					 * 5. Drift calculated in the ACK callback registered with the radio driver. Use it if receiving from a time source neighbor.
+					 **/
+
 					/* this cell is RX ieee154e_vars.cell. Check if it is used for keep alive as well*/
 					if ((ieee154e_vars.cell->link_options & LINK_OPTION_TIME_KEEPING) &&
 							(	ieee154e_vars.join_priority != 0
@@ -945,7 +964,6 @@ SEND_METHOD:
 //						goto SEND_METHOD;
 						//prepare keep-alive msg to be sent later...
 					} {
-						is_broadcast = rimeaddr_cmp(ieee154e_vars.cell->node_address, &rimeaddr_null);
 						//wait before RX
 						schedule_fixed(t, ieee154e_vars.start, TsTxOffset - TsLongGT - delayRx);
 						COOJA_DEBUG_STR("schedule RX on guard time - TsLongGT");
@@ -965,11 +983,11 @@ SEND_METHOD:
 							NETSTACK_RADIO_process_packet();
 							off(keep_radio_on);
 							if(ieee154e_vars.last_rf != NULL) {
-								rx_duration = NETSTACK_RADIO_get_rx_end_time() - ieee154e_vars.last_rf->sfd_timestamp;
+//								rx_duration = NETSTACK_RADIO_get_rx_end_time() - ieee154e_vars.last_rf->sfd_timestamp;
 								/* wait until ack time */
 								if (ieee154e_vars.need_ack) {
-	//								schedule_fixed(t, NETSTACK_RADIO_get_rx_end_time(), TsTxAckDelay - delayTx);
-									schedule_fixed(t, ieee154e_vars.last_rf->sfd_timestamp, rx_duration + TsTxAckDelay - delayTx);
+									schedule_fixed(t, NETSTACK_RADIO_get_rx_end_time(), TsTxAckDelay - delayTx);
+//									schedule_fixed(t, ieee154e_vars.last_rf->sfd_timestamp, rx_duration + TsTxAckDelay - delayTx);
 									PT_YIELD(&ieee154e_vars.mpt);
 									NETSTACK_RADIO_send_ack();
 								}
@@ -983,7 +1001,6 @@ SEND_METHOD:
 									COOJA_DEBUG_PRINTF("ieee154e_vars.drift seen %d\n", ieee154e_vars.registered_drift);
 									// check the source address for potential time-source match
 									ieee154e_vars.n = neighbor_queue_from_addr(&(ieee154e_vars.last_rf)->source_address);
-	//								if(n) {COOJA_DEBUG_ADDR(&(ieee154e_vars.last_rf)->source_address);}
 									if(ieee154e_vars.n != NULL && ieee154e_vars.n->is_time_source) {
 										// should be the average of drifts to all time sources
 										ieee154e_vars.drift_correction -= ieee154e_vars.registered_drift;
@@ -991,10 +1008,7 @@ SEND_METHOD:
 										COOJA_DEBUG_STR("ieee154e_vars.drift recorded");
 									}
 								}
-	//							if((ieee154e_vars.last_rf)) {
-	//								PUTCHAR('C');
-	//							}
-								//XXX return length instead? or status? or something?
+								//TODO return length instead? or status? or something?
 								ret = 1;
 							}
 						}
@@ -1230,7 +1244,7 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 }
 /*---------------------------------------------------------------------------*/
 void
-tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s * last_rf_irq)
+tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_s * last_rf_irq)
 {
 	uint16_t dt=0, next_timeslot=0;
 	rtimer_clock_t duration=0;
@@ -1241,7 +1255,7 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 	COOJA_DEBUG_STR("tsch_wait_eb");
 	NETSTACK_RADIO_sfd_sync(1, 1);
 
-	if (!is_ack && last_rf_irq != NULL && (NETSTACK_RADIO_get_rx_end_time() != 0)) {
+	if (last_rf_irq != NULL && (NETSTACK_RADIO_get_rx_end_time() != 0)) {
 		if ( (FRAME802154_BEACONFRAME == ((ieee154e_vars.last_rf)->buf[0]&7))
 				&& (((ieee154e_vars.last_rf)->buf[1] & (2 | 32 | 128 | 64)) == (2 | 32 | 128 | 64))) {
 			if (((ieee154e_vars.last_rf)->buf[16] & 0xfe) == 0x34) { //sync IE? (0x1a << 1) ==0 0x34
@@ -1331,15 +1345,16 @@ tsch_wait_for_eb(uint8_t is_ack, uint8_t need_ack_irq, struct received_frame_s *
 }
 /*---------------------------------------------------------------------------*/
 #include "net/rpl/rpl.h"
-/* on resynchronization, the node already has joined a rpl network and it is mistaking it with root */
-static volatile uint8_t first_associate =0;
+
+
+/* Synchronize
+ * If we are a master (RPL root), start right away
+ * otherwise, wait for EBs to associate with a master
+ */
 PROCESS_THREAD(tsch_associate, ev, data)
 {
 	PROCESS_BEGIN();
-	/* TODO Synchronize
-	 * If we are a master, start right away
-	 * otherwise, wait for EBs to associate with a master
-	 */
+
 	/* Trying to get the RPL DAG, and polling until it becomes available  */
 	static rpl_dag_t * my_rpl_dag = NULL;
 	static uint8_t cca_status = 0;
@@ -1355,8 +1370,6 @@ PROCESS_THREAD(tsch_associate, ev, data)
 			PROCESS_YIELD();
 			timer_reset(&periodic);
 			NETSTACK_RADIO_sfd_sync(1, 1);
-//			COOJA_DEBUG_STR("waiting for RPL dag");
-
 			/*If I am root (rank==1), then exit association process*/
 			rpl_instance_t* rpl = rpl_get_instance(RPL_DEFAULT_INSTANCE);
 			if(rpl != NULL) {
@@ -1367,8 +1380,8 @@ PROCESS_THREAD(tsch_associate, ev, data)
 					ieee154e_vars.join_priority = (my_rpl_dag->rank) >> 16;
 					/* to make sure that this is a root and not just a low ranked node */
 					if(ieee154e_vars.join_priority == 0 && my_rpl_dag->rank > 1) {
-						//XXX choose something else?
-						if(!first_associate /* || my_rpl_dag->rank == 256 ??*/) {
+						//TODO choose something else?
+						if(!ieee154e_vars.first_associate /* || my_rpl_dag->rank == 256 ??*/) {
 							ieee154e_vars.join_priority = 0;
 						} else {
 							ieee154e_vars.join_priority = 0xf0;
@@ -1377,14 +1390,14 @@ PROCESS_THREAD(tsch_associate, ev, data)
 				}
 			}
 			//XXX there should be a better way of handling rpl, and erasing rank, dag etc. on resync
-			first_associate = 1;
+			ieee154e_vars.first_associate = 1;
 			//if this is root start now
 			if(ieee154e_vars.join_priority == 0) {
 				COOJA_DEBUG_STR("rpl root");
 				//something other than 0 for now
 				ieee154e_vars.state = TSCH_ASSOCIATED;
 				//make queues and data structures
-				tsch_wait_for_eb(0,0,NULL);
+				tsch_wait_for_eb(0,NULL);
 				NETSTACK_RADIO_softack_subscribe(tsch_make_sync_ack, tsch_resume_powercycle);
 				ieee154e_vars.start = RTIMER_NOW();
 				schedule_fixed(&ieee154e_vars.t, ieee154e_vars.start, 5);
@@ -1454,6 +1467,9 @@ tsch_init(void)
 {
 	COOJA_DEBUG_STR("tsch_init");
 	tsch_init_variables();
+	/* on resynchronization, the node has already joined a RPL network and it is mistaking it with root
+	 * this flag is used to prevent this */
+	ieee154e_vars.first_associate = 0;
 	nbr_table_register(neighbor_list, NULL);
 	process_start(&tsch_tx_callback_process, NULL);
 	//try to associate to a network or start one if setup as RPL root
@@ -1485,7 +1501,8 @@ PROCESS_THREAD(tsch_tx_callback_process, ev, data)
 }
 /*---------------------------------------------------------------------------*/
 static void
-tsch_resynchronize(struct rtimer * tm, void * ptr) {
+tsch_resynchronize(struct rtimer * tm, void * ptr)
+{
 	off(keep_radio_on);
 	COOJA_DEBUG_STR("tsch_resynchronize\n");
 	tsch_init_variables();

@@ -114,7 +114,7 @@ void cc2420_set_cca_threshold(int value);
 /* Additional low-level functions for the CC2420 */
 /************************************************************************/
 typedef void(*softack_make_callback_f)(uint8_t **ackbuf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack);
-typedef void(*softack_interrupt_exit_callback_f)(uint8_t is_ack, uint8_t need_ack, struct received_frame_s * last_rf);
+typedef void(*softack_interrupt_exit_callback_f)(uint8_t need_ack, struct received_frame_s * last_rf);
 
 /* Subscribe with two callbacks called from FIFOP interrupt */
 void cc2420_softack_subscribe(softack_make_callback_f softack_make, softack_interrupt_exit_callback_f interrupt_exit);

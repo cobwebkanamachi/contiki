@@ -368,6 +368,8 @@ cc2420_init(void)
 static int
 cc2420_transmit(unsigned short payload_len)
 {
+	/* do not capture start SFD, we are only interested in SFD end which equals TX end time */
+	cc2420_sfd_sync(0, 1);
   int i;
 
   GET_LOCK();
@@ -764,7 +766,7 @@ cc2420_interrupt(void)
     rx_end_time = 0;
 		CC2420_CLEAR_FIFOP_INT();
   	if(interrupt_exit_callback != NULL) {
-  		interrupt_exit_callback(0, 0, NULL);
+  		interrupt_exit_callback(0, NULL);
   	}
   	return 0;
   }
@@ -777,7 +779,7 @@ cc2420_interrupt(void)
     CC2420_CLEAR_FIFOP_INT();
     RELEASE_LOCK();
     if(interrupt_exit_callback != NULL) {
-    	interrupt_exit_callback(0, 0, NULL);
+    	interrupt_exit_callback(0, NULL);
     }
     return 0;
   }
@@ -789,7 +791,7 @@ cc2420_interrupt(void)
     CC2420_CLEAR_FIFOP_INT();
     RELEASE_LOCK();
     if(interrupt_exit_callback != NULL) {
-    	interrupt_exit_callback(0, 0, NULL);
+    	interrupt_exit_callback(0, NULL);
     }
     return 0;
   }
@@ -803,7 +805,7 @@ cc2420_interrupt(void)
     CC2420_CLEAR_FIFOP_INT();
     RELEASE_LOCK();
     if(interrupt_exit_callback != NULL) {
-    	interrupt_exit_callback(0, 0, NULL);
+    	interrupt_exit_callback(0, NULL);
     }
     return 0;
   }
@@ -897,7 +899,7 @@ cc2420_interrupt(void)
   CC2420_CLEAR_FIFOP_INT();
   RELEASE_LOCK();
 	if(interrupt_exit_callback != NULL) {
-		interrupt_exit_callback(is_ack, need_ack, last_rf);
+		interrupt_exit_callback(need_ack, last_rf);
 	}
 	return 1;
 }
