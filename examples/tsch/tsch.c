@@ -1255,8 +1255,8 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 	COOJA_DEBUG_STR("tsch_wait_eb");
 	NETSTACK_RADIO_sfd_sync(1, 1);
 
-	if (last_rf_irq != NULL && (NETSTACK_RADIO_get_rx_end_time() != 0)) {
-		if ( (FRAME802154_BEACONFRAME == ((ieee154e_vars.last_rf)->buf[0]&7))
+	if (last_rf_irq != NULL /*&& (NETSTACK_RADIO_get_rx_end_time() != 0)*/) {
+		if ( ieee154e_vars.last_rf->len >= 23 && (FRAME802154_BEACONFRAME == ((ieee154e_vars.last_rf)->buf[0]&7))
 				&& (((ieee154e_vars.last_rf)->buf[1] & (2 | 32 | 128 | 64)) == (2 | 32 | 128 | 64))) {
 			if (((ieee154e_vars.last_rf)->buf[16] & 0xfe) == 0x34) { //sync IE? (0x1a << 1) ==0 0x34
 //				COOJA_DEBUG_STR("EB");
