@@ -866,7 +866,7 @@ SEND_METHOD:
 					if(ieee154e_vars.p != NULL && ieee154e_vars.n != NULL) {
 						if (success == RADIO_TX_NOACK) {
 							ieee154e_vars.p->transmissions++;
-							if (ieee154e_vars.p->transmissions == macMaxFrameRetries) {
+							if (ieee154e_vars.p->transmissions >= macMaxFrameRetries) {
 								remove_packet_from_queue(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
 								ieee154e_vars.n->BE_value = macMinBE;
 								ieee154e_vars.n->BW_value = 0;
@@ -892,7 +892,7 @@ SEND_METHOD:
 							ret = MAC_TX_OK;
 						} else if (success == RADIO_TX_COLLISION) {
 							ieee154e_vars.p->transmissions++;
-							if (ieee154e_vars.p->transmissions == macMaxFrameRetries) {
+							if (ieee154e_vars.p->transmissions >= macMaxFrameRetries) {
 								remove_packet_from_queue(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
 								ieee154e_vars.n->BE_value = macMinBE;
 								ieee154e_vars.n->BW_value = 0;
@@ -907,7 +907,7 @@ SEND_METHOD:
 							ret = MAC_TX_COLLISION;
 						} else if (success == RADIO_TX_ERR) {
 							ieee154e_vars.p->transmissions++;
-							if (ieee154e_vars.p->transmissions == macMaxFrameRetries) {
+							if (ieee154e_vars.p->transmissions >= macMaxFrameRetries) {
 								remove_packet_from_queue(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
 								ieee154e_vars.n->BE_value = macMinBE;
 								ieee154e_vars.n->BW_value = 0;
