@@ -134,7 +134,7 @@ typedef struct {
 	uint8_t hop_sequence_id;
 	volatile uint16_t timeslot;
 	volatile int16_t registered_drift;
-	volatile struct received_frame_s *last_rf;
+	volatile struct received_frame_radio_s *last_rf;
 	volatile struct rtimer t;
 	volatile struct pt mpt;
 	volatile uint8_t need_ack;

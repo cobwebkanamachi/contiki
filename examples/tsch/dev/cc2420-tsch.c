@@ -734,7 +734,7 @@ uint16_t cc2420_read_sfd_timer(void) {
 }
 /*---------------------------------------------------------------------------*/
 static uint8_t extrabuf[ACK_LEN]={0};
-volatile struct received_frame_s *last_rf=NULL;
+volatile struct received_frame_radio_s last_rf;
 int
 cc2420_interrupt(void)
 {
@@ -750,7 +750,8 @@ cc2420_interrupt(void)
   struct received_frame_s *rf = NULL;
   unsigned char* buf_ptr = NULL;
   need_ack=0;
-  last_rf=NULL;
+//  last_rf=NULL;
+  last_rf.buf=NULL;
 
 #if CC2420_TIMETABLE_PROFILING
   timetable_clear(&cc2420_timetable);
@@ -888,18 +889,23 @@ cc2420_interrupt(void)
 		}
 		rf = NULL;
 	}
-	last_rf = (frame_valid) ? rf : NULL;
 	need_ack = (frame_valid && do_ack) ? 1 + nack : 0;
-	if(last_rf) {
-		last_rf->sfd_timestamp = last_packet_timestamp;
-	}
   /* Flush rx fifo (because we're doing direct FIFO addressing and
    * we don't want to lose track of where we are in the FIFO) */
   flushrx();
   CC2420_CLEAR_FIFOP_INT();
   RELEASE_LOCK();
 	if(interrupt_exit_callback != NULL) {
-		interrupt_exit_callback(need_ack, last_rf);
+		//	last_rf = (frame_valid) ? rf : NULL;
+		if(rf && frame_valid) {
+			last_rf.buf = rf->buf;
+			last_rf.len = rf->len;
+			last_rf.sfd_timestamp = last_packet_timestamp;
+			last_rf.source_address = &(rf->source_address);
+			interrupt_exit_callback(need_ack, &last_rf);
+		} else {
+			interrupt_exit_callback(need_ack, NULL);
+		}
 	}
 	return 1;
 }

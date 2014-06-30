@@ -595,7 +595,7 @@ schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 }
 /*---------------------------------------------------------------------------*/
 void
-tsch_resume_powercycle(uint8_t need_ack_irq, struct received_frame_s * last_rf_irq)
+tsch_resume_powercycle(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_irq)
 {
 	ieee154e_vars.need_ack = need_ack_irq;
 	ieee154e_vars.last_rf = last_rf_irq;
@@ -1000,7 +1000,7 @@ SEND_METHOD:
 									ieee154e_vars.sync_timeout=0;
 									COOJA_DEBUG_PRINTF("ieee154e_vars.drift seen %d\n", ieee154e_vars.registered_drift);
 									// check the source address for potential time-source match
-									ieee154e_vars.n = neighbor_queue_from_addr(&(ieee154e_vars.last_rf)->source_address);
+									ieee154e_vars.n = neighbor_queue_from_addr((ieee154e_vars.last_rf)->source_address);
 									if(ieee154e_vars.n != NULL && ieee154e_vars.n->is_time_source) {
 										// should be the average of drifts to all time sources
 										ieee154e_vars.drift_correction -= ieee154e_vars.registered_drift;
@@ -1244,7 +1244,7 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 }
 /*---------------------------------------------------------------------------*/
 void
-tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_s * last_rf_irq)
+tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_irq)
 {
 	uint16_t dt=0, next_timeslot=0;
 	rtimer_clock_t duration=0;
@@ -1327,10 +1327,10 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_s * last_rf_irq)
 			/* XXX HACK this should be set in sent schedule
 			 * --Set parent as timesource */
 			if((ieee154e_vars.last_rf)) {
-				struct neighbor_queue *n = neighbor_queue_from_addr(&(ieee154e_vars.last_rf)->source_address);
+				struct neighbor_queue *n = neighbor_queue_from_addr((ieee154e_vars.last_rf)->source_address);
 				if (n == NULL) {
 					//add new neighbor to list of neighbors
-					n=add_queue(&(ieee154e_vars.last_rf)->source_address);
+					n=add_queue((ieee154e_vars.last_rf)->source_address);
 				}
 				if( n!= NULL ) {
 					n->is_time_source = 1;
