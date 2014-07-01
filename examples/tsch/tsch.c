@@ -1000,7 +1000,7 @@ SEND_METHOD:
 									ieee154e_vars.sync_timeout=0;
 									COOJA_DEBUG_PRINTF("ieee154e_vars.drift seen %d\n", ieee154e_vars.registered_drift);
 									// check the source address for potential time-source match
-									ieee154e_vars.n = neighbor_queue_from_addr((ieee154e_vars.last_rf)->source_address);
+									ieee154e_vars.n = neighbor_queue_from_addr(&ieee154e_vars.last_rf->source_address);
 									if(ieee154e_vars.n != NULL && ieee154e_vars.n->is_time_source) {
 										// should be the average of drifts to all time sources
 										ieee154e_vars.drift_correction -= ieee154e_vars.registered_drift;
@@ -1327,10 +1327,10 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 			/* XXX HACK this should be set in sent schedule
 			 * --Set parent as timesource */
 			if((ieee154e_vars.last_rf)) {
-				struct neighbor_queue *n = neighbor_queue_from_addr((ieee154e_vars.last_rf)->source_address);
+				struct neighbor_queue *n = neighbor_queue_from_addr(&ieee154e_vars.last_rf->source_address);
 				if (n == NULL) {
 					//add new neighbor to list of neighbors
-					n=add_queue((ieee154e_vars.last_rf)->source_address);
+					n=add_queue(&ieee154e_vars.last_rf->source_address);
 				}
 				if( n!= NULL ) {
 					n->is_time_source = 1;
@@ -1361,6 +1361,7 @@ PROCESS_THREAD(tsch_associate, ev, data)
   static struct etimer periodic;
 
   while (ieee154e_vars.state != TSCH_OFF) {
+  	COOJA_DEBUG_STR("tsch_associate\n");
   	cca_status = 0;
   	my_rpl_dag = NULL;
 		/* setup radio functions for intercepting EB */
@@ -1413,9 +1414,11 @@ PROCESS_THREAD(tsch_associate, ev, data)
 			}
 		}
 		PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
-		COOJA_DEBUG_STR("tsch_associate\n");
+		COOJA_DEBUG_STR("tsch_associate polled");
 
   }
+	COOJA_DEBUG_STR("tsch_associate exit");
+
 	PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/

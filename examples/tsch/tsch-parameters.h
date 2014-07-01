@@ -2,6 +2,13 @@
 #define __TSCH_PARAMETERS_H__
 #include "net/rime/rimeaddr.h"
 
+struct received_frame_radio_s {
+  uint8_t* buf;
+  uint8_t len;
+  rimeaddr_t source_address;
+  rtimer_clock_t sfd_timestamp;
+};
+
 #define NACK_FLAG 0x8000
 
 #define RESYNCH_TIMEOUT ieee154e_vars.current_slotframe->length * 10
@@ -122,8 +129,8 @@ typedef struct {
 #define SYNC_IE_LEN 4
 
 typedef struct {
-	asn_t asn;                // current absolute slot number
-	uint8_t state;              // state of the FSM
+	volatile asn_t asn;                // current absolute slot number
+	volatile uint8_t state;              // state of the FSM
 	uint8_t dsn;                // data sequence number
 	uint16_t sync_timeout;        // how many slots left before loosing sync
 	uint8_t mac_ebsn;						//EB sequence number

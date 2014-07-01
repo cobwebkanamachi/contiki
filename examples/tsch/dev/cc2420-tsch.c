@@ -603,7 +603,7 @@ cc2420_softack_subscribe(softack_make_callback_f softack_make, softack_interrupt
   }
 }
 
-volatile rtimer_clock_t rx_end_time=0;
+static volatile rtimer_clock_t rx_end_time=0;
 rtimer_clock_t cc2420_get_rx_end_time(void)
 {
 	return rx_end_time;
@@ -638,7 +638,7 @@ frame80254_parse_irq(uint8_t *data, uint8_t len)
 }
 
 static void
-extract_sender_address(struct received_frame_s* frame) {
+extract_sender_address(struct received_frame_radio_s* frame) {
 	frame802154_fcf_t fcf;
 	int c;
 
@@ -839,8 +839,10 @@ cc2420_interrupt(void)
 	if(!is_ack) {
 		if(softack_make_callback != NULL) {
 			softack_make_callback(&ackbuf, seqno, last_packet_timestamp, nack);
-			/* first byte is defines frame length */
-			ackbuf[0] += AUX_LEN;
+			/* first byte defines frame length */
+			if(ackbuf) {
+				ackbuf[0] += AUX_LEN;
+			}
 		} else if(do_ack){ /* construct standard ack */
 			ackbuf = extrabuf;
 			ackbuf[0] = AUX_LEN + 3;
@@ -877,7 +879,10 @@ cc2420_interrupt(void)
 		 before acking. */
 			CC2420_READ_FIFO_BUF(rf->buf + len_a, len_b);
 		}
-		extract_sender_address(rf);
+		last_rf.buf = rf->buf;
+		last_rf.len = rf->len;
+		last_rf.sfd_timestamp = last_packet_timestamp;
+		extract_sender_address(&last_rf);
 		frame_valid = 1;
 	} else { /* CRC is wrong */
 		if(do_ack) {
@@ -896,12 +901,7 @@ cc2420_interrupt(void)
   CC2420_CLEAR_FIFOP_INT();
   RELEASE_LOCK();
 	if(interrupt_exit_callback != NULL) {
-		//	last_rf = (frame_valid) ? rf : NULL;
 		if(rf && frame_valid) {
-			last_rf.buf = rf->buf;
-			last_rf.len = rf->len;
-			last_rf.sfd_timestamp = last_packet_timestamp;
-			last_rf.source_address = &(rf->source_address);
 			interrupt_exit_callback(need_ack, &last_rf);
 		} else {
 			interrupt_exit_callback(need_ack, NULL);

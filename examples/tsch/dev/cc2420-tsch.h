@@ -68,14 +68,12 @@ struct received_frame_s {
   struct received_frame_s *next;
   uint8_t buf[CC2420_MAX_PACKET_LEN];
   uint8_t len;
-  rimeaddr_t source_address;
-  rtimer_clock_t sfd_timestamp;
 };
 
 struct received_frame_radio_s {
   uint8_t* buf;
   uint8_t len;
-  rimeaddr_t* source_address;
+  rimeaddr_t source_address;
   rtimer_clock_t sfd_timestamp;
 };
 
