@@ -43,13 +43,32 @@
 
 #include "contiki.h"
 #include "dev/radio.h"
+#include "rimeaddr.h"
 #include <MMAC.h>
+
+
+struct received_frame_radio_s {
+  uint8_t* buf;
+  uint8_t len;
+  rimeaddr_t source_address;
+  rtimer_clock_t sfd_timestamp;
+};
+
+typedef void(*softack_make_callback_f)(uint8_t **ackbuf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack);
+typedef void(*softack_interrupt_exit_callback_f)(uint8_t need_ack, struct received_frame_radio_s * last_rf);
+
+/* Subscribe with two callbacks called from FIFOP interrupt */
+void micromac_radio_softack_subscribe(softack_make_callback_f softack_make, softack_interrupt_exit_callback_f interrupt_exit);
+
 void copy_from_rimeaddress(tuAddr*, rimeaddr_t* );
+void copy_to_rimeaddress(rimeaddr_t* addr, tuAddr* tu_addr);
+
 #define MICROMAC_HEADER_LEN (28)
 
 int micromac_radio_init(void);
 
-#define MICROMAC_RADIO_MAX_PACKET_LEN      127
+#define MICROMAC_RADIO_MAX_PACKET_LEN      (127)
+#define ACK_LEN (3)
 
 int micromac_radio_set_channel(int channel);
 int micromac_radio_get_channel(void);
@@ -85,5 +104,18 @@ void micromac_get_hw_mac_address(tsExtAddr *psExtAddress);
 
 uint32_t* micromac_get_hw_mac_address_location(void);
 
+void micromac_radio_sfd_sync(void);
+rtimer_clock_t micromac_radio_read_sfd_timer(void);
+
+#define NETSTACK_RADIO_softack_subscribe(A,E) 	micromac_radio_softack_subscribe(A,E)
+#define NETSTACK_RADIO_get_rx_end_time() 				micromac_radio_get_rx_end_time()
+#define NETSTACK_RADIO_send_ack() 							micromac_radio_send_ack()
+#define NETSTACK_RADIO_read_ack(B,I)						micromac_radio_read_ack(B,I)
+#define NETSTACK_RADIO_address_decode(E) 				do{ }while(0)
+#define NETSTACK_RADIO_sfd_sync(S,E) 						micromac_radio_sfd_sync()
+#define NETSTACK_RADIO_read_sfd_timer() 				micromac_radio_read_sfd_timer()
+#define NETSTACK_RADIO_set_channel(C)						micromac_radio_set_channel(C)
+#define NETSTACK_RADIO_process_packet()					micromac_radio_interrupt(u32MMAC_PollInterruptSource(E_MMAC_INT_RX_HEADER|E_MMAC_INT_RX_COMPLETE))
+#define NETSTACK_RADIO_pending_irq()						u32MMAC_PollInterruptSource(E_MMAC_INT_RX_HEADER|E_MMAC_INT_RX_COMPLETE)
 
 #endif /* MICROMAC_RADIO_H_ */
