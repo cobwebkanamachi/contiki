@@ -179,6 +179,20 @@ int printf(const char *fmt, ...)
   return m;
 }
 
+int dbg_printf(const char *fmt, ...)
+{
+  int m,i;
+  char str[256];
+  __VALIST va;
+  va_start(va,fmt);
+  m = vsnprintf(str, sizeof(str)-1, fmt, va);
+  va_end(va);
+  str[m+1] = '\0';
+  for (i=0;i<m;i++)
+    uart0_writeb(str[i]);
+  return m;
+}
+
 int puts(const char *s)
 {
   char c;
