@@ -34,15 +34,20 @@
 #include "net/rpl/rpl.h"
 
 #include "net/netstack.h"
-#include "dev/button-sensor.h"
+//#include "dev/button-sensor.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
 #define SERVER_REPLY 1
+
 #define DEBUG DEBUG_PRINT
 #include "net/uip-debug.h"
+
+#ifndef PUTCHAR
+#define PUTCHAR(X)
+#endif /* PUTCHAR(X) */
 
 #define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
 
@@ -64,12 +69,12 @@ tcpip_handler(void)
   if(uip_newdata()) {
     appdata = (char *)uip_appdata;
     appdata[uip_datalen()] = 0;
-    PRINTF("DATA recv '%s' from ", appdata);
+    printf("DATA recv '%s' from ", appdata);
     PRINTF("%d",
            UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 1]);
     PRINTF("\n");
 #if SERVER_REPLY
-    PRINTF("DATA sending reply\n");
+    printf("DATA sending reply\n");
     uip_ipaddr_copy(&server_conn->ripaddr, &UIP_IP_BUF->srcipaddr);
     uip_udp_packet_send(server_conn, "Reply", sizeof("Reply"));
     uip_create_unspecified(&server_conn->ripaddr);
@@ -106,9 +111,9 @@ PROCESS_THREAD(udp_server_process, ev, data)
 
   PROCESS_PAUSE();
 
-  SENSORS_ACTIVATE(button_sensor);
+//  SENSORS_ACTIVATE(button_sensor);
 
-  PRINTF("UDP server started\n");
+  printf("UDP server started\n");
 
 #if UIP_CONF_ROUTER
 /* The choice of server address determines its 6LoPAN header compression.
@@ -120,7 +125,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
  * Note Wireshark's IPCMV6 checksum verification depends on the correct uncompressed addresses.
  */
 
-#if 0
+#if 1
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
@@ -177,11 +182,12 @@ PROCESS_THREAD(udp_server_process, ev, data)
 //        PRINTF("Initialising global repair\n");
 //        rpl_repair_root(RPL_DEFAULT_INSTANCE);
 //      }
-    } else if ((ev == sensors_event && data == &button_sensor) || (etimer_expired(&periodic))) {
-      PRINTF("Button: Initialising global repair\n");
-      etimer_restart(&periodic);
-      rpl_repair_root(RPL_DEFAULT_INSTANCE);
     }
+//    else if (/*(ev == sensors_event && data == &button_sensor) ||*/ (etimer_expired(&periodic))) {
+//    	printf("Initialising global repair\n");
+//      etimer_restart(&periodic);
+//      rpl_repair_root(RPL_DEFAULT_INSTANCE);
+//    }
   }
 
   PROCESS_END();

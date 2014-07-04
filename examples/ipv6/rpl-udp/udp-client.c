@@ -47,8 +47,13 @@
 
 #define UDP_EXAMPLE_ID  190
 
-#define DEBUG DEBUG_NONE
+#define DEBUG DEBUG_PRINT
 #include "net/uip-debug.h"
+
+#ifndef PUTCHAR
+#define PUTCHAR(X)
+#endif /* PUTCHAR(X) */
+
 
 #ifndef PERIOD
 #define PERIOD 10
@@ -133,7 +138,7 @@ set_global_address(void)
  * Note the IPCMV6 checksum verification depends on the correct uncompressed addresses.
  */
 
-#if 0
+#if 1
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
