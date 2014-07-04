@@ -1,7 +1,9 @@
 #ifndef PROJECT_H_
 #define PROJECT_H_
 
-#define ENABLE_COOJA_DEBUG 1
+#define MICROMAC_RADIO_CONF_NO_IRQ 1
+
+#define ENABLE_COOJA_DEBUG 0
 //#undef WITH_UIP6
 //#define WITH_UIP6 0
 

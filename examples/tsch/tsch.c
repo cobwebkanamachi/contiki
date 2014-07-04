@@ -49,19 +49,27 @@
 #include "lib/list.h"
 #include "lib/memb.h"
 #include "lib/random.h"
-#include "dev/cc2420-tsch.h"
+//#include "dev/cc2420-tsch.h"
+#include "dev/micromac-radio.h"
 #include "net/mac/frame802154.h"
 #include "dev/leds.h"
 #include "sys/ctimer.h"
+
+//make sure to #define MICROMAC_RADIO_CONF_NO_IRQ 1
+//#define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
 
 #define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
-//#define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
+#ifndef PUTCHAR
+#define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
+#endif /* PUTCHAR(X) */
 #else
 #define PRINTF(...)
-//#define PUTCHAR(X)
+#ifndef PUTCHAR
+#define PUTCHAR(X)
+#endif /* PUTCHAR(X) */
 #endif
 
 #ifndef True
@@ -790,7 +798,9 @@ SEND_METHOD:
 						tx_time = RTIMER_NOW();
 						//send packet already in radio tx buffer
 						success = NETSTACK_RADIO.transmit(ieee154e_vars.payload_len);
-						tx_time = NETSTACK_RADIO_read_sfd_timer() - tx_time;
+						//tx_time = NETSTACK_RADIO_read_sfd_timer() - tx_time;
+						//XXX check
+						tx_time = (ieee154e_vars.payload_len * (uint32_t)512)/(uint32_t)1000;
 						//limit tx_time in case of something wrong
 						tx_time = MIN(tx_time, wdDataDuration);
 						off(keep_radio_on);
@@ -812,7 +822,7 @@ SEND_METHOD:
 										ieee154e_vars.start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT - delayRx);
 								BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
 										ieee154e_vars.start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT + wdAckDuration);
-								len = NETSTACK_RADIO_read_ack(ieee154e_vars.ackbuf, ACK_LEN + EXTRA_ACK_LEN);
+								len = NETSTACK_RADIO_read_ack(ieee154e_vars.ackbuf, STD_ACK_LEN + SYNC_IE_LEN);
 								/* Enabling address decoding again so the radio filter data packets */
 								NETSTACK_RADIO_address_decode(1);
 								if (2 == ieee154e_vars.ackbuf[0] && len >= ACK_LEN && seqno == ieee154e_vars.ackbuf[2]) {
@@ -821,7 +831,7 @@ SEND_METHOD:
 									ack_status = 0;
 									/* IE-list present? */
 									if (ieee154e_vars.ackbuf[1] & 2) {
-										if (len == ACK_LEN + EXTRA_ACK_LEN) {
+										if (len == STD_ACK_LEN + SYNC_IE_LEN) {
 											if (ieee154e_vars.ackbuf[3] == 0x02 && ieee154e_vars.ackbuf[4] == 0x1e) {
 												ack_status = ieee154e_vars.ackbuf[5];
 												ack_status |= ieee154e_vars.ackbuf[6] << 8;
@@ -1443,7 +1453,7 @@ void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet
 static void tsch_init_variables(void)
 {
 	//setting seed for the random generator
-	srand_newg(node_id * node_id * RTIMER_NOW());
+	srand_newg(clock_time()  * RTIMER_NOW());
 	NETSTACK_RADIO_softack_subscribe(NULL, NULL);
 	//look for a root to sync with
 	ieee154e_vars.current_slotframe = &minimum_slotframe;

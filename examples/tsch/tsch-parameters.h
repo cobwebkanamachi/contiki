@@ -2,12 +2,12 @@
 #define __TSCH_PARAMETERS_H__
 #include "net/rime/rimeaddr.h"
 
-struct received_frame_radio_s {
-  uint8_t* buf;
-  uint8_t len;
-  rimeaddr_t source_address;
-  rtimer_clock_t sfd_timestamp;
-};
+//struct received_frame_radio_s {
+//  uint8_t* buf;
+//  uint8_t len;
+//  rimeaddr_t source_address;
+//  rtimer_clock_t sfd_timestamp;
+//};
 
 #define NACK_FLAG 0x8000
 

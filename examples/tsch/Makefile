@@ -1,6 +1,7 @@
 TARGET ?= sky
+#DEVICE_NAME ?= DR1198
 #APPS=servreg-hack
-CONTIKIDIRS += ./dev 
+CONTIKIDIRS += dev 
 ifeq ($(TARGET), sky) 
 CONTIKI_SOURCEFILES += cc2420-tsch.c tsch.c
 else
