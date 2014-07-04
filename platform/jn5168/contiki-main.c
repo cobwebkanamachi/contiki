@@ -49,6 +49,8 @@
 #include "dev/leds.h"
 
 #include "dev/button-sensor.h"
+#include "dev/micromac-radio.h"
+
 //#include "dev/pir-sensor.h"
 //#include "dev/vib-sensor.h"
 
@@ -116,12 +118,15 @@ set_rime_addr(void)
   int i;
 
   memset(&addr, 0, sizeof(addr));
-#if UIP_CONF_IPV6
-  memcpy(addr.u8, micromac_get_hw_mac_address_location(), sizeof(addr.u8));
-#else
-  memcpy(addr.u8, micromac_get_hw_mac_address_location(), sizeof(addr.u8));
-  //memcpy(addr.u8, micromac_get_hw_mac_address_location()+6, sizeof(addr.u8));
-#endif
+//#if UIP_CONF_IPV6
+//  memcpy(addr.u8, micromac_get_hw_mac_address_location(), sizeof(addr.u8));
+//#else
+//  memcpy(addr.u8, micromac_get_hw_mac_address_location(), sizeof(addr.u8));
+//  //memcpy(addr.u8, micromac_get_hw_mac_address_location()+6, sizeof(addr.u8));
+//#endif
+  tsExtAddr psExtAddress;
+  vMMAC_GetMacAddress(&psExtAddress);
+  copy_to_rimeaddress(&addr, &psExtAddress);
   rimeaddr_set_node_addr(&addr);
   printf("Rime started with address ");
   for(i = 0; i < sizeof(addr.u8) - 1; i++) {
@@ -141,8 +146,6 @@ set_rime_addr(void)
   }
   printf("%02x\n", macaddr[i]);
   */
-  tsExtAddr psExtAddress;
-  micromac_get_hw_mac_address(&psExtAddress);
   printf("HW MAC tsExtAddr: %08x.%08x\n", psExtAddress.u32H, psExtAddress.u32L);
 }
 
@@ -193,7 +196,11 @@ main(void)
   printf("MAC %s RDC %s NETWORK %s\n", NETSTACK_MAC.name, NETSTACK_RDC.name, NETSTACK_NETWORK.name);
 
 #if WITH_UIP6
-  memcpy(&uip_lladdr.addr, micromac_get_hw_mac_address_location(), sizeof(uip_lladdr.addr));
+
+  tsExtAddr psExtAddress;
+  vMMAC_GetMacAddress(&psExtAddress);
+  copy_to_rimeaddress(&uip_lladdr, &psExtAddress);
+//  memcpy(&uip_lladdr.addr, micromac_get_hw_mac_address_location(), sizeof(uip_lladdr.addr));
 
   process_start(&tcpip_process, NULL);
   printf("Tentative link-local IPv6 address ");
