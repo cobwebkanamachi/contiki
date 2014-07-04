@@ -44,7 +44,11 @@
 #include "contiki.h"
 #include "dev/radio.h"
 #include <MMAC.h>
+#include "net/rime/rimeaddr.h"
+
+void copy_to_rimeaddress(rimeaddr_t* addr, tuAddr* tu_addr);
 void copy_from_rimeaddress(tuAddr*, rimeaddr_t* );
+
 #define MICROMAC_HEADER_LEN (28)
 
 int micromac_radio_init(void);
