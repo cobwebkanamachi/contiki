@@ -57,7 +57,7 @@
 #undef RF_CHANNEL
 #define RF_CHANNEL (26)
 #endif
-
+//vMMAC_SetCutOffTimer(uint32 u32CutOffTime, bool_t bEnable);
 /* XXX JN5168_CONF_CCA_THRESH has an arbitrary value */
 // an integer between 0 and 255
 #ifndef JN5168_CONF_CCA_THRESH
@@ -431,10 +431,10 @@ micromac_radio_init(void)
 	u8MaxBE = 0, /* max backoff exponent */
 	u8MaxBackoffs = 1; /* backoff before aborting */
 	vMMAC_SetTxParameters(u8TxAttempts, u8MinBE, u8MaxBE, u8MaxBackoffs);
+	vMMAC_SetCutOffTimer(0, FALSE);
 
 #if MICROMAC_RADIO_ALWAYS_ON
 	rx_in_progress = 1;
-	// vMMAC_SetCutOffTimer(0, FALSE);
 	on();
 #endif
 	RELEASE_LOCK();
@@ -527,7 +527,8 @@ micromac_radio_transmit_delayed(uint32 u32_delay_time)
 /*---------------------------------------------------------------------------*/
 int micromac_radio_get_delayed_transmit_status(void)
 {
-	while (!u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE)){}
+	//XXX while
+	if (!u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE)){}
 	int ret = RADIO_TX_ERR;
 	uint32_t tx_error = u32MMAC_GetTxErrors();
 	if (tx_error == 0) {

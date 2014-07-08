@@ -34,8 +34,7 @@
  * \file
  *         MICROMAC_RADIO driver header file
  * \author
- *         Adam Dunkels <adam@sics.se>
- *         Joakim Eriksson <joakime@sics.se>
+ *         Beshr Al Nahas <beshr@sics.se>
  */
 
 #ifndef MICROMAC_RADIO_H_
@@ -114,8 +113,8 @@ void micromac_radio_start_rx_delayed(uint32 u32_delay_time, uint32 u32_on_durati
 int micromac_radio_read_ack(void *buf, int alen);
 void micromac_radio_interrupt(uint32 mac_event);
 
-#define RADIO_TO_RTIMER(X) 											((rtimer_clock_t)((X * (uint32_t)512)/(uint32_t)1000))
-#define RTIMER_TO_RADIO(X) 											((uint32_t)((X * (uint32_t)1000)/(uint32_t)512))
+#define RADIO_TO_RTIMER(X) 											((rtimer_clock_t)( (uint32_t)(X) << (uint32_t)9 ))
+#define RTIMER_TO_RADIO(X) 											((uint32_t)( (uint32_t)(X) >> (uint32_t)9 ))
 
 #define NETSTACK_RADIO_tx_duration(X) 					RADIO_TO_RTIMER(X+1)
 #define NETSTACK_RADIO_start_rx_delayed(u32_delay_time, u32_on_duration) micromac_radio_start_rx_delayed(u32_delay_time, u32_on_duration)

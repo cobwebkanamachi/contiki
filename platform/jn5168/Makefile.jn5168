@@ -18,8 +18,8 @@ CONTIKI_TARGET_SOURCEFILES += micromac-radio.c
 APPLIBS += MMAC 
 STACKLIBS += JPT
 #For reading internal MAC address using pvAppApiGetMacAddrLocation()
-#JENNIC_STACK = MAC
-JENNIC_STACK = NONE
+JENNIC_STACK = MAC
+#JENNIC_STACK = NONE
 
 # leds-arch.c \
 #                pir-sensor.c vib-sensor.c xmem.c \
