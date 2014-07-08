@@ -26,6 +26,7 @@
  * This file is part of the Contiki operating system.
  *
  */
+//#pragma GCC poison printf
 #undef WITH_COMPOWER
 #include "contiki.h"
 #include "lib/random.h"
@@ -36,7 +37,7 @@
 #ifdef WITH_COMPOWER
 #include "powertrace.h"
 #endif
-#include <stdio.h>
+//#include <stdio.h>
 #include <string.h>
 
 #define UDP_CLIENT_PORT 4000
@@ -44,7 +45,7 @@
 
 #define UDP_EXAMPLE_ID  190
 
-#define DEBUG DEBUG_NONE //DEBUG_PRINT
+#define DEBUG DEBUG_PRINT
 #include "net/uip-debug.h"
 #if DEBUG
 #if ENABLE_COOJA_DEBUG
@@ -96,7 +97,7 @@ send_packet(void *ptr)
   char buf[MAX_PAYLOAD_LEN];
 
   seq_id++;
-//  sprintf(buf, "%d::Hello %d", seq_id, rimeaddr_node_addr.u8[RIMEADDR_SIZE-1]);
+  sprintf(buf, "%d::Hello %d", seq_id, rimeaddr_node_addr.u8[RIMEADDR_SIZE-1]);
   PRINTF("DATA send to %d '%s'\n",
            server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1], buf);
   uip_udp_packet_sendto(client_conn, buf, strlen(buf),

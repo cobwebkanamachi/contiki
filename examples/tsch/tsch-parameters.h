@@ -11,9 +11,60 @@
 
 #define NACK_FLAG 0x8000
 
+#define TRIVIAL_DELAY 5*RTIMER_SECOND/100
+
 #define RESYNCH_TIMEOUT ieee154e_vars.current_slotframe->length * 10
 #define KEEPALIVE_TIMEOUT ieee154e_vars.current_slotframe->length * 3
+#if CONTIKI_TARGET_JN5168
+// Atomic durations
+// expressed in 16MHz ticks:
+//    - ticks = duration_in_seconds * 16000000
+//    - duration_in_seconds = ticks / 16000000
 
+//XXX check these numbers on real hw or cooja
+//164*3 as PORT_TsSlotDuration causes 147.9448us drift every slotframe ==4.51 ticks
+// 15000us
+#define PORT_TsSlotDuration (15000)
+//   1200us
+#define PORT_maxTxDataPrepare (500)
+//   600us
+#define PORT_maxRxAckPrepare (100)
+//   600us
+#define PORT_maxRxDataPrepare (100)
+
+#define PORT_maxTxAckPrepare (100)
+
+// ~327us+129preample
+#define PORT_delayTx (50)
+//~50us delay + 129preample + ??
+#define PORT_delayRx (10)
+
+enum ieee154e_atomicdurations_enum {
+	// time-slot related
+	TsCCAOffset= 1000, //1000us //98,										//3000us
+	TsCCA=500,												//~500us
+	TsRxTx=500,												//500us
+	TsTxOffset = 4000,                  //  4000us
+	TsLongGT = 1300,                  //  1300us
+	TsTxAckDelay = 4000,                  //  4000us
+//	TsTxAckDelay = 99,                  //  3000us
+	TsShortGT = 500,                  //   500us
+//	TsShortGT = 32,                  //  1000us
+	TsSlotDuration = PORT_TsSlotDuration,  // 15000us
+	// execution speed related
+	maxTxDataPrepare = PORT_maxTxDataPrepare,
+	maxRxAckPrepare = PORT_maxRxAckPrepare,
+	maxRxDataPrepare = PORT_maxRxDataPrepare,
+	maxTxAckPrepare = PORT_maxTxAckPrepare,
+	// radio speed related
+	delayTx = PORT_delayTx,         // between GO signal and SFD: radio fixed delay + 4Bytes preample + 1B SFD -- 1Byte time is 32us
+	delayRx = PORT_delayRx,         // between GO signal and start listening
+	// radio watchdog
+	wdRadioTx = 1000,                  //  1000us (needs to be >delayTx)
+	wdDataDuration = 4500,            //  4500us (measured 4280us with max payload)
+	wdAckDuration = 600,                  //  600us (measured 1000us me: 440us)
+};
+#else
 // Atomic durations
 // expressed in 32kHz ticks:
 //    - ticks = duration_in_seconds * 32768
@@ -62,7 +113,7 @@ enum ieee154e_atomicdurations_enum {
 	wdDataDuration = 148,            //  4500us (measured 4280us with max payload)
 	wdAckDuration = 21,                  //  600us (measured 1000us me: 440us)
 };
-
+#endif
 enum ieee154e_states_enum {
 	TSCH_OFF = 0, TSCH_ASSOCIATED = 1, TSCH_SEARCHING = 2, TSCH_TIMEOUT,
 };

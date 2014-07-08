@@ -26,6 +26,8 @@
  * This file is part of the Contiki operating system.
  *
  */
+//#pragma GCC poison printf
+
 #undef WITH_COMPOWER
 #include "contiki.h"
 #include "contiki-lib.h"
@@ -40,7 +42,7 @@
 #include <string.h>
 //#include <ctype.h>
 
-#define DEBUG DEBUG_NONE //DEBUG_PRINT
+#define DEBUG DEBUG_PRINT
 #include "net/uip-debug.h"
 #if DEBUG
 #if ENABLE_COOJA_DEBUG
@@ -85,7 +87,7 @@ tcpip_handler(void)
     if(uip_datalen()>MAX_PAYLOAD_LEN/2) {
     	appdata[MAX_PAYLOAD_LEN/2] = 0;
     }
-//    sprintf(buf, "%d::Reply::%s", rimeaddr_node_addr.u8[RIMEADDR_SIZE-1], appdata);
+    sprintf(buf, "%d::Reply::%s", rimeaddr_node_addr.u8[RIMEADDR_SIZE-1], appdata);
     PRINTF("DATA sending '%s'\n", buf);
 
     uip_ipaddr_copy(&server_conn->ripaddr, &UIP_IP_BUF->srcipaddr);

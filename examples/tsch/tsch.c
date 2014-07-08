@@ -53,28 +53,28 @@
 #include "dev/leds.h"
 #include "sys/ctimer.h"
 
-#ifndef CONTIKI_TARGET_JN5168
-#define CONTIKI_TARGET_JN5168 1
-#endif
+//#ifndef CONTIKI_TARGET_JN5168
+//#define CONTIKI_TARGET_JN5168 1
+//#endif
 #if CONTIKI_TARGET_JN5168
+#pragma "CONTIKI_TARGET_JN5168"
 #include "dev/micromac-radio.h"
+#undef putchar
+#define putchar uart0_writeb
 #else /* Leave CC2420 as default */
 #include "dev/cc2420-tsch.h"
 #endif /* CONTIKI_TARGET */
 
-//make sure to #define MICROMAC_RADIO_CONF_NO_IRQ 1
-//#define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
-#define DEBUG DEBUG_PRINT
-#include "net/uip-debug.h"
-
-#ifndef PUTCHAR
+#define DEBUG 1
+#undef PUTCHAR
 #if DEBUG
-//#include <studio.h>
 #define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
+int dbg_printf(const char *fmt, ...);
+#define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
 #else
+#define PRINTF(...) do {} while (0)
 #define PUTCHAR(X)
 #endif /* DEBUG */
-#endif /* PUTCHAR(X) */
 
 #ifndef True
 #define True (1)
@@ -83,8 +83,6 @@
 #ifndef False
 #define False (0)
 #endif
-
-
 
 /* TSCH queue size: is it non-zero and a power of two? */
 #if ( QUEUEBUF_CONF_NUM && !(QUEUEBUF_CONF_NUM & (QUEUEBUF_CONF_NUM-1)) )
@@ -526,7 +524,7 @@ hop_channel(uint8_t offset)
 {
 	uint8_t channel = 11 + (offset + ieee154e_vars.asn.asn_4lsb) % 16;
 	//XXX disabling channel hopping
-	channel=RF_CONF_CHANNEL;
+	channel=20;
 	if ( NETSTACK_RADIO_set_channel(channel)) {
 		return channel;
 	}
@@ -557,11 +555,11 @@ schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
 		rtimer_clock_t duration)
 {
 	int r, status = 0;
-	rtimer_clock_t now = RTIMER_NOW()+2;
+	rtimer_clock_t now = RTIMER_NOW()+TRIVIAL_DELAY;
 	ref_time += duration;
 //	RTIMER_CLOCK_LT(ref_time - now > duration+5)
 	if (!RTIMER_CLOCK_LT(now,ref_time)) {
-		ref_time = now + 5;
+		ref_time = now + TRIVIAL_DELAY;
 		COOJA_DEBUG_STR("schedule_fixed: missed deadline");
 	}
 	r = rtimer_set(tm, ref_time, 1, (void
@@ -582,7 +580,7 @@ schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 	int r, status = 0;
 	rtimer_clock_t now = RTIMER_NOW() + 1;
 	ref_time += duration;
-	if (ref_time - now > duration+5) {
+	if (ref_time - now > duration+TRIVIAL_DELAY) {
 		COOJA_DEBUG_STR("schedule_strict: missed deadline");
 		status = 1;
 	} else {
@@ -636,7 +634,7 @@ powercycle(struct rtimer *t, void *ptr)
 		ieee154e_vars.payload_len = 0;
 		is_broadcast = 0; len=0; seqno=0; ret=0;
 
-		COOJA_DEBUG_STR("Resync\n");
+		PRINTF("Resync\n");
 		PT_YIELD_UNTIL(&ieee154e_vars.mpt, ieee154e_vars.state == TSCH_ASSOCIATED);
 		ieee154e_vars.timeslot = ieee154e_vars.asn.asn_4lsb % ieee154e_vars.current_slotframe->length;
 		if(ieee154e_vars.join_priority==0) {
@@ -649,7 +647,8 @@ powercycle(struct rtimer *t, void *ptr)
 #endif /* CONTIKI_TARGET_JN5168 */
 			/* sync with cycle start and enable capturing start & end sfd*/
 			NETSTACK_RADIO_sfd_sync(1, 1);
-			leds_on(LEDS_GREEN);
+			leds_on(LEDS_RED);
+
 			ieee154e_vars.cell = get_cell(ieee154e_vars.timeslot);
 			if (ieee154e_vars.cell == NULL || ieee154e_vars.working_on_queue) {
 				COOJA_DEBUG_STR("Off CELL\n");
@@ -1141,7 +1140,7 @@ powercycle(struct rtimer *t, void *ptr)
 					PUTCHAR('!');
 				}
 				ieee154e_vars.start += duration;
-				leds_off(LEDS_GREEN);
+				leds_off(LEDS_RED);
 				PT_YIELD(&ieee154e_vars.mpt);
 			}
 		}
@@ -1344,6 +1343,8 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 		NETSTACK_RADIO_softack_subscribe(softack_make, interrupt_exit);
 
 		//process the schedule, to create queues and find time-sources (time-keeping)
+		//wait until queue is free
+		while(ieee154e_vars.working_on_queue){}
 		if(!ieee154e_vars.working_on_queue) {
 			struct neighbor_queue *n;
 			uint8_t i = 0;
@@ -1421,9 +1422,7 @@ PROCESS_THREAD(tsch_associate, ev, data)
 					/* to make sure that this is a root and not just a low ranked node */
 					if(ieee154e_vars.join_priority == 0 && my_rpl_dag->rank > 1) {
 						//TODO choose something else?
-						if(!ieee154e_vars.first_associate /* || my_rpl_dag->rank == 256 ??*/) {
-							ieee154e_vars.join_priority = 0;
-						} else {
+						if(ieee154e_vars.first_associate /* || my_rpl_dag->rank == 256 ??*/) {
 							ieee154e_vars.join_priority = 0xf0;
 						}
 					}
@@ -1433,15 +1432,16 @@ PROCESS_THREAD(tsch_associate, ev, data)
 			ieee154e_vars.first_associate = 1;
 			//if this is root start now
 			if(ieee154e_vars.join_priority == 0) {
-				COOJA_DEBUG_STR("rpl root");
+				PRINTF("rpl root\n");
 				//something other than 0 for now
 				ieee154e_vars.state = TSCH_ASSOCIATED;
 				//make queues and data structures
 				tsch_wait_for_eb(0,NULL);
 				NETSTACK_RADIO_softack_subscribe(tsch_make_sync_ack, tsch_resume_powercycle);
 				ieee154e_vars.start = RTIMER_NOW();
-				schedule_fixed(&ieee154e_vars.t, ieee154e_vars.start, 5);
-				COOJA_DEBUG_STR("associate done");
+
+				schedule_fixed(&ieee154e_vars.t, ieee154e_vars.start, TRIVIAL_DELAY);
+				PRINTF("associate done\n");
 				// XXX for debugging
 				ieee154e_vars.asn.asn_4lsb = 0;
 			} else {
@@ -1481,6 +1481,7 @@ void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet
 /*---------------------------------------------------------------------------*/
 static void tsch_init_variables(void)
 {
+
 	//setting seed for the random generator
 	srand_newg(clock_time()  * RTIMER_NOW());
 	NETSTACK_RADIO_softack_subscribe(NULL, NULL);
@@ -1502,11 +1503,13 @@ static void tsch_init_variables(void)
 	ieee154e_vars.registered_drift = 0;
 	ieee154e_vars.timeslot = 0;
 	NETSTACK_RADIO_sfd_sync(True, True);
+
 }
 /*---------------------------------------------------------------------------*/
 static void
 tsch_init(void)
 {
+	leds_blink();
 	COOJA_DEBUG_STR("tsch_init");
 	tsch_init_variables();
 	/* on resynchronization, the node has already joined a RPL network and it is mistaking it with root
