@@ -37,7 +37,7 @@
 #include "contiki-conf.h"
 #include <LedControl.h>
 
-static uint8_t leds;
+static volatile uint8_t leds;
 
 /*---------------------------------------------------------------------------*/
 void
@@ -57,8 +57,8 @@ void
 leds_arch_set(unsigned char c)
 {
   leds = c;
-  vLedControl(LED_S0_PIN, leds&LEDS_RED);
-  vLedControl(LED_S1_PIN, leds&LEDS_GREEN);
-  vLedControl(LED_S2_PIN, leds&LEDS_YELLOW);
+  vLedControl(LED_S0_PIN, leds&LEDS_GREEN);
+  vLedControl(LED_S1_PIN, leds&LEDS_YELLOW);
+  vLedControl(LED_S2_PIN, leds&LEDS_RED);
 }
 
