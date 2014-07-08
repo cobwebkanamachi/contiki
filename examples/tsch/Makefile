@@ -5,7 +5,7 @@ CONTIKIDIRS += dev
 ifeq ($(TARGET), sky) 
 CONTIKI_SOURCEFILES += cc2420-tsch.c tsch.c
 else
-CONTIKI_SOURCEFILES += tsch.c
+CONTIKI_SOURCEFILES += micromac-radio.c tsch.c
 endif
 
 

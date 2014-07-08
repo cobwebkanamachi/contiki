@@ -26,7 +26,7 @@
  * This file is part of the Contiki operating system.
  *
  */
-
+#undef WITH_COMPOWER
 #include "contiki.h"
 #include "contiki-lib.h"
 #include "contiki-net.h"
@@ -34,27 +34,28 @@
 #include "net/rpl/rpl.h"
 
 #include "net/netstack.h"
-#include "dev/button-sensor.h"
-#include <stdio.h>
-#include <stdlib.h>
+//#include "dev/button-sensor.h"
+//#include <stdio.h>
+//#include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
+//#include <ctype.h>
 
-#if 0
+#define DEBUG DEBUG_NONE //DEBUG_PRINT
+#include "net/uip-debug.h"
+#if DEBUG
+#if ENABLE_COOJA_DEBUG
 #include "cooja-debug.h"
+#undef PRINTF
+#undef PRINT6ADDR
 #define PRINTF COOJA_DEBUG_PRINTF
 #define PRINT6ADDR COOJA_DEBUG_ADDR16
-#elif 1
-//#define DEBUG DEBUG_PRINT
-//#include "net/uip-debug.h"
-void uip_debug_ipaddr_print(const uip_ipaddr_t *addr);
-void uip_debug_lladdr_print(const uip_lladdr_t *addr);
-#define PRINTF(...) printf(__VA_ARGS__)
-#define PRINT6ADDR(addr) uip_debug_ipaddr_print(addr)
+#endif /* ENABLE_COOJA_DEBUG */
 #else
+#undef PRINTF
+#undef PRINT6ADDR
 #define PRINTF(...)
 #define PRINT6ADDR(...)
-#endif
+#endif /* DEBUG */
 
 #define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
 
@@ -84,7 +85,7 @@ tcpip_handler(void)
     if(uip_datalen()>MAX_PAYLOAD_LEN/2) {
     	appdata[MAX_PAYLOAD_LEN/2] = 0;
     }
-    sprintf(buf, "%d::Reply::%s", rimeaddr_node_addr.u8[RIMEADDR_SIZE-1], appdata);
+//    sprintf(buf, "%d::Reply::%s", rimeaddr_node_addr.u8[RIMEADDR_SIZE-1], appdata);
     PRINTF("DATA sending '%s'\n", buf);
 
     uip_ipaddr_copy(&server_conn->ripaddr, &UIP_IP_BUF->srcipaddr);
@@ -123,7 +124,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
 
   PROCESS_PAUSE();
 
-  SENSORS_ACTIVATE(button_sensor);
+  //SENSORS_ACTIVATE(button_sensor);
 
   PRINTF("UDP server started\n");
 
@@ -136,7 +137,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
  * (Setting Context 0 to aaaa::1111:2222:3333:4444 will report a 16 bit compressed address of aaaa::1111:22ff:fe33:xxxx)
  * Note Wireshark's IPCMV6 checksum verification depends on the correct uncompressed addresses.
  */
- 
+
 #if 0
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
@@ -161,10 +162,10 @@ PROCESS_THREAD(udp_server_process, ev, data)
     PRINTF("failed to create a new RPL DAG\n");
   }
 #endif /* UIP_CONF_ROUTER */
-  
+
   print_local_addresses();
 
-  /* The data sink runs with a 100% duty cycle in order to ensure high 
+  /* The data sink runs with a 100% duty cycle in order to ensure high
      packet reception rates. */
   //NETSTACK_MAC.off(1);
 
@@ -184,10 +185,10 @@ PROCESS_THREAD(udp_server_process, ev, data)
     PROCESS_YIELD();
     if(ev == tcpip_event) {
       tcpip_handler();
-    } else if (ev == sensors_event && data == &button_sensor) {
+    } /*else if (ev == sensors_event && data == &button_sensor) {
       PRINTF("Initiaing global repair\n");
       rpl_repair_root(RPL_DEFAULT_INSTANCE);
-    }
+    }*/
   }
 
   PROCESS_END();

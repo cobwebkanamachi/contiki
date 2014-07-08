@@ -26,7 +26,7 @@
  * This file is part of the Contiki operating system.
  *
  */
-
+#undef WITH_COMPOWER
 #include "contiki.h"
 #include "lib/random.h"
 #include "sys/ctimer.h"
@@ -44,21 +44,22 @@
 
 #define UDP_EXAMPLE_ID  190
 
-#if 0
+#define DEBUG DEBUG_NONE //DEBUG_PRINT
+#include "net/uip-debug.h"
+#if DEBUG
+#if ENABLE_COOJA_DEBUG
 #include "cooja-debug.h"
+#undef PRINTF
+#undef PRINT6ADDR
 #define PRINTF COOJA_DEBUG_PRINTF
 #define PRINT6ADDR COOJA_DEBUG_ADDR16
-#elif 1
-//#define DEBUG DEBUG_PRINT
-//#include "net/uip-debug.h"
-void uip_debug_ipaddr_print(const uip_ipaddr_t *addr);
-void uip_debug_lladdr_print(const uip_lladdr_t *addr);
-#define PRINTF(...) printf(__VA_ARGS__)
-#define PRINT6ADDR(addr) uip_debug_ipaddr_print(addr)
+#endif /* ENABLE_COOJA_DEBUG */
 #else
+#undef PRINTF
+#undef PRINT6ADDR
 #define PRINTF(...)
 #define PRINT6ADDR(...)
-#endif
+#endif /* DEBUG */
 
 #ifndef PERIOD
 #define PERIOD 15
@@ -95,7 +96,7 @@ send_packet(void *ptr)
   char buf[MAX_PAYLOAD_LEN];
 
   seq_id++;
-  sprintf(buf, "%d::Hello %d", seq_id, rimeaddr_node_addr.u8[RIMEADDR_SIZE-1]);
+//  sprintf(buf, "%d::Hello %d", seq_id, rimeaddr_node_addr.u8[RIMEADDR_SIZE-1]);
   PRINTF("DATA send to %d '%s'\n",
            server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1], buf);
   uip_udp_packet_sendto(client_conn, buf, strlen(buf),
@@ -142,7 +143,7 @@ set_global_address(void)
  *
  * Note the IPCMV6 checksum verification depends on the correct uncompressed addresses.
  */
- 
+
 #if 0
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
@@ -168,18 +169,18 @@ PROCESS_THREAD(udp_client_process, ev, data)
   PROCESS_PAUSE();
 
   set_global_address();
-  
+
   PRINTF("UDP client process started\n");
 
   print_local_addresses();
 
   /* new connection with remote host */
-  client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL); 
+  client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL);
   if(client_conn == NULL) {
     PRINTF("No UDP connection available, exiting the process!\n");
     PROCESS_EXIT();
   }
-  udp_bind(client_conn, UIP_HTONS(UDP_CLIENT_PORT)); 
+  udp_bind(client_conn, UIP_HTONS(UDP_CLIENT_PORT));
 
   PRINTF("Created a connection with the server ");
   PRINT6ADDR(&client_conn->ripaddr);
@@ -196,21 +197,21 @@ PROCESS_THREAD(udp_client_process, ev, data)
     if(ev == tcpip_event) {
       tcpip_handler();
     }
-    
+
     if(etimer_expired(&periodic)) {
       etimer_reset(&periodic);
       ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);
 //      etimer_set(&periodic, SEND_INTERVAL+SEND_TIME);
 //      send_packet(NULL);
 
-#if WITH_COMPOWER
-      if (print == 0) {
-	powertrace_print("#P");
-      }
-      if (++print == 3) {
-	print = 0;
-      }
-#endif
+//#if WITH_COMPOWER
+//      if (print == 0) {
+//	powertrace_print("#P");
+//      }
+//      if (++print == 3) {
+//	print = 0;
+//      }
+//#endif
 
     }
   }

@@ -49,28 +49,32 @@
 #include "lib/list.h"
 #include "lib/memb.h"
 #include "lib/random.h"
-//#include "dev/cc2420-tsch.h"
-#include "dev/micromac-radio.h"
 #include "net/mac/frame802154.h"
 #include "dev/leds.h"
 #include "sys/ctimer.h"
 
+#ifndef CONTIKI_TARGET_JN5168
+#define CONTIKI_TARGET_JN5168 1
+#endif
+#if CONTIKI_TARGET_JN5168
+#include "dev/micromac-radio.h"
+#else /* Leave CC2420 as default */
+#include "dev/cc2420-tsch.h"
+#endif /* CONTIKI_TARGET */
+
 //make sure to #define MICROMAC_RADIO_CONF_NO_IRQ 1
 //#define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
+#define DEBUG DEBUG_PRINT
+#include "net/uip-debug.h"
 
-#define DEBUG 0
+#ifndef PUTCHAR
 #if DEBUG
-#include <stdio.h>
-#define PRINTF(...) printf(__VA_ARGS__)
-#ifndef PUTCHAR
+//#include <studio.h>
 #define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
-#endif /* PUTCHAR(X) */
 #else
-#define PRINTF(...)
-#ifndef PUTCHAR
 #define PUTCHAR(X)
+#endif /* DEBUG */
 #endif /* PUTCHAR(X) */
-#endif
 
 #ifndef True
 #define True (1)
@@ -177,8 +181,6 @@ static volatile ieee154e_vars_t ieee154e_vars;
 #include "net/nbr-table.h"
 NBR_TABLE(struct neighbor_queue, neighbor_list);
 
-static struct TSCH_packet *
-get_next_packet_for_shared_tx(void);
 struct neighbor_queue *
 neighbor_queue_from_addr(const rimeaddr_t *addr);
 struct neighbor_queue *
@@ -192,7 +194,6 @@ remove_packet_from_queue(const rimeaddr_t *addr);
 struct TSCH_packet*
 read_packet_from_queue(const rimeaddr_t *addr);
 /*---------------------------------------------------------------------------*/
-static void tsch_timer(void *ptr);
 static int make_eb(uint8_t * buf, uint8_t buf_size);
 void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack);
 static void tsch_init(void);
@@ -323,36 +324,29 @@ remove_packet_from_queue(const rimeaddr_t *addr)
 	return 0;
 }
 /*---------------------------------------------------------------------------*/
-/* returns the first packet in the queue of neighbor */
-struct TSCH_packet*
-read_packet_from_queue(const rimeaddr_t *addr)
-{
-	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
-	if (n != NULL) {
-		if (((n->put_ptr - n->get_ptr) & (NBR_BUFFER_SIZE - 1)) > 0) {
-			return &(n->buffer[n->get_ptr]);
-		}
-	}
-	return 0;
-}
-/*---------------------------------------------------------------------------*/
 /* returns the first packet in the queue of a neighbor */
 struct TSCH_packet*
 read_packet_from_neighbor_queue(const struct neighbor_queue *n)
 {
-	if (n != NULL) {
+	if(n != NULL) {
 		if (((n->put_ptr - n->get_ptr) & (NBR_BUFFER_SIZE - 1)) > 0) {
-			return &(n->buffer[n->get_ptr]);
-		} else {
-			return 0;
+			return (struct TSCH_packet*)&(n->buffer[n->get_ptr]);
 		}
 	}
-	return 0;
+	return NULL;
+}
+/*---------------------------------------------------------------------------*/
+/* returns the first packet in the queue of neighbor */
+struct TSCH_packet*
+read_packet_from_queue(const rimeaddr_t *addr)
+{
+	return read_packet_from_neighbor_queue( neighbor_queue_from_addr(addr) );
 }
 /*---------------------------------------------------------------------------*/
 /* get a packet to send in a shared slot */
 static struct TSCH_packet *
-get_next_packet_for_shared_slot_tx(void) {
+get_next_packet_for_shared_slot_tx(void)
+{
 	static struct neighbor_queue* last_neighbor_tx = NULL;
 	if(last_neighbor_tx == NULL) {
 		last_neighbor_tx = nbr_table_head(neighbor_list);
@@ -532,7 +526,7 @@ hop_channel(uint8_t offset)
 {
 	uint8_t channel = 11 + (offset + ieee154e_vars.asn.asn_4lsb) % 16;
 	//XXX disabling channel hopping
-	channel=20;
+	channel=RF_CONF_CHANNEL;
 	if ( NETSTACK_RADIO_set_channel(channel)) {
 		return channel;
 	}
@@ -571,7 +565,7 @@ schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
 		COOJA_DEBUG_STR("schedule_fixed: missed deadline");
 	}
 	r = rtimer_set(tm, ref_time, 1, (void
-	(*)(struct rtimer *, void *)) powercycle, status);
+	(*)(struct rtimer *, void *)) powercycle, NULL /*(void*)&status*/);
 	if (r != RTIMER_OK) {
 		COOJA_DEBUG_STR("schedule_fixed: could not set rtimer\n");
 		status = 2;
@@ -593,7 +587,7 @@ schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 		status = 1;
 	} else {
 		r = rtimer_set(tm, ref_time, 1, (void
-		(*)(struct rtimer *, void *)) powercycle, status);
+		(*)(struct rtimer *, void *)) powercycle, NULL /*(void*)&status*/);
 		if (r != RTIMER_OK) {
 			COOJA_DEBUG_STR("schedule_strict: could not set rtimer\n");
 			status = 2;
@@ -623,8 +617,11 @@ powercycle(struct rtimer *t, void *ptr)
 	static uint8_t is_broadcast = 0, len=0, seqno=0, ret=0;
 	//to record the duration of packet tx
 	static rtimer_clock_t tx_time;
-
 	uint8_t success=0, cca_status=1, window=0;
+#if CONTIKI_TARGET_JN5168
+	static uint32_t cycle_start_radio_clock=0;
+	uint32_t tx_offset=0;
+#endif /* CONTIKI_TARGET_JN5168 */
 
 	while (ieee154e_vars.state != TSCH_OFF) {
 		ieee154e_vars.timeslot = 0;
@@ -647,6 +644,9 @@ powercycle(struct rtimer *t, void *ptr)
 		}
 		//while MAC-RDC is not disabled, and while its synchronized
 		while (ieee154e_vars.state == TSCH_ASSOCIATED) {
+#if CONTIKI_TARGET_JN5168
+			cycle_start_radio_clock = NETSTACK_RADIO_get_time();
+#endif /* CONTIKI_TARGET_JN5168 */
 			/* sync with cycle start and enable capturing start & end sfd*/
 			NETSTACK_RADIO_sfd_sync(1, 1);
 			leds_on(LEDS_GREEN);
@@ -672,8 +672,8 @@ powercycle(struct rtimer *t, void *ptr)
 						//TODO fetch adv/EB packets
 						ieee154e_vars.n = neighbor_queue_from_addr(&EB_CELL_ADDRESS);
 						if(generate_random_byte(8) >= 4) {
-							ieee154e_vars.payload_len = make_eb(ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN+1); //last byte in eb buf is for length
-							ieee154e_vars.payload = ieee154e_vars.eb_buf;
+							ieee154e_vars.payload_len = make_eb((uint8_t *)ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN+1); //last byte in eb buf is for length
+							ieee154e_vars.payload = (void *)ieee154e_vars.eb_buf;
 						} else {
 							COOJA_DEBUG_STR("Do not send EB");
 						}
@@ -766,7 +766,7 @@ powercycle(struct rtimer *t, void *ptr)
 					 * 6. Update CSMA parameters according to TX status
 					 * 7. Schedule mac_call_sent_callback
 					 **/
-SEND_METHOD:
+//SEND_METHOD:
 					COOJA_DEBUG_STR("CELL_TX");
 					//TODO There are small timing variations visible in cooja, which needs tuning
 					//read seqno from payload!
@@ -792,6 +792,15 @@ SEND_METHOD:
 						//I do it in transmit function now
 //						NETSTACK_RADIO_sfd_sync(0, 1);
 						//delay before TX
+#if CONTIKI_TARGET_JN5168
+						//XXX fix potential wrap
+						tx_offset = RTIMER_TO_RADIO(TsTxOffset) - (uint32_t)(NETSTACK_RADIO_get_time() - cycle_start_radio_clock);
+						NETSTACK_RADIO_transmit_delayed(tx_offset);
+						tx_time = NETSTACK_RADIO_tx_duration(ieee154e_vars.payload_len);
+						schedule_fixed(t, ieee154e_vars.start, TsTxOffset + tx_time);
+						PT_YIELD(&ieee154e_vars.mpt);
+						success = NETSTACK_RADIO_get_delayed_transmit_status();
+#else /* Leave CC2420 as default */
 						schedule_fixed(t, ieee154e_vars.start, TsTxOffset - delayTx);
 						PT_YIELD(&ieee154e_vars.mpt);
 
@@ -800,15 +809,22 @@ SEND_METHOD:
 						success = NETSTACK_RADIO.transmit(ieee154e_vars.payload_len);
 						//tx_time = NETSTACK_RADIO_read_sfd_timer() - tx_time;
 						//XXX check
-						tx_time = (ieee154e_vars.payload_len * (uint32_t)512)/(uint32_t)1000;
+						tx_time = ((ieee154e_vars.payload_len+1) * (uint32_t)512)/(uint32_t)1000;
 						//limit tx_time in case of something wrong
 						tx_time = MIN(tx_time, wdDataDuration);
 						off(keep_radio_on);
-
+#endif /* CONTIKI_TARGET */
 						if (success == RADIO_TX_OK) {
 							if (!is_broadcast) {
 								//wait for ack: after tx
 								COOJA_DEBUG_STR("wait for ACK\n");
+#if CONTIKI_TARGET_JN5168
+								tx_offset = RTIMER_TO_RADIO(TsTxOffset + tx_time + TsTxAckDelay) - (uint32_t)(NETSTACK_RADIO_get_time() - cycle_start_radio_clock);
+								NETSTACK_RADIO_start_rx_delayed(tx_offset, RTIMER_TO_RADIO(TsShortGT*2));
+								schedule_fixed(t, ieee154e_vars.start,
+										TsTxOffset + tx_time + TsTxAckDelay + TsShortGT + wdAckDuration);
+								PT_YIELD(&ieee154e_vars.mpt);
+#else
 								/* disable capturing sfd */
 //								NETSTACK_RADIO_sfd_sync(0, 0);
 								schedule_fixed(t, ieee154e_vars.start,
@@ -819,12 +835,13 @@ SEND_METHOD:
 								cca_status=0;
 								on();
 								BUSYWAIT_UNTIL_ABS(NETSTACK_RADIO.receiving_packet(),
-										ieee154e_vars.start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT - delayRx);
+																		ieee154e_vars.start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT - delayRx);
 								BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
 										ieee154e_vars.start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT + wdAckDuration);
-								len = NETSTACK_RADIO_read_ack(ieee154e_vars.ackbuf, STD_ACK_LEN + SYNC_IE_LEN);
 								/* Enabling address decoding again so the radio filter data packets */
 								NETSTACK_RADIO_address_decode(1);
+#endif /* CONTIKI_TARGET_JN5168 */
+								len = NETSTACK_RADIO_read_ack((void *)ieee154e_vars.ackbuf, STD_ACK_LEN + SYNC_IE_LEN);
 								if (2 == ieee154e_vars.ackbuf[0] && len >= ACK_LEN && seqno == ieee154e_vars.ackbuf[2]) {
 									success = RADIO_TX_OK;
 									ieee154e_vars.sync_timeout=0;
@@ -974,6 +991,12 @@ SEND_METHOD:
 //						goto SEND_METHOD;
 						//prepare keep-alive msg to be sent later...
 					} {
+#if CONTIKI_TARGET_JN5168
+						tx_offset = RTIMER_TO_RADIO(TsTxOffset - TsLongGT) - (uint32_t)(NETSTACK_RADIO_get_time() - cycle_start_radio_clock);
+						NETSTACK_RADIO_start_rx_delayed(tx_offset, RTIMER_TO_RADIO(TsLongGT*2));
+						schedule_fixed(t, ieee154e_vars.start, TsTxOffset - TsLongGT);
+						PT_YIELD(&ieee154e_vars.mpt);
+#else
 						//wait before RX
 						schedule_fixed(t, ieee154e_vars.start, TsTxOffset - TsLongGT - delayRx);
 						COOJA_DEBUG_STR("schedule RX on guard time - TsLongGT");
@@ -981,6 +1004,8 @@ SEND_METHOD:
 						PT_YIELD(&ieee154e_vars.mpt);
 						//Start radio for at least guard time
 						on();
+#endif /* CONTIKI_TARGET_JN5168 */
+
 						cca_status = 0;
 						//Check if receiving within guard time
 						BUSYWAIT_UNTIL_ABS(NETSTACK_RADIO.receiving_packet(),
@@ -996,10 +1021,15 @@ SEND_METHOD:
 //								rx_duration = NETSTACK_RADIO_get_rx_end_time() - ieee154e_vars.last_rf->sfd_timestamp;
 								/* wait until ack time */
 								if (ieee154e_vars.need_ack) {
+#if CONTIKI_TARGET_JN5168
+									tx_offset = RTIMER_TO_RADIO(TsTxAckDelay);
+									NETSTACK_RADIO_send_ack_delayed(tx_offset);
+#else
 									schedule_fixed(t, NETSTACK_RADIO_get_rx_end_time(), TsTxAckDelay - delayTx);
 //									schedule_fixed(t, ieee154e_vars.last_rf->sfd_timestamp, rx_duration + TsTxAckDelay - delayTx);
 									PT_YIELD(&ieee154e_vars.mpt);
 									NETSTACK_RADIO_send_ack();
+#endif
 								}
 								/* If the originator was a time source neighbor, the receiver adjusts its own clock by incorporating the
 								 * 	difference into an average of the drift to all its time source neighbors. The averaging method is
@@ -1010,7 +1040,7 @@ SEND_METHOD:
 									ieee154e_vars.sync_timeout=0;
 									COOJA_DEBUG_PRINTF("ieee154e_vars.drift seen %d\n", ieee154e_vars.registered_drift);
 									// check the source address for potential time-source match
-									ieee154e_vars.n = neighbor_queue_from_addr(&ieee154e_vars.last_rf->source_address);
+									ieee154e_vars.n = neighbor_queue_from_addr(&(ieee154e_vars.last_rf->source_address));
 									if(ieee154e_vars.n != NULL && ieee154e_vars.n->is_time_source) {
 										// should be the average of drifts to all time sources
 										ieee154e_vars.drift_correction -= ieee154e_vars.registered_drift;
@@ -1125,7 +1155,6 @@ static int16_t
 add_sync_IE(uint8_t* buf, int32_t time_difference_32, uint8_t nack) {
 	int16_t time_difference;
 	uint16_t ack_status = 0;
-	uint8_t len=4;
 	//do the math in 32bits to save precision
 	time_difference = (time_difference_32 * 3051)/100;
 	COOJA_DEBUG_PRINTF("ACK drift time_difference_32 %d, time_difference %d", time_difference_32, time_difference);
@@ -1149,8 +1178,8 @@ static int
 make_eb(uint8_t * buf, uint8_t buf_size)
 {
 	/* XXX make sure this function does not overflow buf */
-	uint16_t seqno, j=0;
-	uint8_t nack = 0, len, sub_id, type, i=0, k=0;
+	uint16_t j=0;
+	uint8_t len, sub_id, type, i=0, k=0;
 
 	COOJA_DEBUG_STR("TSCH make EB");
 	//fcf: 2Bytes
@@ -1222,7 +1251,7 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 			buf[i++] = ieee154e_vars.current_slotframe->length >> 8;
 			//buf[i++] = ieee154e_vars.current_slotframe->on_size & 0xff; /* number of included cells */
 			k=i++; //index of the element containing the number of included cells
-			for(j=0; j < ieee154e_vars.current_slotframe->on_size && 0xff; j++) {
+			for(j=0; j < (ieee154e_vars.current_slotframe->on_size & 0xff); j++) {
 				/* Include cells I am listening on only */
 				if(ieee154e_vars.current_slotframe->cells[j]->link_options & LINK_OPTION_RX) {
 					/* increase the number of included cells */
@@ -1256,7 +1285,7 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 void
 tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_irq)
 {
-	uint16_t dt=0, next_timeslot=0;
+	uint16_t dt=0;
 	rtimer_clock_t duration=0;
 	volatile softack_interrupt_exit_callback_f *interrupt_exit = tsch_wait_for_eb;
 	volatile softack_make_callback_f *softack_make = NULL;
