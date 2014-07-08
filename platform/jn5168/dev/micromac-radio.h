@@ -106,16 +106,32 @@ uint32_t* micromac_get_hw_mac_address_location(void);
 
 void micromac_radio_sfd_sync(void);
 rtimer_clock_t micromac_radio_read_sfd_timer(void);
+int micromac_radio_get_delayed_transmit_status(void);
+void micromac_radio_send_ack_delayed(uint32 u32_delay_time);
+void micromac_radio_send_ack(void);
+void micromac_radio_transmit_delayed(uint32 u32_delay_time);
+void micromac_radio_start_rx_delayed(uint32 u32_delay_time, uint32 u32_on_duration);
+int micromac_radio_read_ack(void *buf, int alen);
+void micromac_radio_interrupt(uint32 mac_event);
 
+#define RADIO_TO_RTIMER(X) 											((rtimer_clock_t)((X * (uint32_t)512)/(uint32_t)1000))
+#define RTIMER_TO_RADIO(X) 											((uint32_t)((X * (uint32_t)1000)/(uint32_t)512))
+
+#define NETSTACK_RADIO_tx_duration(X) 					RADIO_TO_RTIMER(X+1)
+#define NETSTACK_RADIO_start_rx_delayed(u32_delay_time, u32_on_duration) micromac_radio_start_rx_delayed(u32_delay_time, u32_on_duration)
+#define NETSTACK_RADIO_get_delayed_transmit_status()		micromac_radio_get_delayed_transmit_status()
 #define NETSTACK_RADIO_softack_subscribe(A,E) 	micromac_radio_softack_subscribe(A,E)
 #define NETSTACK_RADIO_get_rx_end_time() 				micromac_radio_get_rx_end_time()
 #define NETSTACK_RADIO_send_ack() 							micromac_radio_send_ack()
+#define NETSTACK_RADIO_send_ack_delayed(D) 			micromac_radio_send_ack_delayed(D)
 #define NETSTACK_RADIO_read_ack(B,I)						micromac_radio_read_ack(B,I)
 #define NETSTACK_RADIO_address_decode(E) 				do{ }while(0)
 #define NETSTACK_RADIO_sfd_sync(S,E) 						micromac_radio_sfd_sync()
 #define NETSTACK_RADIO_read_sfd_timer() 				micromac_radio_read_sfd_timer()
 #define NETSTACK_RADIO_set_channel(C)						micromac_radio_set_channel(C)
-#define NETSTACK_RADIO_process_packet()					micromac_radio_interrupt(u32MMAC_PollInterruptSource(E_MMAC_INT_RX_HEADER|E_MMAC_INT_RX_COMPLETE))
+#define NETSTACK_RADIO_process_packet(...)			micromac_radio_interrupt( u32MMAC_PollInterruptSource(E_MMAC_INT_RX_HEADER|E_MMAC_INT_RX_COMPLETE) )
 #define NETSTACK_RADIO_pending_irq()						u32MMAC_PollInterruptSource(E_MMAC_INT_RX_HEADER|E_MMAC_INT_RX_COMPLETE)
-
+#define NETSTACK_RADIO_transmit_delayed(D) 			micromac_radio_transmit_delayed(D)
+#define NETSTACK_RADIO_get_time() 							u32MMAC_GetTime()
+#define NETSTACK_RADIO_get_radio_rx_end_time() 	micromac_radio_get_radio_rx_end_time()
 #endif /* MICROMAC_RADIO_H_ */

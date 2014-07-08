@@ -59,6 +59,7 @@
 #endif /* WITH_UIP6 */
 
 #include "net/rime.h"
+#include "MMAC.h"
 
 #ifdef SELECT_CONF_MAX
 #define SELECT_MAX SELECT_CONF_MAX
@@ -70,8 +71,13 @@
 SENSORS(&button_sensor);
 
 /*---------------------------------------------------------------------------*/
-#include "MMAC.h"
-
+#define VERBOSE 1
+#if VERBOSE
+int dbg_printf(const char *fmt, ...);
+#define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
+#else
+#define PRINTF(...) do {} while (0)
+#endif
 /*---------------------------------------------------------------------------*/
 
 //static void
@@ -91,17 +97,17 @@ SENSORS(&button_sensor);
 //  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
 //  uip_ds6_addr_add(&ipaddr, 0, ADDR_TENTATIVE);
 //
-//  printf("Tentative link-local IPv6 address ");
+//  PRINTF("Tentative link-local IPv6 address ");
 //  {
 //    int i, a;
 //    for(a = 0; a < UIP_DS6_ADDR_NB; a++) {
 //      if (uip_ds6_if.addr_list[a].isused) {
 //        for(i = 0; i < 7; ++i) {
-//          printf("%02x%02x:",
+//          PRINTF("%02x%02x:",
 //                 uip_ds6_if.addr_list[a].ipaddr.u8[i * 2],
 //                 uip_ds6_if.addr_list[a].ipaddr.u8[i * 2 + 1]);
 //        }
-//        printf("%02x%02x\n",
+//        PRINTF("%02x%02x\n",
 //               uip_ds6_if.addr_list[a].ipaddr.u8[14],
 //               uip_ds6_if.addr_list[a].ipaddr.u8[15]);
 //      }
@@ -126,27 +132,14 @@ set_rime_addr(void)
 //#endif
   tsExtAddr psExtAddress;
   vMMAC_GetMacAddress(&psExtAddress);
-  copy_to_rimeaddress(&addr, &psExtAddress);
+  copy_to_rimeaddress(&addr, (tuAddr *)&psExtAddress);
   rimeaddr_set_node_addr(&addr);
-  printf("Rime started with address ");
+  PRINTF("Rime started with address ");
   for(i = 0; i < sizeof(addr.u8) - 1; i++) {
-    printf("%02x.", addr.u8[i]);
+    PRINTF("%02x.", addr.u8[i]);
   }
-  printf("%02x\n", addr.u8[i]);
-
-  /** Different ways for reading HW MAC address. All work.
-  unsigned char macaddr[8];
-  memcpy(macaddr, micromac_get_hw_mac_address_location(), sizeof(macaddr));
-	for(i = 0; i < 8; ++i) {
-		macaddr[i] = ((unsigned char*)micromac_get_hw_mac_address_location())[i];
-	}
-  printf("HW MAC address:\n");
-  for(i=0; i<7; i++) {
-  	printf("%02x.", macaddr[i]);
-  }
-  printf("%02x\n", macaddr[i]);
-  */
-  printf("HW MAC tsExtAddr: %08x.%08x\n", psExtAddress.u32H, psExtAddress.u32L);
+  PRINTF("%02x\n", addr.u8[i]);
+  PRINTF("HW MAC tsExtAddr: %08x.%08x\n", psExtAddress.u32H, psExtAddress.u32L);
 }
 
 
@@ -163,14 +156,14 @@ main(void)
 
   queuebuf_init();
   serial_line_init();
-  uart0_init(E_AHI_UART_RATE_115200); /* Must come before first printf */
+  uart0_init(E_AHI_UART_RATE_115200); /* Must come before first PRINTF */
 #if USE_SLIP_UART1
   uart1_init(E_AHI_UART_RATE_115200);
 #endif /* USE_SLIP_UART1 */
 
   //check for reset source
   if (bAHI_WatchdogResetEvent()) {
-		printf("Init: Watchdog timer has reset device!\r\n");
+		PRINTF("Init: Watchdog timer has reset device!\r\n");
 	}
 	vAHI_WatchdogStop();
 
@@ -183,39 +176,39 @@ main(void)
 
 #if UIP_CONF_IPV6
 #if UIP_CONF_IPV6_RPL
-  printf(CONTIKI_VERSION_STRING " started with IPV6, RPL\n");
+  PRINTF(CONTIKI_VERSION_STRING " started with IPV6, RPL\n");
 #else
-  printf(CONTIKI_VERSION_STRING " started with IPV6\n");
+  PRINTF(CONTIKI_VERSION_STRING " started with IPV6\n");
 #endif
 #else
-  printf(CONTIKI_VERSION_STRING " started\n");
+  PRINTF(CONTIKI_VERSION_STRING " started\n");
 #endif
   NETSTACK_MAC.init();
   NETSTACK_RDC.init();
   NETSTACK_NETWORK.init();
-  printf("MAC %s RDC %s NETWORK %s\n", NETSTACK_MAC.name, NETSTACK_RDC.name, NETSTACK_NETWORK.name);
+  PRINTF("MAC %s RDC %s NETWORK %s\n", NETSTACK_MAC.name, NETSTACK_RDC.name, NETSTACK_NETWORK.name);
 
 #if WITH_UIP6
 
   tsExtAddr psExtAddress;
   vMMAC_GetMacAddress(&psExtAddress);
-  copy_to_rimeaddress(&uip_lladdr, &psExtAddress);
+  copy_to_rimeaddress((rimeaddr_t *)&uip_lladdr, (tuAddr *)&psExtAddress);
 //  memcpy(&uip_lladdr.addr, micromac_get_hw_mac_address_location(), sizeof(uip_lladdr.addr));
 
   process_start(&tcpip_process, NULL);
-  printf("Tentative link-local IPv6 address ");
+  PRINTF("Tentative link-local IPv6 address ");
   {
     uip_ds6_addr_t *lladdr;
     int i;
     lladdr = uip_ds6_get_link_local(-1);
     for(i = 0; i < 7; ++i) {
-      printf("%02x%02x:", lladdr->ipaddr.u8[i * 2],
+      PRINTF("%02x%02x:", lladdr->ipaddr.u8[i * 2],
              lladdr->ipaddr.u8[i * 2 + 1]);
     }
     /* make it hardcoded... */
     lladdr->state = ADDR_AUTOCONF;
 
-    printf("%02x%02x\n", lladdr->ipaddr.u8[14], lladdr->ipaddr.u8[15]);
+    PRINTF("%02x%02x\n", lladdr->ipaddr.u8[14], lladdr->ipaddr.u8[15]);
   }
 #else
   process_start(&tcpip_process, NULL);
@@ -245,13 +238,13 @@ main(void)
 void
 log_message(char *m1, char *m2)
 {
-  printf("log_message: %s%s\n", m1, m2);
+  PRINTF("log_message: %s%s\n", m1, m2);
 }
 /*---------------------------------------------------------------------------*/
 void
 uip_log(char *m)
 {
-  printf("uip_log: %s\n", m);
+  PRINTF("uip_log: %s\n", m);
 }
 /*---------------------------------------------------------------------------*/
 void

@@ -69,8 +69,8 @@
 
 #define DEBUG 0
 #if DEBUG
-#include <stdio.h>
-#define PRINTF(...) printf(__VA_ARGS__)
+int dbg_printf(const char *fmt, ...);
+#define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
 #else
 #define PRINTF(...) do {} while (0)
 #endif
@@ -189,7 +189,7 @@ int
 frame802154_create(frame802154_t *p, uint8_t *buf, int buf_len)
 {
 	PRINTF("frame802154_create: %d bytes\n", buf_len);
-  int c;
+
   field_length_t flen;
   tsMacFrame *tx_frame_buffer;
   uint8_t pos;

@@ -45,13 +45,12 @@
 #include <MMAC.h>
 
 #define DEBUG 0
-
 #if DEBUG
-#include <stdio.h>
-#define PRINTF(...) printf(__VA_ARGS__)
+int dbg_printf(const char *fmt, ...);
+#define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
 #define PRINTADDR(addr) PRINTF(" %02x%02x:%02x%02x:%02x%02x:%02x%02x ", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7])
 #else
-#define PRINTF(...)
+#define PRINTF(...) do {} while (0)
 #define PRINTADDR(addr)
 #endif
 
@@ -177,7 +176,7 @@ create(void)
     PRINTF("15.4-OUT: %2X", params.fcf.frame_type);
     PRINTADDR(params.dest_addr);
     PRINTF("%d %u (%u)\n", len, packetbuf_datalen(), packetbuf_totlen());
-    int i;
+//    int i;
 //    for(i=0; i<packetbuf_totlen(); i++) {
 //    	PRINTF("%02x ", ((uint8_t*)packetbuf_hdrptr())[i]);
 //    }
@@ -188,6 +187,7 @@ create(void)
   }
 }
 /*---------------------------------------------------------------------------*/
+static int
 parse(void)
 {
   frame802154_t frame;

@@ -18,8 +18,8 @@ CONTIKI_TARGET_SOURCEFILES += micromac-radio.c
 APPLIBS += MMAC 
 STACKLIBS += JPT
 #For reading internal MAC address using pvAppApiGetMacAddrLocation()
-JENNIC_STACK = MAC
-#JENNIC_STACK = NONE
+#JENNIC_STACK = MAC
+JENNIC_STACK = NONE
 
 # leds-arch.c \
 #                pir-sensor.c vib-sensor.c xmem.c \
@@ -34,7 +34,7 @@ JENNIC_CHIP ?= JN5168
 # Default DK4 development kit target hardware
 JENNIC_PCB ?= DEVKIT4
 
-# Default driver device is DR1174, (but really has no effect on this template router) 
+# Default driver device is DR1174
 DEVICE_NAME ?= DR1174
 
 
