@@ -193,14 +193,15 @@ void
 micromac_radio_start_rx_delayed(uint32 u32_delay_time, uint32 u32_on_duration)
 {
 	micromac_radio_sfd_sync();
-	vMMAC_SetCutOffTimer(u32_on_duration, TRUE);
 	vMMAC_SetRxStartTime(u32MMAC_GetTime() + u32_delay_time);
+	vMMAC_SetCutOffTimer(u32MMAC_GetTime() + u32_delay_time + u32_on_duration, TRUE);
 	vMMAC_StartMacReceive(rx_frame_buffer_write_ptr,
 			E_MMAC_RX_DELAY_START
 			| MMAC_RX_AUTO_ACK_CONF
 			| E_MMAC_RX_ALLOW_MALFORMED
 			| E_MMAC_RX_NO_FCS_ERROR
 			| E_MMAC_RX_ADDRESS_MATCH);
+	vMMAC_SetCutOffTimer(0, FALSE);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -210,7 +211,7 @@ on(void)
 	vMMAC_StartMacReceive(rx_frame_buffer_write_ptr,
 			E_MMAC_RX_START_NOW
 			| MMAC_RX_AUTO_ACK_CONF
-			| E_MMAC_RX_NO_MALFORMED
+			| E_MMAC_RX_ALLOW_MALFORMED
 			| E_MMAC_RX_NO_FCS_ERROR
 			| E_MMAC_RX_ADDRESS_MATCH);
 }
@@ -218,6 +219,7 @@ on(void)
 static void
 off(void)
 {
+	vMMAC_SetCutOffTimer(0, FALSE);
 	vMMAC_RadioOff();
 	//PROTOCOL shutdown... to shutdown the circuit instead.
 }
@@ -293,6 +295,7 @@ micromac_radio_interrupt(uint32 mac_event)
 				 ackbuf[0] = 3;
 				 ackbuf[1] = 0x02;
 				 ackbuf[2] = 0;
+				 ackbuf[3] = rx_frame_buffer_recent_ptr->u8SequenceNum;
 			 }
 			 /* copy ACK to phy_buf */
 			 phy_ackbuf.u8PayloadLength = ackbuf[0];
@@ -349,6 +352,7 @@ micromac_radio_read_ack(void *buf, int alen) {
   uint8_t len=0, footer1=0, overflow=0;
 	if (!locked) {
 //		BUSYWAIT_UNTIL(!bMMAC_RxDetected(), delayRx);
+		BUSYWAIT_UNTIL(u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE), 16*500); //TsShortGT
 		len = sizeof(tsMacFrame) - 32 * sizeof(uint32) + rx_frame_buffer_read_ptr->u8PayloadLength; //MICROMAC_HEADER_LEN
 //		len = rx_frame_buffer_read_ptr->u8PayloadLength; //MICROMAC_HEADER_LEN
 
@@ -402,6 +406,12 @@ volatile static uint16_t u16ShortAddress;
 int
 micromac_radio_init(void)
 {
+	uint8_t u8TxAttempts = 0, /* 1 transmission attempt without ACK */
+	u8MinBE = 0, /* min backoff exponent */
+	u8MaxBE = 0, /* max backoff exponent */
+	u8MaxBackoffs = 0; /* backoff before aborting */
+	uint32_t jpt_ver = 0;
+	tsExtAddr psExtAddress;
 	if (locked) {
 		return 0;
 	}
@@ -410,7 +420,7 @@ micromac_radio_init(void)
 	rx_frame_buffer_write_ptr = &(rx_frame_buffer[0]);
 	rx_frame_buffer_read_ptr = rx_frame_buffer_write_ptr;
 	rx_frame_buffer_recent_ptr = rx_frame_buffer_write_ptr;
-	uint32_t jpt_ver = u32JPT_Init();
+	jpt_ver = u32JPT_Init();
 	vMMAC_Enable();
 #if MICROMAC_RADIO_NO_IRQ
 	vMMAC_EnableInterrupts(NULL);
@@ -422,14 +432,11 @@ micromac_radio_init(void)
 	channel = RF_CHANNEL;
 	vMMAC_SetChannel(channel);
 	u16ShortAddress = rimeaddr_node_addr.u8[1] + (rimeaddr_node_addr.u8[0] << 8);
-	tsExtAddr psExtAddress;
+
 	vMMAC_GetMacAddress((tsExtAddr *)&psExtAddress);
 	vMMAC_SetRxAddress(u16PanId, u16ShortAddress, &psExtAddress);
 	/* these parameters should disable hardware backoff, but still enable autoACK processing and TX CCA */
-	uint8_t u8TxAttempts = 1, /* 1 transmission attempt without ACK */
-	u8MinBE = 0, /* min backoff exponent */
-	u8MaxBE = 0, /* max backoff exponent */
-	u8MaxBackoffs = 1; /* backoff before aborting */
+
 	vMMAC_SetTxParameters(u8TxAttempts, u8MinBE, u8MaxBE, u8MaxBackoffs);
 	vMMAC_SetCutOffTimer(0, FALSE);
 
@@ -489,7 +496,8 @@ micromac_radio_transmit(unsigned short payload_len)
 			| MMAC_TX_AUTO_ACK_CONF
 			| E_MMAC_TX_NO_CCA);
 //	uint32 u32Mask = E_MMAC_INT_TX_COMPLETE;
-	while (!u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE)){}
+	BUSYWAIT_UNTIL(u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE), MAX_PACKET_DURATION);
+//	while (!u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE)){}
 	tx_in_progress = 0;
 	int ret = RADIO_TX_ERR;
 	uint32_t tx_error = u32MMAC_GetTxErrors();
@@ -527,9 +535,9 @@ micromac_radio_transmit_delayed(uint32 u32_delay_time)
 /*---------------------------------------------------------------------------*/
 int micromac_radio_get_delayed_transmit_status(void)
 {
-	//XXX while
-	if (!u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE)){}
 	int ret = RADIO_TX_ERR;
+	//XXX could stall longer!
+	BUSYWAIT_UNTIL(u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE), MAX_PACKET_DURATION);
 	uint32_t tx_error = u32MMAC_GetTxErrors();
 	if (tx_error == 0) {
 		ret = RADIO_TX_OK;
@@ -572,7 +580,8 @@ micromac_radio_raw_transmit(tsPhyFrame *psFrame)
 			| MMAC_TX_AUTO_ACK_CONF
 			| E_MMAC_TX_NO_CCA);
 //	uint32 u32Mask = E_MMAC_INT_TX_COMPLETE;
-	while (!u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE)){}
+	BUSYWAIT_UNTIL(u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE), MAX_PACKET_DURATION);
+//	while (!u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE)){}
 	tx_in_progress = 0;
 	int ret = RADIO_TX_ERR;
 	uint32_t tx_error = u32MMAC_GetTxErrors();
@@ -660,7 +669,8 @@ static int
 micromac_radio_get_transmission_status(void)
 {
 //	uint32 u32Mask = E_MMAC_INT_TX_COMPLETE;
-	while (!u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE)){}
+//	BUSYWAIT_UNTIL(u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE), MAX_PACKET_DURATION);
+//	while (!u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE)){}
 	int ret = RADIO_TX_ERR;
 	uint32_t tx_error = u32MMAC_GetTxErrors();
 	if (tx_error == 0) {

@@ -230,6 +230,7 @@ main(void)
     /*
      * Idle processing.
      */
+    vAHI_CpuDoze();
   }
 
   return 0;

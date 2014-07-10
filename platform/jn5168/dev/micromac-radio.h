@@ -45,6 +45,20 @@
 #include "rimeaddr.h"
 #include <MMAC.h>
 
+#define RADIO_TO_RTIMER(X) 											((rtimer_clock_t)( (uint32_t)(X) << (uint32_t)9 ))
+#define RTIMER_TO_RADIO(X) 											((uint32_t)( (uint32_t)(X) >> (uint32_t)9 ))
+#define MICROMAC_RADIO_MAX_PACKET_LEN      (127)
+#define ACK_LEN (3)
+#define MICROMAC_HEADER_LEN (28)
+
+#define MAX_PACKET_DURATION RADIO_TO_RTIMER((MICROMAC_RADIO_MAX_PACKET_LEN+1))
+
+#define BUSYWAIT_UNTIL(cond, max_time)                                  \
+  do {                                                                  \
+    rtimer_clock_t t0;                                                  \
+    t0 = RTIMER_NOW();                                                  \
+    while(!(cond) && RTIMER_CLOCK_LT(RTIMER_NOW(), t0 + (max_time)));   \
+  } while(0)
 
 struct received_frame_radio_s {
   uint8_t* buf;
@@ -56,18 +70,13 @@ struct received_frame_radio_s {
 typedef void(*softack_make_callback_f)(uint8_t **ackbuf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack);
 typedef void(*softack_interrupt_exit_callback_f)(uint8_t need_ack, struct received_frame_radio_s * last_rf);
 
-/* Subscribe with two callbacks called from FIFOP interrupt */
-void micromac_radio_softack_subscribe(softack_make_callback_f softack_make, softack_interrupt_exit_callback_f interrupt_exit);
-
 void copy_from_rimeaddress(tuAddr*, rimeaddr_t* );
 void copy_to_rimeaddress(rimeaddr_t* addr, tuAddr* tu_addr);
 
-#define MICROMAC_HEADER_LEN (28)
+/* Subscribe with two callbacks called from FIFOP interrupt */
+void micromac_radio_softack_subscribe(softack_make_callback_f softack_make, softack_interrupt_exit_callback_f interrupt_exit);
 
 int micromac_radio_init(void);
-
-#define MICROMAC_RADIO_MAX_PACKET_LEN      (127)
-#define ACK_LEN (3)
 
 int micromac_radio_set_channel(int channel);
 int micromac_radio_get_channel(void);
@@ -113,9 +122,6 @@ void micromac_radio_start_rx_delayed(uint32 u32_delay_time, uint32 u32_on_durati
 int micromac_radio_read_ack(void *buf, int alen);
 void micromac_radio_interrupt(uint32 mac_event);
 
-#define RADIO_TO_RTIMER(X) 											((rtimer_clock_t)( (uint32_t)(X) << (uint32_t)9 ))
-#define RTIMER_TO_RADIO(X) 											((uint32_t)( (uint32_t)(X) >> (uint32_t)9 ))
-
 #define NETSTACK_RADIO_tx_duration(X) 					RADIO_TO_RTIMER(X+1)
 #define NETSTACK_RADIO_start_rx_delayed(u32_delay_time, u32_on_duration) micromac_radio_start_rx_delayed(u32_delay_time, u32_on_duration)
 #define NETSTACK_RADIO_get_delayed_transmit_status()		micromac_radio_get_delayed_transmit_status()
@@ -133,4 +139,5 @@ void micromac_radio_interrupt(uint32 mac_event);
 #define NETSTACK_RADIO_transmit_delayed(D) 			micromac_radio_transmit_delayed(D)
 #define NETSTACK_RADIO_get_time() 							u32MMAC_GetTime()
 #define NETSTACK_RADIO_get_radio_rx_end_time() 	micromac_radio_get_radio_rx_end_time()
+
 #endif /* MICROMAC_RADIO_H_ */

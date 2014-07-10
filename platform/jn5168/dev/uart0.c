@@ -97,7 +97,12 @@ uart0_writeb(unsigned char c)
 	//watchdog_periodic();
 	/* push into ringbuf until there is space */
 	while (!ringbuf_put(&txbuf, c));
-	UART_vPTSChar(ringbuf_get(&txbuf));
+  if (transmitting==0)
+  {
+    transmitting=1;
+//    UART_vPTSChar(ringbuf_get(&txbuf));
+    vAHI_UartWriteData(u8Uart, ringbuf_get(&txbuf));
+  }
 }
 
 void

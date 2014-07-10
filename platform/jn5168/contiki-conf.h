@@ -70,15 +70,17 @@ typedef uint16_t u16_t;
 typedef uint32_t u32_t;
 typedef  int32_t s32_t;
 
+#if !true
 #define true (1)
 #define false (0)
+#endif
 
 typedef uint32_t clock_time_t;
 typedef unsigned short uip_stats_t;
 
 /* Core rtimer.h defaults to 16 bit timer unless RTIMER_CLOCK_LT is defined */
 typedef uint32_t rtimer_clock_t;
-#define RTIMER_CLOCK_LT(a,b)     ((signed long)((a)-(b)) < 0)
+#define RTIMER_CLOCK_LT(a,b)     ((int32_t)((a)-(b)) < 0)
 /* 10ms timer tick */
 #define CLOCK_CONF_SECOND 100
 

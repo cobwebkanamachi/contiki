@@ -36,6 +36,7 @@
 #include <AppHardwareApi.h>
 #include "contiki-conf.h"
 #include <LedControl.h>
+#include <GenericBoard.h>
 
 static volatile uint8_t leds;
 
@@ -43,7 +44,8 @@ static volatile uint8_t leds;
 void
 leds_arch_init(void)
 {
-	vLedInitRfd();
+//	vLedInitRfd();
+	vGenericLEDInit();
 	leds=0;
 }
 /*---------------------------------------------------------------------------*/
@@ -57,8 +59,12 @@ void
 leds_arch_set(unsigned char c)
 {
   leds = c;
-  vLedControl(LED_S0_PIN, leds&LEDS_GREEN);
-  vLedControl(LED_S1_PIN, leds&LEDS_YELLOW);
-  vLedControl(LED_S2_PIN, leds&LEDS_RED);
+  vGenericLEDSetOutput(GEN_BOARD_LED_D1_VAL, leds&LEDS_GREEN);
+  vGenericLEDSetOutput(GEN_BOARD_LED_D2_VAL, leds&LEDS_BLUE);
+  vGenericLEDSetOutput(GEN_BOARD_LED_D3_VAL, leds&LEDS_RED);
+
+//  vLedControl(LED_S0_PIN, leds&LEDS_GREEN);
+//  vLedControl(LED_S1_PIN, leds&LEDS_YELLOW);
+//  vLedControl(LED_S2_PIN, leds&LEDS_RED);
 }
 

@@ -17,9 +17,9 @@ CONTIKI_TARGET_SOURCEFILES += packetbuf.c frame802154.c framer-802154.c chameleo
 CONTIKI_TARGET_SOURCEFILES += micromac-radio.c
 APPLIBS += MMAC 
 STACKLIBS += JPT
+JENNIC_STACK = NONE
 #For reading internal MAC address using pvAppApiGetMacAddrLocation()
-JENNIC_STACK = MAC
-#JENNIC_STACK = NONE
+#JENNIC_STACK = MAC ##Not needed anymore. I can read the MAC address with the new MMAC lib or with direct memory access
 
 # leds-arch.c \
 #                pir-sensor.c vib-sensor.c xmem.c \
