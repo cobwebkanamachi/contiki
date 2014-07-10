@@ -11,11 +11,13 @@
 
 #define NACK_FLAG 0x8000
 
-#define TRIVIAL_DELAY 5*RTIMER_SECOND/100
+
 
 #define RESYNCH_TIMEOUT ieee154e_vars.current_slotframe->length * 10
 #define KEEPALIVE_TIMEOUT ieee154e_vars.current_slotframe->length * 3
 #if CONTIKI_TARGET_JN5168
+#pragma __TSCH_PARAMETERS_H__ CONTIKI_TARGET_JN5168
+#define TRIVIAL_DELAY (100*16UL) //50us
 // Atomic durations
 // expressed in 16MHz ticks:
 //    - ticks = duration_in_seconds * 16000000
@@ -24,47 +26,72 @@
 //XXX check these numbers on real hw or cooja
 //164*3 as PORT_TsSlotDuration causes 147.9448us drift every slotframe ==4.51 ticks
 // 15000us
-#define PORT_TsSlotDuration (15000)
+#define PORT_TsSlotDuration (16*15000UL)
 //   1200us
-#define PORT_maxTxDataPrepare (500)
+#define PORT_maxTxDataPrepare (1600)
 //   600us
-#define PORT_maxRxAckPrepare (100)
+#define PORT_maxRxAckPrepare (1600)
 //   600us
-#define PORT_maxRxDataPrepare (100)
+#define PORT_maxRxDataPrepare (1600)
 
-#define PORT_maxTxAckPrepare (100)
+#define PORT_maxTxAckPrepare (1600)
 
 // ~327us+129preample
-#define PORT_delayTx (50)
+#define PORT_delayTx (16*260)
 //~50us delay + 129preample + ??
-#define PORT_delayRx (10)
+#define PORT_delayRx (16*50)
 
-enum ieee154e_atomicdurations_enum {
 	// time-slot related
-	TsCCAOffset= 1000, //1000us //98,										//3000us
-	TsCCA=500,												//~500us
-	TsRxTx=500,												//500us
-	TsTxOffset = 4000,                  //  4000us
-	TsLongGT = 1300,                  //  1300us
-	TsTxAckDelay = 4000,                  //  4000us
+#define	TsCCAOffset (16*1000UL) //1000us //98,										//3000us
+#define	TsCCA (16*500UL)												//~500us
+#define	TsRxTx (16*500UL)												//500us
+#define	TsTxOffset (16*4000UL)                  //  4000us
+#define TsLongGT (16*1300UL)                  //  1300us
+#define	TsTxAckDelay (16*4000UL)                  //  4000us
 //	TsTxAckDelay = 99,                  //  3000us
-	TsShortGT = 500,                  //   500us
+#define	TsShortGT (16*500UL)                  //   500us
 //	TsShortGT = 32,                  //  1000us
-	TsSlotDuration = PORT_TsSlotDuration,  // 15000us
+#define	TsSlotDuration (PORT_TsSlotDuration)  // 15000us
 	// execution speed related
-	maxTxDataPrepare = PORT_maxTxDataPrepare,
-	maxRxAckPrepare = PORT_maxRxAckPrepare,
-	maxRxDataPrepare = PORT_maxRxDataPrepare,
-	maxTxAckPrepare = PORT_maxTxAckPrepare,
+#define	maxTxDataPrepare (PORT_maxTxDataPrepare)
+#define maxRxAckPrepare (PORT_maxRxAckPrepare)
+#define	maxRxDataPrepare (PORT_maxRxDataPrepare)
+#define	maxTxAckPrepare (PORT_maxTxAckPrepare)
 	// radio speed related
-	delayTx = PORT_delayTx,         // between GO signal and SFD: radio fixed delay + 4Bytes preample + 1B SFD -- 1Byte time is 32us
-	delayRx = PORT_delayRx,         // between GO signal and start listening
+#define	delayTx (PORT_delayTx)         // between GO signal and SFD: radio fixed delay + 4Bytes preample + 1B SFD -- 1Byte time is 32us
+#define	delayRx (PORT_delayRx)         // between GO signal and start listening
 	// radio watchdog
-	wdRadioTx = 1000,                  //  1000us (needs to be >delayTx)
-	wdDataDuration = 4500,            //  4500us (measured 4280us with max payload)
-	wdAckDuration = 600,                  //  600us (measured 1000us me: 440us)
-};
+#define	wdRadioTx (16*1000UL)                  //  1000us (needs to be >delayTx)
+#define	wdDataDuration (16*4300UL)            //  4500us (measured 4280us with max payload)
+#define	wdAckDuration (16*460UL)                  //  600us (measured 1000us me: 440us)
+
+//enum ieee154e_atomicdurations_enum {
+//	// time-slot related
+//	TsCCAOffset= 16*1000, //1000us //98,										//3000us
+//	TsCCA=16*500,												//~500us
+//	TsRxTx=16*500,												//500us
+//	TsTxOffset = 16*4000,                  //  4000us
+//	TsLongGT = 16*1300,                  //  1300us
+//	TsTxAckDelay = 16*4000,                  //  4000us
+////	TsTxAckDelay = 99,                  //  3000us
+//	TsShortGT = 16*500,                  //   500us
+////	TsShortGT = 32,                  //  1000us
+//	TsSlotDuration = PORT_TsSlotDuration,  // 15000us
+//	// execution speed related
+//	maxTxDataPrepare = PORT_maxTxDataPrepare,
+//	maxRxAckPrepare = PORT_maxRxAckPrepare,
+//	maxRxDataPrepare = PORT_maxRxDataPrepare,
+//	maxTxAckPrepare = PORT_maxTxAckPrepare,
+//	// radio speed related
+//	delayTx = PORT_delayTx,         // between GO signal and SFD: radio fixed delay + 4Bytes preample + 1B SFD -- 1Byte time is 32us
+//	delayRx = PORT_delayRx,         // between GO signal and start listening
+//	// radio watchdog
+//	wdRadioTx = 16*1000,                  //  1000us (needs to be >delayTx)
+//	wdDataDuration = (129<<8),            //  4500us (measured 4280us with max payload)
+//	wdAckDuration = (9<<8),                  //  600us (measured 1000us me: 440us)
+//};
 #else
+#define TRIVIAL_DELAY 5
 // Atomic durations
 // expressed in 32kHz ticks:
 //    - ticks = duration_in_seconds * 32768
@@ -187,7 +214,7 @@ typedef struct {
 	uint8_t mac_ebsn;						//EB sequence number
 	uint8_t join_priority;			//inherit from RPL - for PAN coordinator: 0 -- lower is better
 	slotframe_t * current_slotframe;
-	rtimer_clock_t start; //cell start time
+	volatile rtimer_clock_t start; //cell start time
 	uint8_t slot_template_id;
 	uint8_t hop_sequence_id;
 	volatile uint16_t timeslot;
