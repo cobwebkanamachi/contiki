@@ -169,7 +169,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
          UIP_HTONS(server_conn->rport));
 
   rpl_repair_root(RPL_DEFAULT_INSTANCE);
-  static uint32_t count=0;
+
   static struct etimer periodic;
 
   etimer_set(&periodic, 60 * CLOCK_SECOND);
