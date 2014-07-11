@@ -58,6 +58,7 @@
 //#endif
 
 #if CONTIKI_TARGET_JN5168
+#define CONVERT_DRIFT_US_TO_RTIMER(D, DC) (D * 100)/(3051 * DC);
 #define ENABLE_DELAYED_RF 1
 #pragma "CONTIKI_TARGET_JN5168"
 #include "dev/micromac-radio.h"
@@ -65,6 +66,7 @@
 void uart0_writeb(unsigned char c);
 #define putchar uart0_writeb
 #else /* Leave CC2420 as default */
+#define CONVERT_DRIFT_US_TO_RTIMER(D, DC) (D * 16)/(DC);
 #include "dev/cc2420-tsch.h"
 #pragma "CONTIKI_TARGET_SKY"
 #endif /* CONTIKI_TARGET */
@@ -566,6 +568,7 @@ schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
 	if (ref_time - now > duration+5) {
 		ref_time = now + TRIVIAL_DELAY;
 		COOJA_DEBUG_STR("schedule_fixed: missed deadline");
+		PRINTF("schedule_fixed: missed deadline: %u, %u, %u, %u\n", ref_time, now, now - ref_time, duration );
 	}
 	r = rtimer_set(tm, ref_time, 1, (void
 	(*)(struct rtimer *, void *)) powercycle, NULL /*(void*)&status*/);
@@ -578,17 +581,22 @@ schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
 /*---------------------------------------------------------------------------*/
 /* schedule only if deadline not passed.
  * A non-zero return value signals to powercycle a missed deadline */
+#include "dev/watchdog.h"
+static rtimer_clock_t t0tx=0, t0txack=0, t0rx=0, t0rxack=0, tq=0, tn=0;
 static uint8_t
 schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 		rtimer_clock_t duration)
 {
 	int r, status = 0;
 	rtimer_clock_t now = RTIMER_NOW() + 5;
+	PUTCHAR('H');
+//	watchdog_periodic();
 	ref_time += duration;
 	if (ref_time - now > duration+5) {
 		COOJA_DEBUG_STR("schedule_strict: missed deadline");
-//		PRINTF("schedule_strict: missed deadline: %u, %u, %u, %u\n", ref_time, now, now - ref_time, duration );
-		PUTCHAR('!');
+//		PRINTF("tq: %u, t0tx %u, t0txack %u, tn %u\n", tq, t0tx, t0txack, tn );
+		PRINTF("schedule_strict: missed deadline: %u, %u, %u, %u\n", ref_time, now, now - ref_time, duration );
+//		PUTCHAR('!');
 		status = 1;
 	} else {
 		r = rtimer_set(tm, ref_time, 1, (void
@@ -617,7 +625,8 @@ powercycle(struct rtimer *t, void *ptr)
 	 * otherwise, schedule next wakeup
 	 */
 	PT_BEGIN(&ieee154e_vars.mpt);
-	uint16_t dt, duration, duration2, next_timeslot;
+	rtimer_clock_t duration, duration2;
+	uint16_t dt, next_timeslot;
 	uint16_t ack_status = 0;
 	static uint8_t is_broadcast = 0, len=0, seqno=0, ret=0;
 	//to record the duration of packet tx
@@ -653,6 +662,7 @@ powercycle(struct rtimer *t, void *ptr)
 		}
 		//while MAC-RDC is not disabled, and while its synchronized
 		while (ieee154e_vars.state == TSCH_ASSOCIATED) {
+			tq=RTIMER_NOW();
 #if CONTIKI_TARGET_JN5168
 			cycle_start_radio_clock = NETSTACK_RADIO_get_time();
 #endif /* CONTIKI_TARGET_JN5168 */
@@ -732,33 +742,34 @@ powercycle(struct rtimer *t, void *ptr)
 				if( (ieee154e_vars.cell->link_options & LINK_OPTION_RX) && ieee154e_vars.cell_decison != CELL_TX) {
 					ieee154e_vars.cell_decison = CELL_RX;
 				}
+				tq=RTIMER_NOW()-tq;
 
-#if DEBUG
-//				switch (ieee154e_vars.cell_decison) {
-//				case CELL_TX:
-//					if(ieee154e_vars.cell->link_type == LINK_TYPE_ADVERTISING) {
-//						PUTCHAR('E');
-//					}
-//					else if(is_broadcast) {
-//						PUTCHAR('B');
-//					} else {
-//						PUTCHAR('T');
-//					}
-//					break;
-//				case CELL_TX_BACKOFF:
-//					PUTCHAR('F');
-//					break;
-//				case CELL_TX_IDLE:
-//					PUTCHAR('I');
-//					break;
-//				case CELL_RX:
-//					PUTCHAR('R');
-//					break;
-//				case CELL_OFF:
-//				default:
-//					PUTCHAR('O');
-//					break;
-//				}
+#if 0&&DEBUG
+				switch (ieee154e_vars.cell_decison) {
+				case CELL_TX:
+					if(ieee154e_vars.cell->link_type == LINK_TYPE_ADVERTISING) {
+						PUTCHAR('E');
+					}
+					else if(is_broadcast) {
+						PUTCHAR('B');
+					} else {
+						PUTCHAR('T');
+					}
+					break;
+				case CELL_TX_BACKOFF:
+					PUTCHAR('F');
+					break;
+				case CELL_TX_IDLE:
+					PUTCHAR('I');
+					break;
+				case CELL_RX:
+					PUTCHAR('R');
+					break;
+				case CELL_OFF:
+				default:
+					PUTCHAR('O');
+					break;
+				}
 #endif /* DEBUG */
 
 				/* execute the cell */
@@ -778,6 +789,7 @@ powercycle(struct rtimer *t, void *ptr)
 					 * 7. Schedule mac_call_sent_callback
 					 **/
 //SEND_METHOD:
+					t0tx=RTIMER_NOW();
 					COOJA_DEBUG_STR("CELL_TX");
 					//TODO There are small timing variations visible in cooja, which needs tuning
 					//read seqno from payload!
@@ -825,6 +837,8 @@ powercycle(struct rtimer *t, void *ptr)
 						tx_time = MIN(tx_time, wdDataDuration);
 						off(keep_radio_on);
 #endif /* CONTIKI_TARGET */
+						t0tx=RTIMER_NOW()-t0tx;
+						t0txack=RTIMER_NOW();
 						if (success == RADIO_TX_OK) {
 							if (!is_broadcast) {
 								//wait for ack: after tx
@@ -975,6 +989,7 @@ powercycle(struct rtimer *t, void *ptr)
 						ieee154e_vars.p->ret=ret;
 						process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, ieee154e_vars.p);
 					}
+					t0txack=RTIMER_NOW()-t0txack;
 				} else if (ieee154e_vars.cell_decison == CELL_RX) {
 					/**
 					 * RX cell:
@@ -1071,7 +1086,7 @@ powercycle(struct rtimer *t, void *ptr)
 				}
 			}
 //			COOJA_DEBUG_PRINTF("ASN %lu TS %u", ieee154e_vars.asn.asn_4lsb, ieee154e_vars.timeslot);
-
+			tn=RTIMER_NOW();
 			next_timeslot = get_next_on_timeslot(ieee154e_vars.timeslot);
 			dt =
 					next_timeslot ? next_timeslot - ieee154e_vars.timeslot :
@@ -1084,7 +1099,7 @@ powercycle(struct rtimer *t, void *ptr)
 			if (!next_timeslot) {
 				if(ieee154e_vars.drift_counter) {
 					/* convert from microseconds to rtimer ticks and take average */
-					ieee154e_vars.drift_correction += (ieee154e_vars.drift * 100)/(3051 * ieee154e_vars.drift_counter);
+					ieee154e_vars.drift_correction += CONVERT_DRIFT_US_TO_RTIMER(ieee154e_vars.drift, ieee154e_vars.drift_counter);
 				}
 				if(ieee154e_vars.drift_correction) {
 					COOJA_DEBUG_PRINTF("New slot frame: drift_correction %d", ieee154e_vars.drift_correction);
@@ -1127,6 +1142,7 @@ powercycle(struct rtimer *t, void *ptr)
 				ieee154e_vars.start -= duration;
 			}
 			leds_off(LEDS_RED);
+			tn=RTIMER_NOW()-tn;
 			/* Check if we need to resynchronize */
 			if(	ieee154e_vars.join_priority != 0
 					&& ieee154e_vars.sync_timeout > RESYNCH_TIMEOUT ) {
@@ -1138,10 +1154,11 @@ powercycle(struct rtimer *t, void *ptr)
 				if (r != RTIMER_OK) {
 					COOJA_DEBUG_STR("schedule tsch_resynchronize: could not set rtimer\n");
 				}
-//				PUTCHAR('S');
+				PUTCHAR('S');
 			} else {
 				/* skip slot if missed the deadline */
 				while ( schedule_strict(t, ieee154e_vars.start, duration) ) {
+//					watchdog_periodic();
 					ieee154e_vars.start += duration;
 					next_timeslot = get_next_on_timeslot(ieee154e_vars.timeslot);
 					dt =
@@ -1156,6 +1173,7 @@ powercycle(struct rtimer *t, void *ptr)
 					}
 //					PUTCHAR('!');
 				}
+//				PUTCHAR('N');
 				ieee154e_vars.start += duration;
 
 				PT_YIELD(&ieee154e_vars.mpt);
@@ -1457,7 +1475,8 @@ PROCESS_THREAD(tsch_associate, ev, data)
 				NETSTACK_RADIO_softack_subscribe(tsch_make_sync_ack, tsch_resume_powercycle);
 				ieee154e_vars.start = RTIMER_NOW();
 
-				schedule_fixed(&ieee154e_vars.t, ieee154e_vars.start, TRIVIAL_DELAY);
+				schedule_fixed(&ieee154e_vars.t, ieee154e_vars.start, 2*TRIVIAL_DELAY);
+//				ieee154e_vars.start += 2*TRIVIAL_DELAY;
 				PRINTF("associate done\n");
 				// XXX for debugging
 				ieee154e_vars.asn.asn_4lsb = 0;
