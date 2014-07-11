@@ -158,6 +158,7 @@ main(void)
   serial_line_init();
   uart0_init(E_AHI_UART_RATE_115200); /* Must come before first PRINTF */
 #if USE_SLIP_UART1
+#include "dev/uart1.h"
   uart1_init(E_AHI_UART_RATE_115200);
 #endif /* USE_SLIP_UART1 */
 

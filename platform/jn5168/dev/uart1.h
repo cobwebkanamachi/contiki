@@ -39,6 +39,4 @@
 void uart1_set_input(int (*input)(unsigned char c));
 void uart1_writeb(unsigned char c);
 void uart1_init(unsigned char br);
-void UART_vClose(void);
-void UART_vPTSChar(char cChar);
 #endif
