@@ -129,6 +129,103 @@ create(void)
      \todo For phase 1 the addresses are all long. We'll need a mechanism
      in the rime attributes to tell the mac to use long or short for phase 2.
   */
+  if(sizeof(rimeaddr_t) == 2) {
+    /* Use short address mode if rimeaddr size is short. */
+    params.fcf.src_addr_mode = FRAME802154_SHORTADDRMODE;
+  } else {
+    params.fcf.src_addr_mode = FRAME802154_LONGADDRMODE;
+  }
+  params.dest_pid = mac_dst_pan_id;
+
+  /*
+   *  If the output address is NULL in the Rime buf, then it is broadcast
+   *  on the 802.15.4 network.
+   */
+  if(rimeaddr_cmp(packetbuf_addr(PACKETBUF_ADDR_RECEIVER), &rimeaddr_null)) {
+    /* Broadcast requires short address mode. */
+    params.fcf.dest_addr_mode = FRAME802154_SHORTADDRMODE;
+    params.dest_addr[0] = 0xFF;
+    params.dest_addr[1] = 0xFF;
+
+  } else {
+    rimeaddr_copy((rimeaddr_t *)&params.dest_addr,
+                  packetbuf_addr(PACKETBUF_ADDR_RECEIVER));
+    /* Use short address mode if rimeaddr size is small */
+    if(sizeof(rimeaddr_t) == 2) {
+      params.fcf.dest_addr_mode = FRAME802154_SHORTADDRMODE;
+    } else {
+      params.fcf.dest_addr_mode = FRAME802154_LONGADDRMODE;
+    }
+  }
+
+  /* Set the source PAN ID to the global variable. */
+  params.src_pid = mac_src_pan_id;
+
+  /*
+   * Set up the source address using only the long address mode for
+   * phase 1.
+   */
+  rimeaddr_copy((rimeaddr_t *)&params.src_addr, &rimeaddr_node_addr);
+
+  params.payload = packetbuf_dataptr();
+  params.payload_len = packetbuf_datalen();
+  len = frame802154_hdrlen(&params);
+  if(packetbuf_hdralloc(len)) {
+    frame802154_create(&params, packetbuf_hdrptr(), len);
+
+    PRINTF("15.4-OUT: %2X", params.fcf.frame_type);
+    PRINTADDR(params.dest_addr);
+    PRINTF("%d %u (%u)\n", len, packetbuf_datalen(), packetbuf_totlen());
+
+    return len;
+  } else {
+    PRINTF("15.4-OUT: too large header: %u\n", len);
+    return FRAMER_FAILED;
+  }
+}
+/*---------------------------------------------------------------------------*/
+static int
+create_mac_frame(void)
+{
+  frame802154_t params;
+  int len;
+
+  /* init to zeros */
+  memset(&params, 0, sizeof(params));
+
+  if(!initialized) {
+    initialized = 1;
+    mac_dsn = random_rand() & 0xff;
+  }
+
+  /* Build the FCF. */
+  params.fcf.frame_type = FRAME802154_DATAFRAME;
+  params.fcf.security_enabled = 0;
+  params.fcf.frame_pending = packetbuf_attr(PACKETBUF_ATTR_PENDING);
+  if(rimeaddr_cmp(packetbuf_addr(PACKETBUF_ADDR_RECEIVER), &rimeaddr_null)) {
+    params.fcf.ack_required = 0;
+  } else {
+    params.fcf.ack_required = packetbuf_attr(PACKETBUF_ATTR_MAC_ACK);
+  }
+  params.fcf.panid_compression = 0;
+
+  /* Insert IEEE 802.15.4 (2003) version bit. */
+  params.fcf.frame_version = FRAME802154_IEEE802154_2003;
+
+  /* Increment and set the data sequence number. */
+  if(packetbuf_attr(PACKETBUF_ATTR_MAC_SEQNO)) {
+    params.seq = packetbuf_attr(PACKETBUF_ATTR_MAC_SEQNO);
+  } else {
+    params.seq = mac_dsn++;
+    packetbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, params.seq);
+  }
+/*   params.seq = packetbuf_attr(PACKETBUF_ATTR_PACKET_ID); */
+
+  /* Complete the addressing fields. */
+  /**
+     \todo For phase 1 the addresses are all long. We'll need a mechanism
+     in the rime attributes to tell the mac to use long or short for phase 2.
+  */
   if(RIMEADDR_SIZE == 2) {
     /* Use short address mode if rimeaddr size is short. */
     params.fcf.src_addr_mode = FRAME802154_SHORTADDRMODE;
