@@ -49,6 +49,7 @@
 
 #undef PUTCHAR(X)
 #define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
+#define RADIO_TO_RTIMER(X) 	((rtimer_clock_t)( (uint32_t)(X*524)/(uint32_t)1000 ))
 
 int cc2420_init(void);
 //Timesync IE length with header = 4
