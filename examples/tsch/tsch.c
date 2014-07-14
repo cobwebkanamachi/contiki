@@ -59,7 +59,7 @@
 
 #if CONTIKI_TARGET_JN5168
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) (D * 100)/(3051 * DC);
-#define ENABLE_DELAYED_RF 1
+#define ENABLE_DELAYED_RF 0
 #pragma "CONTIKI_TARGET_JN5168"
 #include "dev/micromac-radio.h"
 #undef putchar
@@ -75,8 +75,12 @@ void uart0_writeb(unsigned char c);
 #undef PUTCHAR
 #if DEBUG
 #define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
+#if CONTIKI_TARGET_JN5168
 int dbg_printf(const char *fmt, ...);
 #define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
+#else
+#define PRINTF(...) do {printf(__VA_ARGS__);} while(0)
+#endif /*CONTIKI_TARGET_JN5168*/
 #else
 #define PRINTF(...) do {} while (0)
 #define PUTCHAR(X)
@@ -530,8 +534,11 @@ hop_channel(uint8_t offset)
 {
 	uint8_t channel = 11 + (offset + ieee154e_vars.asn.asn_4lsb) % 16;
 	//XXX disabling channel hopping
-	channel=20;
-	if ( NETSTACK_RADIO_set_channel(channel)) {
+	channel = RF_CONF_CHANNEL;
+//#if (RF_CONF_CHANNEL != 15)
+//#error "MACRO definition: RF_CONF_CHANNEL is unavailable"
+//#endif
+	if (NETSTACK_RADIO_set_channel(channel)) {
 		return channel;
 	}
 	return 0;
@@ -691,7 +698,8 @@ powercycle(struct rtimer *t, void *ptr)
 					if (ieee154e_vars.cell->link_type == LINK_TYPE_ADVERTISING) {
 						//TODO fetch adv/EB packets
 						ieee154e_vars.n = neighbor_queue_from_addr(&EB_CELL_ADDRESS);
-						if(1 || generate_random_byte(8) >= 4) {
+						//XXX limit EB rate
+						if(generate_random_byte(8) >= 4) {
 							ieee154e_vars.payload_len = make_eb((uint8_t *)ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN+1); //last byte in eb buf is for length
 							ieee154e_vars.payload = (void *)ieee154e_vars.eb_buf;
 						} else {
@@ -1038,6 +1046,7 @@ powercycle(struct rtimer *t, void *ptr)
 						if(!NETSTACK_RADIO.receiving_packet() && !NETSTACK_RADIO_pending_irq()) {
 							off(keep_radio_on);
 							//no packets on air
+							PUTCHAR('A');
 							ret = 0;
 						} else {
 #if CONTIKI_TARGET_JN5168
@@ -1046,8 +1055,11 @@ powercycle(struct rtimer *t, void *ptr)
 									ieee154e_vars.start, TsTxOffset + TsLongGT+wdDataDuration);
 #endif
 							NETSTACK_RADIO_process_packet();
+							PUTCHAR('K');
 							off(keep_radio_on);
 							if(ieee154e_vars.last_rf != NULL) {
+								PUTCHAR('P');
+
 //								rx_duration = NETSTACK_RADIO_get_rx_end_time() - ieee154e_vars.last_rf->sfd_timestamp;
 								/* wait until ack time */
 								if (ieee154e_vars.need_ack) {
