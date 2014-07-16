@@ -21,6 +21,12 @@
 #include <MMAC/include/MMAC.h>
 #include "micromac-radio.h"
 #include "lib/crc16.h"
+
+#undef putchar
+void uart0_writeb(unsigned char c);
+#define putchar uart0_writeb
+#define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
+
 #define CHECKSUM_LEN 2
 
 #if MICROMAC_RADIO_CONF_NO_IRQ
@@ -111,7 +117,7 @@ static volatile uint32_t micromac_radio_rx_garbage = 0,
 		micromac_radio_tx_completed = 0, rx_state;
 
 //TODO: consider making a list
-#define RX_LIST_SIZE 10
+#define RX_LIST_SIZE 2
 static tsPhyFrame __attribute__((aligned)) tx_frame_buffer;
 static tsMacFrame __attribute__((aligned)) rx_frame_buffer[RX_LIST_SIZE];
 static tsMacFrame * volatile rx_frame_buffer_write_ptr,
@@ -221,7 +227,9 @@ static void
 off(void)
 {
 	vMMAC_SetCutOffTimer(0, FALSE);
+#if !MICROMAC_RADIO_ALWAYS_ON
 	vMMAC_RadioOff();
+#endif
 	//PROTOCOL shutdown... to shutdown the circuit instead.
 }
 /*---------------------------------------------------------------------------*/
@@ -263,15 +271,25 @@ micromac_radio_interrupt(uint32 mac_event)
 {
 	uint8_t* ackbuf=NULL;
 	uint8_t need_ack = 0;
-
+	uint16_t checksum = 0;
+//	printf(
+//					"micromac_radio_process_packet: rx_overflow %u, rx_ackneeded %u, rx_noackneeded %u, rx_state %u, rx_complete %d, rx_error %d, rx_malformed %d, rx_aborted %d, packets_seen %d, rx_garbage %u,\nsfd_counter %d, noacktx %u, acktx %u, tx_completed %u, contentiondrop %u, sendingdrop %u\n",
+//				rx_overflow, rx_ackneeded, rx_noackneeded, rx_state,
+//					rx_complete, rx_error, rx_malformed, rx_aborted,
+//					micromac_radio_packets_seen, micromac_radio_rx_garbage,
+//					micromac_radio_sfd_counter, RIMESTATS_GET(noacktx), RIMESTATS_GET(acktx),
+//					micromac_radio_tx_completed, RIMESTATS_GET(contentiondrop),
+//					RIMESTATS_GET(sendingdrop));
 	if (mac_event & E_MMAC_INT_TX_COMPLETE) { /* Transmission attempt has finished */
 		tx_in_progress = 0;
 		micromac_radio_tx_completed++;
+//		PUTCHAR('X');
 		//XXX: Always ON!!
 #if MICROMAC_RADIO_ALWAYS_ON
 		on();
 #endif
 	} else if (mac_event & E_MMAC_INT_RX_HEADER) { /* MAC header has been received */
+//		PUTCHAR('R');
 		micromac_radio_sfd_counter++;
 		rx_state = u32MMAC_GetRxErrors();
 		/* if rx is successful */
@@ -304,7 +322,7 @@ micromac_radio_interrupt(uint32 mac_event)
 			 for(i=0; i<phy_ackbuf.u8PayloadLength; i++) {
 				 phy_ackbuf.uPayload.au8Byte[i]=ackbuf[i+1];
 			 }
-			 uint16_t checksum = crc16_data(phy_ackbuf.uPayload.au8Byte, phy_ackbuf.u8PayloadLength, 0);
+			 checksum = crc16_data(phy_ackbuf.uPayload.au8Byte, phy_ackbuf.u8PayloadLength, 0);
 			 phy_ackbuf.uPayload.au8Byte[i++] = checksum;
 			 phy_ackbuf.uPayload.au8Byte[i++] = ( checksum >> 8) & 0xff;
 			 phy_ackbuf.u8PayloadLength += CHECKSUM_LEN;
@@ -315,6 +333,24 @@ micromac_radio_interrupt(uint32 mac_event)
 				on();
 #endif
 			}
+			/* E_MMAC_INT_RX_COMPLETE */
+			rx_complete++;
+			need_ack = (rx_frame_buffer_recent_ptr->u16FCF >> 5) & 1;
+			//XXX: Always ON!!
+	#if MICROMAC_RADIO_ALWAYS_ON
+			if (need_ack) {
+				on();
+			}
+	#endif
+
+			if(interrupt_exit_callback != NULL) {
+			 last_rf.buf = rx_frame_buffer_recent_ptr->uPayload.au8Byte;
+			 last_rf.len = rx_frame_buffer_recent_ptr->u8PayloadLength;
+			 last_rf.sfd_timestamp = micromac_radio_time_of_arrival;
+			 copy_to_rimeaddress(&(last_rf.source_address), &rx_frame_buffer_recent_ptr->uSrcAddr);
+			 interrupt_exit_callback(need_ack, &last_rf);
+			}
+
 		} else { /* if rx is not successful */
 			if (rx_state & E_MMAC_RXSTAT_ABORTED) {
 				rx_aborted++;
@@ -331,25 +367,13 @@ micromac_radio_interrupt(uint32 mac_event)
 		  	interrupt_exit_callback(0, NULL);
 		  }
 		}
-	} else if (mac_event & E_MMAC_INT_RX_COMPLETE) { /* Complete frame has been received and ACKed*/
-		//rx_in_progress = 0;
-		rx_complete++;
-		need_ack = (rx_frame_buffer_recent_ptr->u16FCF >> 5) & 1;
-		//XXX: Always ON!!
-#if MICROMAC_RADIO_ALWAYS_ON
-		if (need_ack) {
-			on();
-		}
-#endif
 
-		if(interrupt_exit_callback != NULL) {
-		 last_rf.buf = rx_frame_buffer_recent_ptr->uPayload.au8Byte;
-		 last_rf.len = rx_frame_buffer_recent_ptr->u8PayloadLength;
-		 last_rf.sfd_timestamp = micromac_radio_time_of_arrival;
-		 copy_to_rimeaddress(&(last_rf.source_address), &rx_frame_buffer_recent_ptr->uSrcAddr);
-		 interrupt_exit_callback(need_ack, &last_rf);
-		}
 	}
+//	else if (mac_event & E_MMAC_INT_RX_COMPLETE) { /* Complete frame has been received and ACKed*/
+////		PUTCHAR('L');
+//		//rx_in_progress = 0;
+//
+//	}
 }
 /*---------------------------------------------------------------------------*/
 int
@@ -391,8 +415,8 @@ micromac_radio_send_ack(void) {
 void
 micromac_radio_send_ack_delayed(uint32 u32_delay_time)
 {
-  if(!locked) {
-		GET_LOCK();
+//  if(!locked) {
+//		GET_LOCK();
 		tx_in_progress = 1;
 		vMMAC_SetTxStartTime(micromac_radio_get_rx_radio_end_time() + u32_delay_time);
 		vMMAC_StartPhyTransmit(&phy_ackbuf,
@@ -400,8 +424,8 @@ micromac_radio_send_ack_delayed(uint32 u32_delay_time)
 				| E_MMAC_TX_NO_AUTO_ACK
 				| E_MMAC_TX_NO_CCA);
 		tx_in_progress = 0;
-		RELEASE_LOCK();
-  }
+//		RELEASE_LOCK();
+//  }
   rx_end_time = 0;
 }
 /*---------------------------------------------------------------------------*/

@@ -134,7 +134,7 @@ void micromac_radio_interrupt(uint32 mac_event);
 #define NETSTACK_RADIO_sfd_sync(S,E) 						micromac_radio_sfd_sync()
 #define NETSTACK_RADIO_read_sfd_timer() 				micromac_radio_read_sfd_timer()
 #define NETSTACK_RADIO_set_channel(C)						micromac_radio_set_channel(C)
-#define NETSTACK_RADIO_process_packet(...)			micromac_radio_interrupt( u32MMAC_PollInterruptSource(E_MMAC_INT_RX_HEADER|E_MMAC_INT_RX_COMPLETE) )
+#define NETSTACK_RADIO_process_packet(X)				micromac_radio_interrupt( X )
 #define NETSTACK_RADIO_pending_irq()						u32MMAC_PollInterruptSource(E_MMAC_INT_RX_HEADER|E_MMAC_INT_RX_COMPLETE)
 #define NETSTACK_RADIO_transmit_delayed(D) 			micromac_radio_transmit_delayed(D)
 #define NETSTACK_RADIO_get_time() 							u32MMAC_GetTime()
