@@ -144,7 +144,7 @@ int cc2420_interrupt(void);
 #define NETSTACK_RADIO_sfd_sync(S,E) 						cc2420_sfd_sync(S,E)
 #define NETSTACK_RADIO_read_sfd_timer() 				cc2420_read_sfd_timer()
 #define NETSTACK_RADIO_set_channel(C)						cc2420_set_channel(C)
-#define NETSTACK_RADIO_process_packet()					cc2420_interrupt()
+#define NETSTACK_RADIO_process_packet(...)			cc2420_interrupt()
 #define NETSTACK_RADIO_pending_irq()						cc2420_pending_irq()
 
 /************************************************************************/

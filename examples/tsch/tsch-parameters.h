@@ -11,8 +11,6 @@
 
 #define NACK_FLAG 0x8000
 
-
-
 #define RESYNCH_TIMEOUT ieee154e_vars.current_slotframe->length * 10
 #define KEEPALIVE_TIMEOUT ieee154e_vars.current_slotframe->length * 3
 #if CONTIKI_TARGET_JN5168
@@ -63,7 +61,7 @@
 	// radio watchdog
 #define	wdRadioTx (16*1000UL)                  //  1000us (needs to be >delayTx)
 #define	wdDataDuration (16*4300UL)            //  4500us (measured 4280us with max payload)
-#define	wdAckDuration (16*460UL)                  //  600us (measured 1000us me: 440us)
+#define	wdAckDuration (16*500UL)                  //  600us (measured 1000us me: 440us)
 
 //enum ieee154e_atomicdurations_enum {
 //	// time-slot related
