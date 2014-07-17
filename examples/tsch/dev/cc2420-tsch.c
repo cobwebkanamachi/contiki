@@ -688,7 +688,7 @@ extract_sender_address(struct received_frame_radio_s* frame) {
 			p += 2;
 		} else if(fcf.src_addr_mode == FRAME802154_LONGADDRMODE) {
 			for(c = 0; c < 8; c++) {
-				frame->source_address.u8[c] = p[c];
+				frame->source_address.u8[c] = p[7-c];
 			}
 			p += 8;
 		}
