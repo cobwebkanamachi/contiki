@@ -173,7 +173,7 @@ PUBLIC void vUartInit(uint8_t u8Uart, uint8_t u8BaudRateEnum, uint8_t *pu8TxBuff
 	}
 
 	/* Enable TX Fifo empty and Rx data interrupts */
-    vAHI_UartSetInterrupt(u8Uart, FALSE, FALSE, TRUE, TRUE, E_AHI_UART_FIFO_LEVEL_1);
+		vAHI_UartSetInterrupt(u8Uart, FALSE /*bEnableModemStatus*/, FALSE /*bEnableRxLineStatus*/, TRUE /*bEnableTxFifoEmpty*/, TRUE /* bEnableRxData */, E_AHI_UART_FIFO_LEVEL_1);
 
     uart_input[u8Uart]=uart_input_function;
 }
@@ -545,6 +545,8 @@ PUBLIC void vUartWriteString(uint8_t u8Uart, uint8_t *pu8String)
  ****************************************************************************/
 PUBLIC void vUartWrite(uint8_t u8Uart, uint8_t u8Data)
 {
+	//enable interrupts again
+	vAHI_UartSetInterrupt(u8Uart, FALSE /*bEnableModemStatus*/, FALSE /*bEnableRxLineStatus*/, TRUE /*bEnableTxFifoEmpty*/, TRUE /* bEnableRxData */, E_AHI_UART_FIFO_LEVEL_1);
 
 	while(!bQueue_Write(&asUart_TxQueue[u8Uart], u8Data));
 
@@ -703,7 +705,7 @@ PRIVATE void vUartISR(uint32_t u32DeviceId, uint32_t u32ItemBitmap)
  ****************************************************************************/
 PRIVATE void vUartTxIsr(uint8_t u8Uart)
 {
-	uint8_t u8Data;
+	uint8_t u8Data, data_available=0;
 	uint32_t u32Bytes = 0;
 
 	/*
@@ -711,10 +713,15 @@ PRIVATE void vUartTxIsr(uint8_t u8Uart)
 	 * hardware fifo up
 	 */
 
-	while(u32Bytes++ < 16 && bQueue_Read(&asUart_TxQueue[u8Uart], &u8Data))
+	while(u32Bytes++ < 16 && (data_available=bQueue_Read(&asUart_TxQueue[u8Uart], &u8Data)))
 	{
 		vAHI_UartWriteData(u8Uart, u8Data); /* write one byte to the UART */
   }
+	if(!data_available) {
+		/* Disable TX fifo empty interrupt until we get more data to send */
+		vAHI_UartSetInterrupt(u8Uart, FALSE, FALSE, FALSE /*bEnableTxFifoEmpty*/, TRUE /* bEnableRxData */, E_AHI_UART_FIFO_LEVEL_1);
+//		vAHI_UartWriteData(u8Uart, '?');
+	}
 }
 
 
