@@ -322,6 +322,9 @@ micromac_radio_interrupt(uint32 mac_event)
 			 for(i=0; i<phy_ackbuf.u8PayloadLength; i++) {
 				 phy_ackbuf.uPayload.au8Byte[i]=ackbuf[i+1];
 			 }
+//			 phy_ackbuf.u16FCF = ackbuf[1];
+//			 phy_ackbuf.u16FCF |= 0xff00 & (ackbuf[2]<<8);
+//			 phy_ackbuf.u8SequenceNum = ackbuf[3];
 			 checksum = crc16_data(phy_ackbuf.uPayload.au8Byte, phy_ackbuf.u8PayloadLength, 0);
 			 phy_ackbuf.uPayload.au8Byte[i++] = checksum;
 			 phy_ackbuf.uPayload.au8Byte[i++] = ( checksum >> 8) & 0xff;
@@ -399,16 +402,20 @@ micromac_radio_read_ack(void *buf, int alen) {
 /*---------------------------------------------------------------------------*/
 void
 micromac_radio_send_ack(void) {
-  if(!locked) {
-		GET_LOCK();
+//  if(!locked) {
+//		GET_LOCK();
 		tx_in_progress = 1;
 		vMMAC_StartPhyTransmit(&phy_ackbuf,
 				E_MMAC_TX_START_NOW
 				| E_MMAC_TX_NO_AUTO_ACK
 				| E_MMAC_TX_NO_CCA);
+//		vMMAC_StartMacTransmit(&phy_ackbuf,
+//				E_MMAC_TX_START_NOW
+//				| E_MMAC_TX_NO_AUTO_ACK
+//				| E_MMAC_TX_NO_CCA);
 		tx_in_progress = 0;
-		RELEASE_LOCK();
-  }
+//		RELEASE_LOCK();
+//  }
   rx_end_time = 0;
 }
 /*---------------------------------------------------------------------------*/
@@ -423,6 +430,10 @@ micromac_radio_send_ack_delayed(uint32 u32_delay_time)
 				E_MMAC_TX_DELAY_START
 				| E_MMAC_TX_NO_AUTO_ACK
 				| E_MMAC_TX_NO_CCA);
+//		vMMAC_StartMacTransmit(&phy_ackbuf,
+//				E_MMAC_TX_DELAY_START
+//				| E_MMAC_TX_NO_AUTO_ACK
+//				| E_MMAC_TX_NO_CCA);
 		tx_in_progress = 0;
 //		RELEASE_LOCK();
 //  }
@@ -483,6 +494,7 @@ static int
 micromac_radio_transmit_with_irq(unsigned short payload_len)
 {
 	if (tx_in_progress) {
+		PUTCHAR('#');
 		return RADIO_TX_COLLISION;
 	}
 	GET_LOCK();
@@ -520,6 +532,7 @@ static int
 micromac_radio_transmit(unsigned short payload_len)
 {
 	if (tx_in_progress) {
+		PUTCHAR('#');
 		return RADIO_TX_COLLISION;
 	}
 	GET_LOCK();
@@ -611,6 +624,7 @@ int
 micromac_radio_raw_transmit(tsPhyFrame *psFrame)
 {
 	if (tx_in_progress) {
+		PUTCHAR('#');
 		return RADIO_TX_COLLISION;
 	}
 	GET_LOCK();
@@ -702,6 +716,7 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 	RIMESTATS_ADD(lltx);
 
 	if (tx_in_progress) {
+		PUTCHAR('$');
 		return 1;
 	}
 	GET_LOCK();
@@ -747,6 +762,7 @@ micromac_radio_send_delayed(const void *payload, unsigned short payload_len, uin
 {
 	micromac_radio_prepare(payload, payload_len);
 	if (tx_in_progress) {
+		PUTCHAR('#');
 			return RADIO_TX_COLLISION;
 		}
 		GET_LOCK();
