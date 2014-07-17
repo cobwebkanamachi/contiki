@@ -571,13 +571,13 @@ schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
 		rtimer_clock_t duration)
 {
 	int r, status = 0;
-	rtimer_clock_t now = RTIMER_NOW()+5;
+	rtimer_clock_t now = RTIMER_NOW();
 	ref_time += duration;
 //	RTIMER_CLOCK_LT(ref_time - now > duration+5)
 //	!RTIMER_CLOCK_LT(now,ref_time)
-	if (ref_time - now > duration+1) {
+	if (ref_time - now > duration) {
 		COOJA_DEBUG_STR("schedule_fixed: missed deadline");
-		PRINTF("schedule_fixed: missed deadline: %u, %u, %u, %u\n", ref_time, now, now - ref_time, duration );
+//		PRINTF("schedule_fixed: missed deadline: %u, %u, %u, %u\n", ref_time, now, now - ref_time, duration );
 		ref_time = now + TRIVIAL_DELAY;
 	}
 	r = rtimer_set(tm, ref_time, 1, (void
@@ -598,9 +598,9 @@ schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 		rtimer_clock_t duration)
 {
 	int r, status = 0;
-	rtimer_clock_t now = RTIMER_NOW() + 5;
+	rtimer_clock_t now = RTIMER_NOW();
 	ref_time += duration;
-	if (ref_time - now > duration+5) {
+	if (ref_time - now > duration) {
 		COOJA_DEBUG_STR("schedule_strict: missed deadline");
 		PRINTF("schedule_strict: missed deadline: %u, %u, %u, %u\n", ref_time, now, now - ref_time, duration );
 		PRINTF("tq: %u, t0prepare %u, t0tx %u, t0txack %u, t0post_tx %u, t0rx %u, t0rxack %u, tn %u\n", tq, t0prepare, t0tx, t0txack, t0post_tx, t0rx, t0rxack, tn );
@@ -883,7 +883,6 @@ powercycle(struct rtimer *t, void *ptr)
 								len = NETSTACK_RADIO_read_ack((void *)ieee154e_vars.ackbuf, STD_ACK_LEN + SYNC_IE_LEN);
 								if (2 == ieee154e_vars.ackbuf[0] && len >= ACK_LEN && seqno == ieee154e_vars.ackbuf[2]) {
 									success = RADIO_TX_OK;
-									ieee154e_vars.sync_timeout=0;
 									ack_status = 0;
 									/* IE-list present? */
 									if (ieee154e_vars.ackbuf[1] & 2) {
@@ -906,6 +905,7 @@ powercycle(struct rtimer *t, void *ptr)
 													}
 													ieee154e_vars.drift += d;
 													ieee154e_vars.drift_counter++;
+													PUTCHAR('+');
 												}
 												if (ack_status & NACK_FLAG) {
 													//TODO return NACK status to upper layer
@@ -1091,7 +1091,6 @@ powercycle(struct rtimer *t, void *ptr)
 								 */
 								//drift calculated in radio_interrupt
 								if (ieee154e_vars.registered_drift) {
-									ieee154e_vars.sync_timeout=0;
 									COOJA_DEBUG_PRINTF("ieee154e_vars.drift seen %d\n", ieee154e_vars.registered_drift);
 									// check the source address for potential time-source match
 									ieee154e_vars.n = neighbor_queue_from_addr(&(ieee154e_vars.last_rf->source_address));
@@ -1119,54 +1118,30 @@ powercycle(struct rtimer *t, void *ptr)
 			duration = dt * TsSlotDuration;
 			/* increase the timeout counter because we will reset it in case of successful TX or RX */
 			ieee154e_vars.sync_timeout += dt;
-
-			/* apply sync correction on the ieee154e_vars.start of the new slotframe */
-			if (!next_timeslot) {
-				if(ieee154e_vars.drift_counter) {
-					/* convert from microseconds to rtimer ticks and take average */
-					ieee154e_vars.drift_correction += CONVERT_DRIFT_US_TO_RTIMER(ieee154e_vars.drift, ieee154e_vars.drift_counter);
-				}
-				if(ieee154e_vars.drift_correction) {
-					COOJA_DEBUG_PRINTF("New slot frame: drift_correction %d", ieee154e_vars.drift_correction);
-				}	else {
-					COOJA_DEBUG_STR("New slot frame");
-				}
-				duration += (int16_t)ieee154e_vars.drift_correction;
-				ieee154e_vars.drift_correction = 0;
-				ieee154e_vars.drift=0;
-				ieee154e_vars.drift_counter=0;
-			}
-
 			ieee154e_vars.timeslot = next_timeslot;
 			//increase asn
 			ieee154e_vars.asn.asn_4lsb += dt;
 			if(!ieee154e_vars.asn.asn_4lsb) {
 				ieee154e_vars.asn.asn_msb++;
 			}
-			ieee154e_vars.start += duration;
-
-			/* check for missed deadline and skip slot accordingly in order not to corrupt the whole schedule */
-			if (ieee154e_vars.start - RTIMER_NOW() > duration) {
-				COOJA_DEBUG_STR("skipping slot because of missed deadline!\n");
-				//go for next slot then
-				next_timeslot = get_next_on_timeslot(ieee154e_vars.timeslot);
-				dt =
-						next_timeslot ? next_timeslot - ieee154e_vars.timeslot :
-								ieee154e_vars.current_slotframe->length - ieee154e_vars.timeslot;
-				duration2 = dt * TsSlotDuration;
-				ieee154e_vars.sync_timeout += dt;
-				ieee154e_vars.timeslot = next_timeslot;
-				//increase asn
-				ieee154e_vars.asn.asn_4lsb += dt;
-				if(!ieee154e_vars.asn.asn_4lsb) {
-					ieee154e_vars.asn.asn_msb++;
-				}
-				ieee154e_vars.start -= duration;
-				duration += duration2;
-			} else {
-				ieee154e_vars.start -= duration;
-			}
 			leds_off(LEDS_RED);
+
+			/* apply drift correction */
+			if ( ieee154e_vars.sync_timeout > DRIFT_CORRECTION_TIMEOUT && ieee154e_vars.drift_counter) {
+				/* convert from microseconds to rtimer ticks and take average */
+				ieee154e_vars.drift_correction += CONVERT_DRIFT_US_TO_RTIMER(
+						ieee154e_vars.drift, ieee154e_vars.drift_counter);
+				duration += (int16_t) ieee154e_vars.drift_correction;
+				if(ieee154e_vars.drift_correction) {
+					COOJA_DEBUG_PRINTF("New slot frame: drift_correction %d", ieee154e_vars.drift_correction);
+				}	else {
+					COOJA_DEBUG_STR("New slot frame");
+				}
+				ieee154e_vars.drift_correction = 0;
+				ieee154e_vars.drift = 0;
+				ieee154e_vars.drift_counter = 0;
+				ieee154e_vars.sync_timeout = 0;
+			}
 
 			/* Check if we need to resynchronize */
 			if(	ieee154e_vars.join_priority != 0
@@ -1174,14 +1149,14 @@ powercycle(struct rtimer *t, void *ptr)
 				ieee154e_vars.state = TSCH_SEARCHING;
 				ieee154e_vars.timeslot = 0;
 				/* schedule init function to run again */
-				int r = rtimer_set(t, RTIMER_NOW(), RTIMER_SECOND, (void
-				(*)(struct rtimer *, void *)) tsch_resynchronize, NULL);
-				if (r != RTIMER_OK) {
-					COOJA_DEBUG_STR("schedule tsch_resynchronize: could not set rtimer\n");
-				}
+				int r = 0, i = 1;
+				do {
+					r = rtimer_set(t, RTIMER_NOW(), (i++)*(RTIMER_SECOND/2), (void
+					(*)(struct rtimer *, void *)) tsch_resynchronize, NULL);
+				} while (r != RTIMER_OK);
 				tn=RTIMER_NOW()-tn;
 				PUTCHAR('S');
-			} else {
+			} else { /* Schedule wakeup for next slot */
 				/* skip slot if missed the deadline */
 				while ( schedule_strict(t, ieee154e_vars.start, duration) ) {
 //					watchdog_periodic();
@@ -1245,9 +1220,9 @@ void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet
 	ieee154e_vars.ackbuf[2] = 0x00; /* b9:IE-list-present=1 - b12-b13:frame version=2 */
 	ieee154e_vars.ackbuf[0] = 3; /*length*/
 	/* Append IE timesync */
-//	add_sync_IE(&(ieee154e_vars.ackbuf[4]), time_difference_32, nack);
-//	ieee154e_vars.ackbuf[0] = 3 /*FCF 2B + SEQNO 1B*/ + 4 /* sync IE size */;
-//	ieee154e_vars.ackbuf[2] = 0x22; /* b9:IE-list-present=1 - b12-b13:frame version=2 */
+	add_sync_IE(&(ieee154e_vars.ackbuf[4]), time_difference_32, nack);
+	ieee154e_vars.ackbuf[0] = 7; /* Len: FCF 2B + SEQNO 1B + sync IE 4B*/
+	ieee154e_vars.ackbuf[2] = 0x22; /* b9:IE-list-present=1 - b12-b13:frame version=2 */
 }
 /*---------------------------------------------------------------------------*/
 /* Create an EB packet */
@@ -1273,8 +1248,8 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 	buf[i++] = (IEEE802154_PANID >> 8) & 0xff;
 
   /* Source address */
-	for(k = 0; k < 8; k++) {
-    buf[i++] = rimeaddr_node_addr.u8[7-k];
+	for(k = RIMEADDR_SIZE; k > 0; k--) {
+    buf[i++] = rimeaddr_node_addr.u8[k-1];
   }
 	k=0;
 	/* XXX in 6top: EB length, group ID and type: leave 2 bytes for that */
@@ -1422,7 +1397,7 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 
 		//process the schedule, to create queues and find time-sources (time-keeping)
 		//wait until queue is free
-		while(ieee154e_vars.working_on_queue){}
+//		while(ieee154e_vars.working_on_queue){}
 		if(!ieee154e_vars.working_on_queue) {
 			struct neighbor_queue *n;
 			uint8_t i = 0;
@@ -1442,17 +1417,20 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 					}
 				}
 			}
-			/* XXX HACK this should be set in sent schedule
-			 * --Set parent as timesource */
-			if((ieee154e_vars.last_rf)) {
-				struct neighbor_queue *n = neighbor_queue_from_addr(&ieee154e_vars.last_rf->source_address);
-				if (n == NULL) {
-					//add new neighbor to list of neighbors
-					n=add_queue(&ieee154e_vars.last_rf->source_address);
-				}
-				if( n!= NULL ) {
-					n->is_time_source = 1;
-				}
+		} else {
+			printf("XXX Could not create queues on association. Time source will not be set!\n");
+		}
+		/* XXX HACK this should be set in sent schedule
+		 * --Set parent as timesource */
+		if((ieee154e_vars.last_rf)) {
+			struct neighbor_queue *n = neighbor_queue_from_addr(&ieee154e_vars.last_rf->source_address);
+			if (n == NULL && !ieee154e_vars.working_on_queue) {
+				//add new neighbor to list of neighbors
+				n=add_queue(&ieee154e_vars.last_rf->source_address);
+			}
+			if( n!= NULL ) {
+				n->is_time_source = 1;
+				printf("Setting parent as time source : %x.%x\n", ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE-2], ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE-1]);
 			}
 		}
 	} else {
