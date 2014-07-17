@@ -130,16 +130,16 @@ set_rime_addr(void)
 //  memcpy(addr.u8, micromac_get_hw_mac_address_location(), sizeof(addr.u8));
 //  //memcpy(addr.u8, micromac_get_hw_mac_address_location()+6, sizeof(addr.u8));
 //#endif
-  tsExtAddr psExtAddress;
-  vMMAC_GetMacAddress(&psExtAddress);
-  copy_to_rimeaddress(&addr, (tuAddr *)&psExtAddress);
+  tuAddr psExtAddress;
+  vMMAC_GetMacAddress(&psExtAddress.sExt);
+  copy_to_rimeaddress(&addr, &psExtAddress);
   rimeaddr_set_node_addr(&addr);
   PRINTF("Rime started with address ");
   for(i = 0; i < sizeof(addr.u8) - 1; i++) {
     PRINTF("%02x.", addr.u8[i]);
   }
   PRINTF("%02x\n", addr.u8[i]);
-  PRINTF("HW MAC tsExtAddr: %08x.%08x\n", psExtAddress.u32H, psExtAddress.u32L);
+  PRINTF("HW MAC tsExtAddr: %08x.%08x\n", psExtAddress.sExt.u32H, psExtAddress.sExt.u32L);
 }
 
 
