@@ -52,6 +52,7 @@
 #include "net/mac/frame802154.h"
 #include "dev/leds.h"
 #include "sys/ctimer.h"
+#include "net/nbr-table.h"
 
 //#ifndef CONTIKI_TARGET_JN5168
 //#define CONTIKI_TARGET_JN5168 1
@@ -189,7 +190,6 @@ static const slotframe_t minimum_slotframe = { 0, 101, 6, minimum_cells };
 static volatile ieee154e_vars_t ieee154e_vars;
 /*---------------------------------------------------------------------------*/
 /* NBR_TABLE_CONF_MAX_NEIGHBORS specifies the size of the table */
-#include "net/nbr-table.h"
 NBR_TABLE(struct neighbor_queue, neighbor_list);
 
 struct neighbor_queue *
@@ -354,16 +354,18 @@ read_packet_from_queue(const rimeaddr_t *addr)
 	return read_packet_from_neighbor_queue( neighbor_queue_from_addr(addr) );
 }
 /*---------------------------------------------------------------------------*/
-/* get a packet to send in a shared slot */
+/* get a packet to send in a shared slot, and put the neighbor reference in n */
 static struct TSCH_packet *
-get_next_packet_for_shared_slot_tx(void)
+get_next_packet_for_shared_slot_tx( struct neighbor_queue** n )
 {
 	static struct neighbor_queue* last_neighbor_tx = NULL;
 	if(last_neighbor_tx == NULL) {
 		last_neighbor_tx = nbr_table_head(neighbor_list);
+		*n = last_neighbor_tx;
 	}
 	struct TSCH_packet * p = NULL;
 	while(p==NULL && last_neighbor_tx != NULL) {
+		*n = last_neighbor_tx;
 		p = read_packet_from_neighbor_queue( last_neighbor_tx );
 		last_neighbor_tx = nbr_table_next(neighbor_list, last_neighbor_tx);
 	}
@@ -714,12 +716,12 @@ powercycle(struct rtimer *t, void *ptr)
 						ieee154e_vars.n = neighbor_queue_from_addr(ieee154e_vars.cell->node_address);
 						if (ieee154e_vars.n != NULL) {
 							ieee154e_vars.p = read_packet_from_neighbor_queue(ieee154e_vars.n);
-							//if there it is a shared broadcast slot and there were no broadcast packets, pick any unicast packet
-							if(ieee154e_vars.p==NULL
-									&& rimeaddr_cmp(ieee154e_vars.cell->node_address, &BROADCAST_CELL_ADDRESS)
-									&& (ieee154e_vars.cell->link_options & LINK_OPTION_SHARED)) {
-								ieee154e_vars.p = get_next_packet_for_shared_slot_tx();
-							}
+						}
+						//if there it is a shared broadcast slot and there were no broadcast packets, pick any unicast packet
+						if(ieee154e_vars.p==NULL
+								&& rimeaddr_cmp(ieee154e_vars.cell->node_address, &BROADCAST_CELL_ADDRESS)
+								&& (ieee154e_vars.cell->link_options & LINK_OPTION_SHARED)) {
+							ieee154e_vars.p = get_next_packet_for_shared_slot_tx( &ieee154e_vars.n );
 						}
 						if(ieee154e_vars.p!= NULL) {
 							ieee154e_vars.payload = queuebuf_dataptr(ieee154e_vars.p->pkt);
@@ -881,42 +883,43 @@ powercycle(struct rtimer *t, void *ptr)
 								NETSTACK_RADIO_address_decode(1);
 #endif /* CONTIKI_TARGET_JN5168 */
 								len = NETSTACK_RADIO_read_ack((void *)ieee154e_vars.ackbuf, STD_ACK_LEN + SYNC_IE_LEN);
-								if (2 == ieee154e_vars.ackbuf[0] && len >= ACK_LEN && seqno == ieee154e_vars.ackbuf[2]) {
+								if (2 == ieee154e_vars.ackbuf[0] && len >= STD_ACK_LEN && seqno == ieee154e_vars.ackbuf[2]) {
 									success = RADIO_TX_OK;
 									ack_status = 0;
 									/* IE-list present? */
 									if (ieee154e_vars.ackbuf[1] & 2) {
 										if (len == STD_ACK_LEN + SYNC_IE_LEN) {
-											if (ieee154e_vars.ackbuf[3] == 0x02 && ieee154e_vars.ackbuf[4] == 0x1e) {
+											if (ieee154e_vars.ackbuf[3] == 0x02
+													&& ieee154e_vars.ackbuf[4] == 0x1e) {
 												ack_status = ieee154e_vars.ackbuf[5];
 												ack_status |= ieee154e_vars.ackbuf[6] << 8;
 												/* If the originator was a time source neighbor, the receiver adjusts its own clock by incorporating the
 												 * 	difference into an average of the drift to all its time source neighbors. The averaging method is
 												 * 	implementation dependent. If the receiver is not a clock source, the time correction is ignored.
 												 */
-												if (ieee154e_vars.n->is_time_source) {
-													/* extract time correction */
-													int16_t d=0;
-													/*is it a negative correction?*/
-													if(ack_status & 0x0800) {
-														d = -(ack_status & 0x0fff & ~0x0800);
-													} else {
-														d = ack_status & 0x0fff;
+												if (ieee154e_vars.n != NULL) {
+													if (ieee154e_vars.n->is_time_source) {
+														/* extract time correction */
+														int16_t d = 0;
+														/*is it a negative correction?*/
+														if (ack_status & 0x0800) {
+															d = -(ack_status & 0x0fff & ~0x0800);
+														} else {
+															d = ack_status & 0x0fff;
+														}
+														ieee154e_vars.drift += d;
+														ieee154e_vars.drift_counter++;
+														PUTCHAR('+');
 													}
-													ieee154e_vars.drift += d;
-													ieee154e_vars.drift_counter++;
-													PUTCHAR('+');
 												}
 												if (ack_status & NACK_FLAG) {
 													//TODO return NACK status to upper layer
-													PUTCHAR('/');
-													COOJA_DEBUG_STR("ACK NACK_FLAG\n");
+													PUTCHAR('/'); COOJA_DEBUG_STR("ACK NACK_FLAG\n");
 												}
 											}
 										}
 									}
-									PUTCHAR('*');
-									COOJA_DEBUG_STR("ACK ok\n");
+									PUTCHAR('*'); COOJA_DEBUG_STR("ACK ok\n");
 								} else {
 									success = RADIO_TX_NOACK;
 									PUTCHAR('@');
