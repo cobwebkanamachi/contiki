@@ -381,23 +381,20 @@ micromac_radio_interrupt(uint32 mac_event)
 /*---------------------------------------------------------------------------*/
 int
 micromac_radio_read_ack(void *buf, int alen) {
-  uint8_t len=0, footer1=0, overflow=0;
-	if (!locked) {
-//		BUSYWAIT_UNTIL(!bMMAC_RxDetected(), delayRx);
-		BUSYWAIT_UNTIL(u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE), 16*500); //TsShortGT
-		len = sizeof(tsMacFrame) - 32 * sizeof(uint32) + rx_frame_buffer_read_ptr->u8PayloadLength; //MICROMAC_HEADER_LEN
-//		len = rx_frame_buffer_read_ptr->u8PayloadLength; //MICROMAC_HEADER_LEN
+	uint8_t len = 0, i = 0;
+	BUSYWAIT_UNTIL(u32MMAC_PollInterruptSource(E_MMAC_INT_TX_COMPLETE), 16 * 500); //TsShortGT
+	len = rx_frame_buffer_write_ptr->u8PayloadLength;
 
-		alen = (len > alen) ? alen : len;
-		if (buf && len >= ACK_LEN) {
-//			//should copy the whole thing or else something wrong happens probably because of alignment
-//			//XXX check for possibility of overflow: rx_frame_buffer_read_ptr == rx_frame_buffer_write_ptr
-//			memcpy(buf, rx_frame_buffer_read_ptr, sizeof(tsMacFrame));
-			memcpy(buf, &rx_frame_buffer_write_ptr->uPayload.au8Byte, alen);
+	alen = (len > alen) ? alen : len;
+	if (buf && len >= ACK_LEN) {
+		//XXX check for possibility of overflow: rx_frame_buffer_read_ptr == rx_frame_buffer_write_ptr
+//			memcpy(buf, &rx_frame_buffer_write_ptr->uPayload.au8Byte, alen);
+		for (i = 0; i < alen; i++) {
+			((uint8_t*)buf)[i] = rx_frame_buffer_write_ptr->uPayload.au8Byte[i];
 		}
-		rx_frame_buffer_read_ptr->u8PayloadLength=0;
-  }
-  return rx_frame_buffer_read_ptr->u8PayloadLength;
+	}
+	rx_frame_buffer_write_ptr->u8PayloadLength=0;
+	return len;
 }
 /*---------------------------------------------------------------------------*/
 void
