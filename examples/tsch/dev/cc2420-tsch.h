@@ -146,6 +146,7 @@ int cc2420_interrupt(void);
 #define NETSTACK_RADIO_set_channel(C)						cc2420_set_channel(C)
 #define NETSTACK_RADIO_process_packet(...)			cc2420_interrupt()
 #define NETSTACK_RADIO_pending_irq()						cc2420_pending_irq()
+#define NETSTACK_RADIO_radio_raw_rx_on()				NETSTACK_RADIO.on()
 
 /************************************************************************/
 /* Additional SPI Macros for the CC2420 */

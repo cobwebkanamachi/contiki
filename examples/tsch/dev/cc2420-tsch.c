@@ -882,6 +882,8 @@ cc2420_interrupt(void)
 		last_rf.buf = rf->buf;
 		last_rf.len = rf->len;
 		last_rf.sfd_timestamp = last_packet_timestamp;
+		/* in case of 16bit SFD timer and 32bit RTimer*/
+		last_rf.sfd_timestamp += (uint32_t)RTIMER_NOW() & 0xffff0000UL;
 		extract_sender_address(&last_rf);
 		frame_valid = 1;
 	} else { /* CRC is wrong */
