@@ -108,9 +108,6 @@ int micromac_radio_on(void);
 int micromac_radio_off(void);
 
 void micromac_radio_set_cca_threshold(int value);
-void micromac_get_hw_mac_address(tsExtAddr *psExtAddress);
-
-uint32_t* micromac_get_hw_mac_address_location(void);
 
 void micromac_radio_sfd_sync(void);
 rtimer_clock_t micromac_radio_read_sfd_timer(void);
@@ -121,6 +118,7 @@ void micromac_radio_transmit_delayed(uint32 u32_delay_time);
 void micromac_radio_start_rx_delayed(uint32 u32_delay_time, uint32 u32_on_duration);
 int micromac_radio_read_ack(void *buf, int alen);
 void micromac_radio_interrupt(uint32 mac_event);
+int micromac_radio_raw_rx_on(void);
 
 #define NETSTACK_RADIO_tx_duration(X) 					RADIO_TO_RTIMER(X+1)
 #define NETSTACK_RADIO_start_rx_delayed(u32_delay_time, u32_on_duration) micromac_radio_start_rx_delayed(u32_delay_time, u32_on_duration)
@@ -139,5 +137,6 @@ void micromac_radio_interrupt(uint32 mac_event);
 #define NETSTACK_RADIO_transmit_delayed(D) 			micromac_radio_transmit_delayed(D)
 #define NETSTACK_RADIO_get_time() 							u32MMAC_GetTime()
 #define NETSTACK_RADIO_get_radio_rx_end_time() 	micromac_radio_get_radio_rx_end_time()
+#define NETSTACK_RADIO_radio_raw_rx_on()				micromac_radio_raw_rx_on()
 
 #endif /* MICROMAC_RADIO_H_ */
