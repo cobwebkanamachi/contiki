@@ -53,10 +53,16 @@
 #include "dev/leds.h"
 #include "sys/ctimer.h"
 #include "net/nbr-table.h"
+#include "net/uip.h"
+
+#include "sys/process.h"
 
 //#ifndef CONTIKI_TARGET_JN5168
 //#define CONTIKI_TARGET_JN5168 1
 //#endif
+
+void rpl_reset_periodic_timer(void);
+void dis_output(uip_ipaddr_t *addr);
 
 #if CONTIKI_TARGET_JN5168
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) ((uint32_t)D * 16UL)/((uint32_t)DC);
@@ -217,7 +223,7 @@ static void tsch_resynchronize(struct rtimer *, void *);
  **/
 #include "sys/node-id.h"
 
-uint32_t seed_newg;
+static uint32_t seed_newg;
 void srand_newg(uint32_t x){
      seed_newg=x;
 }
@@ -300,6 +306,8 @@ add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
 	if (n != NULL) {
 		//is queue full?
 		if (((n->put_ptr - n->get_ptr) & (NBR_BUFFER_SIZE - 1)) == (NBR_BUFFER_SIZE - 1)) {
+			/* send the callback to signal that tx failed */
+			mac_call_sent_callback(sent, ptr, MAC_TX_ERR, 0);
 			return 0;
 		}
 		n->buffer[n->put_ptr].pkt = queuebuf_new_from_packetbuf(); // create new packet from packetbuf
@@ -606,7 +614,7 @@ schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 		COOJA_DEBUG_STR("schedule_strict: missed deadline");
 		PRINTF("schedule_strict: missed deadline: %u, %u, %u, %u\n", ref_time, now, now - ref_time, duration );
 		PRINTF("tq: %u, t0prepare %u, t0tx %u, t0txack %u, t0post_tx %u, t0rx %u, t0rxack %u, tn %u\n", tq, t0prepare, t0tx, t0txack, t0post_tx, t0rx, t0rxack, tn );
-//		PUTCHAR('!');
+		PUTCHAR('!');
 		status = 1;
 	} else {
 		r = rtimer_set(tm, ref_time, 1, (void
@@ -638,7 +646,7 @@ powercycle(struct rtimer *t, void *ptr)
 	 * otherwise, schedule next wakeup
 	 */
 	PT_BEGIN(&ieee154e_vars.mpt);
-	rtimer_clock_t duration, duration2;
+	rtimer_clock_t duration;
 	uint16_t dt, next_timeslot;
 	uint16_t ack_status = 0;
 	static uint8_t is_broadcast = 0, len=0, seqno=0, ret=0;
@@ -667,7 +675,9 @@ powercycle(struct rtimer *t, void *ptr)
 //		PT_YIELD_UNTIL(&ieee154e_vars.mpt, ieee154e_vars.state == TSCH_ASSOCIATED);
 
 		while(ieee154e_vars.state != TSCH_ASSOCIATED) {
+			leds_on(LEDS_RED);
 			PT_YIELD(&ieee154e_vars.mpt);
+			leds_off(LEDS_RED);
 		}
 		ieee154e_vars.timeslot = ieee154e_vars.asn.asn_4lsb % ieee154e_vars.current_slotframe->length;
 		if(ieee154e_vars.join_priority==0) {
@@ -705,7 +715,7 @@ powercycle(struct rtimer *t, void *ptr)
 						//TODO fetch adv/EB packets
 						ieee154e_vars.n = neighbor_queue_from_addr(&EB_CELL_ADDRESS);
 						//XXX limit EB rate
-						if(generate_random_byte(8) >= 4) {
+						if(generate_random_byte(8-1) >= 4) {
 							ieee154e_vars.payload_len = make_eb((uint8_t *)ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN+1); //last byte in eb buf is for length
 							ieee154e_vars.payload = (void *)ieee154e_vars.eb_buf;
 						} else {
@@ -1006,7 +1016,8 @@ powercycle(struct rtimer *t, void *ptr)
 						}
 						/* poll MAC TX callback */
 						ieee154e_vars.p->ret=ret;
-						process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, ieee154e_vars.p);
+
+						while( PROCESS_ERR_OK != process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, ieee154e_vars.p)) {};
 					}
 					t0post_tx = RTIMER_NOW() - t0post_tx;
 				} else if (ieee154e_vars.cell_decison == CELL_RX) {
@@ -1144,6 +1155,7 @@ powercycle(struct rtimer *t, void *ptr)
 				ieee154e_vars.drift = 0;
 				ieee154e_vars.drift_counter = 0;
 				ieee154e_vars.sync_timeout = 0;
+				PUTCHAR('D');
 			}
 
 			/* Check if we need to resynchronize */
@@ -1152,9 +1164,9 @@ powercycle(struct rtimer *t, void *ptr)
 				ieee154e_vars.state = TSCH_SEARCHING;
 				ieee154e_vars.timeslot = 0;
 				/* schedule init function to run again */
-				int r = 0, i = 1;
+				int r = RTIMER_OK, i = 1;
 				do {
-					r = rtimer_set(t, RTIMER_NOW(), (i++)*(RTIMER_SECOND/2), (void
+					r = rtimer_set(t, RTIMER_NOW() + (i++)*(RTIMER_SECOND/8), 1, (void
 					(*)(struct rtimer *, void *)) tsch_resynchronize, NULL);
 				} while (r != RTIMER_OK);
 				tn=RTIMER_NOW()-tn;
@@ -1348,12 +1360,15 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 	ieee154e_vars.last_rf = last_rf_irq;
 	COOJA_DEBUG_STR("tsch_wait_eb");
 	NETSTACK_RADIO_sfd_sync(1, 1);
-
-	if (last_rf_irq != NULL /*&& (NETSTACK_RADIO_get_rx_end_time() != 0)*/) {
+	if (ieee154e_vars.last_rf != NULL /*&& (NETSTACK_RADIO_get_rx_end_time() != 0)*/) {
+//		 int i;
+//		 for(i=0; i<ieee154e_vars.last_rf->len; i++) {
+//			 PRINTF("%x", ieee154e_vars.last_rf->buf[i]);
+//		 }
+//		 PRINTF("\n");
 		if ( ieee154e_vars.last_rf->len >= 23 && (FRAME802154_BEACONFRAME == ((ieee154e_vars.last_rf)->buf[0]&7))
 				&& (((ieee154e_vars.last_rf)->buf[1] & (2 | 32 | 128 | 64)) == (2 | 32 | 128 | 64))) {
 			if (((ieee154e_vars.last_rf)->buf[16] & 0xfe) == 0x34) { //sync IE? (0x1a << 1) ==0 0x34
-//				COOJA_DEBUG_STR("EB");
 				ieee154e_vars.asn.asn_4lsb = (uint32_t)(ieee154e_vars.last_rf)->buf[17];
 				ieee154e_vars.asn.asn_4lsb += ((uint32_t)(ieee154e_vars.last_rf)->buf[18] << (uint32_t)8);
 				ieee154e_vars.asn.asn_4lsb += ((uint32_t)(ieee154e_vars.last_rf)->buf[19] << (uint32_t)16);
@@ -1364,29 +1379,27 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 				(ieee154e_vars.last_rf)->len = 0;
 				//sync for next slot
 				ieee154e_vars.start = (ieee154e_vars.last_rf)->sfd_timestamp - TsTxOffset;
-				/* in case of 16bit SFD timer and 32bit RTimer*/
-				ieee154e_vars.start += RTIMER_NOW() & 0xffff0000;
-
+//				PRINTF("tsch_wait_for_eb: sfd_timestamp %u, start %u, now %u\n", ieee154e_vars.last_rf->sfd_timestamp, ieee154e_vars.start, RTIMER_NOW());
 				//we are in sync
 				ieee154e_vars.state = TSCH_ASSOCIATED;
 
 				//XXX schedule to run after sometime
 				/* check if missed deadline, try a new one */
 				if(ieee154e_vars.current_slotframe) {
-					dt=10;
+					dt=20+generate_random_byte(16-1);
 				} else {
-					dt = 50;
+					dt = 50+generate_random_byte(32-1);
 				}
 				duration=0;
 				do {
 					ieee154e_vars.start += duration;
-					duration += dt * TsSlotDuration;
+					duration = dt * TsSlotDuration;
 					//increase asn
 					ieee154e_vars.asn.asn_4lsb += dt;
 					if(!ieee154e_vars.asn.asn_4lsb) {
 						ieee154e_vars.asn.asn_msb++;
 					}
-					dt = 10;
+					dt=15+generate_random_byte(16-1);
 				} while ( schedule_strict(&ieee154e_vars.t, ieee154e_vars.start, duration) );
 				ieee154e_vars.start += duration;
 			}
@@ -1421,7 +1434,7 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 				}
 			}
 		} else {
-			printf("XXX Could not create queues on association. Time source will not be set!\n");
+			PRINTF("XXX Could not create queues on association. Time source will not be set!\n");
 		}
 		/* XXX HACK this should be set in sent schedule
 		 * --Set parent as timesource */
@@ -1433,11 +1446,14 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 			}
 			if( n!= NULL ) {
 				n->is_time_source = 1;
-				printf("Setting parent as time source : %x.%x\n", ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE-2], ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE-1]);
+				PRINTF("Setting parent as time source : %x.%x\n", ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE-2], ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE-1]);
 			}
 		}
+		/* Reset RPL timers */
+//		rpl_reset_periodic_timer();
+		dis_output(NULL);
 	} else {
-		on();
+		NETSTACK_RADIO_radio_raw_rx_on();
 	}
 
 	leds_off(LEDS_RED);
@@ -1458,6 +1474,7 @@ PROCESS_THREAD(tsch_associate, ev, data)
 	static rpl_dag_t * my_rpl_dag = NULL;
 	static uint8_t cca_status = 0;
   static struct etimer periodic;
+  uint32_t irq_status = 0;
 
   while (ieee154e_vars.state != TSCH_OFF) {
   	COOJA_DEBUG_STR("tsch_associate\n");
@@ -1468,7 +1485,7 @@ PROCESS_THREAD(tsch_associate, ev, data)
 		etimer_set(&periodic, CLOCK_SECOND/10);
 		while(ieee154e_vars.state == TSCH_SEARCHING) {
 			PROCESS_YIELD();
-			timer_reset(&periodic);
+			etimer_set(&periodic, CLOCK_SECOND/100);
 			NETSTACK_RADIO_sfd_sync(1, 1);
 			/*If I am root (rank==1), then exit association process*/
 			rpl_instance_t* rpl = rpl_get_instance(RPL_DEFAULT_INSTANCE);
@@ -1477,7 +1494,7 @@ PROCESS_THREAD(tsch_associate, ev, data)
 				if(my_rpl_dag != NULL) {
 					COOJA_DEBUG_PRINTF("rank %d", my_rpl_dag->rank);
 
-					ieee154e_vars.join_priority = (my_rpl_dag->rank) >> 16;
+					ieee154e_vars.join_priority = (my_rpl_dag->rank) >> 8;
 					/* to make sure that this is a root and not just a low ranked node */
 					if(ieee154e_vars.join_priority == 0 && my_rpl_dag->rank > 1) {
 						//TODO choose something else?
@@ -1504,22 +1521,22 @@ PROCESS_THREAD(tsch_associate, ev, data)
 				PRINTF("associate done\n");
 				// XXX for debugging
 				ieee154e_vars.asn.asn_4lsb = 0;
+//				rpl_reset_periodic_timer();
 			} else {
-				NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
+#if CONTIKI_TARGET_JN5168
+				NETSTACK_RADIO_radio_raw_rx_on();
+				while(!(irq_status= NETSTACK_RADIO_pending_irq()));
+				NETSTACK_RADIO_process_packet( irq_status );
+#else
 				on();
-				#if CONTIKI_TARGET_JN5168
-							//Check if receiving within guard time
-//				BUSYWAIT_UNTIL_ABS(NETSTACK_RADIO.receiving_packet(),
-//						RTIMER_NOW(), 100*wdDataDuration);
-				while(!NETSTACK_RADIO.receiving_packet());
-				NETSTACK_RADIO_process_packet( NETSTACK_RADIO_pending_irq() );
-				#endif
+#endif /* CONTIKI_TARGET_JN5168 */
 				//TODO hop channel after timeout
 				//... set_channel...
 			}
 		}
 		PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
-		COOJA_DEBUG_STR("tsch_associate polled");
+		PRINTF("tsch_associate polled");
+		NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
 
   }
 	COOJA_DEBUG_STR("tsch_associate exit");
@@ -1552,7 +1569,7 @@ static void tsch_init_variables(void)
 	ieee154e_vars.registered_drift = 0;
 	ieee154e_vars.timeslot = 0;
 	NETSTACK_RADIO_sfd_sync(True, True);
-
+	NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -1600,8 +1617,9 @@ tsch_resynchronize(struct rtimer * tm, void * ptr)
 	off(keep_radio_on);
 	COOJA_DEBUG_STR("tsch_resynchronize\n");
 	tsch_init_variables();
+	NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
 	//try to associate to a network or start one if setup as RPL root
-	process_post(&tsch_associate, PROCESS_EVENT_POLL, NULL);
+	while ( PROCESS_ERR_OK != process_post(&tsch_associate, PROCESS_EVENT_POLL, NULL) ) {};
 }
 /*---------------------------------------------------------------------------*/
 const struct rdc_driver tschrdc_driver = {

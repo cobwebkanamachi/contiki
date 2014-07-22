@@ -140,7 +140,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
  * Note Wireshark's IPCMV6 checksum verification depends on the correct uncompressed addresses.
  */
 
-#if 0
+#if 1
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
 #elif 1

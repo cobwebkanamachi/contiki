@@ -12,7 +12,7 @@
 #define NACK_FLAG 0x8000
 
 /* number of slots to wait before initiating resynchronization */
-#define RESYNCH_TIMEOUT ieee154e_vars.current_slotframe->length * 10
+#define RESYNCH_TIMEOUT ieee154e_vars.current_slotframe->length * 30
 /* number of slots to wait before activating keep-alive mechanism */
 #define KEEPALIVE_TIMEOUT ieee154e_vars.current_slotframe->length * 3
 /* number of slots to wait before applying drift correction */

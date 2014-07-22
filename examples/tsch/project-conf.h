@@ -59,5 +59,55 @@
 #undef TSCH_CONF_802154_DUPLICATE_DETECTION
 #define TSCH_CONF_802154_DUPLICATE_DETECTION 0
 
+#undef RPL_CONF_DIO_INTERVAL_DOUBLINGS
+#define RPL_CONF_DIO_INTERVAL_DOUBLINGS 8
+
+#undef IEEE802154_CONF_PANID
+#define IEEE802154_CONF_PANID     0xcdba
+
+/* RPL and neighborhood information */
+
+#undef RPL_CONF_INIT_LINK_METRIC
+#define RPL_CONF_INIT_LINK_METRIC 2
+
+#undef RPL_CONF_MIN_HOPRANKINC
+#define RPL_CONF_MIN_HOPRANKINC 128
+
+#define UIP_CONF_DS6_ADDR_NBU 1
+
+#define RPL_CONF_MAX_INSTANCES    1 /* default 1 */
+#define RPL_CONF_MAX_DAG_PER_INSTANCE 1 /* default 2 */
+
+#undef RPL_CONF_DIO_INTERVAL_MIN
+#define RPL_CONF_DIO_INTERVAL_MIN 10
+
+/* Other system parameters */
+#undef UIP_CONF_UDP_CONNS
+#define UIP_CONF_UDP_CONNS       1
+
+#undef UIP_CONF_FWCACHE_SIZE
+#define UIP_CONF_FWCACHE_SIZE    4
+
+#undef UIP_CONF_TCP
+#define UIP_CONF_TCP          0
+
+#undef UIP_CONF_UDP_CHECKSUMS
+#define UIP_CONF_UDP_CHECKSUMS   0
+
+#undef SICSLOWPAN_CONF_FRAG
+#define SICSLOWPAN_CONF_FRAG 0
+
+#undef QUEUEBUF_CONF_NUM
+#define QUEUEBUF_CONF_NUM 4
+
+#define ALL_NODES_ADDRESSABLE 1
+
+/* Reject parents that have a higher link metric than the following. */
+#define MAX_LINK_METRIC     10
+
+#undef UIP_CONF_MAX_ROUTES
+#define UIP_CONF_MAX_ROUTES  2
+
+
 #endif /* PROJECT_H_ */
 
