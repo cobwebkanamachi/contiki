@@ -191,7 +191,8 @@ static const cell_t * minimum_cells[6] = {
 		&generic_shared_cell, &generic_shared_cell,	&generic_shared_cell	};
 static const cell_t * links_list[TOTAL_LINKS] = { &generic_eb_cell, &generic_shared_cell,
 		&cell_to_1, &cell_to_2, &cell_to_3, &cell_3_to_2 };
-static const slotframe_t minimum_slotframe = { 0, 101, 6, minimum_cells };
+static const slotframe_t minimum_slotframe = { 0, 101, 6, (cell_t **)minimum_cells };
+//static const slotframe_t minimum_slotframe = { 0, 10, 6, (cell_t **)minimum_cells };
 /*---------------------------------------------------------------------------*/
 static volatile ieee154e_vars_t ieee154e_vars;
 /*---------------------------------------------------------------------------*/
@@ -306,12 +307,12 @@ add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
 	if (n != NULL) {
 		//is queue full?
 		if (((n->put_ptr - n->get_ptr) & (NBR_BUFFER_SIZE - 1)) == (NBR_BUFFER_SIZE - 1)) {
+			PRINTF("queue full %x.%x.%x.%x.%x.%x.%x.%x\n", addr->u8[7],addr->u8[6],addr->u8[5],addr->u8[4],addr->u8[3],addr->u8[2],addr->u8[1],addr->u8[0]);
 			/* send the callback to signal that tx failed */
-			mac_call_sent_callback(sent, ptr, MAC_TX_ERR, 0);
+			mac_call_sent_callback(sent, ptr, MAC_TX_ERR_FATAL, 0);
 			return 0;
 		}
 		n->buffer[n->put_ptr].pkt = queuebuf_new_from_packetbuf(); // create new packet from packetbuf
-		n->buffer[n->put_ptr].sent = sent;
 		n->buffer[n->put_ptr].ptr = ptr;
 		n->buffer[n->put_ptr].ret = MAC_TX_DEFERRED;
 		n->buffer[n->put_ptr].transmissions = 0;
@@ -385,9 +386,11 @@ static int
 send_one_packet(mac_callback_t sent, void *ptr)
 {
 	//send_one_packet(sent, ptr);
-	COOJA_DEBUG_STR("TSCH send_one_packet\n");
-
+	PRINTF("TSCH send_one_packet\n");
+	int ret = 1;
 	uint16_t seqno;
+	struct neighbor_queue *n;
+
 	const rimeaddr_t *addr = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
 	//Ask for ACK if we are sending anything other than broadcast
 	if (!rimeaddr_cmp(addr, &rimeaddr_null)) {
@@ -396,27 +399,32 @@ send_one_packet(mac_callback_t sent, void *ptr)
 	/* PACKETBUF_ATTR_MAC_SEQNO cannot be zero, due to a peculiarity
 	 in framer-802154.c. */
 	seqno = (++ieee154e_vars.dsn) ? ieee154e_vars.dsn : ++ieee154e_vars.dsn;
-
 	packetbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, seqno);
 	if (NETSTACK_FRAMER.create() < 0) {
-		return 0;
-	}
-	struct neighbor_queue *n;
-	/* Look for the neighbor entry */
-	n = neighbor_queue_from_addr(addr);
-	if (n == NULL) {
-		//add new neighbor to list of neighbors
-		if (!add_queue(addr))
-			return 0;
-		//add new packet to neighbor list
-		if (!add_packet_to_queue(sent, ptr, addr))
-			return 0;
+		PRINTF("tsch: can't send packet due to framer error\n");
+		ret = 0;
 	} else {
-		//add new packet to neighbor list
-		if (!add_packet_to_queue(sent, ptr, addr))
-			return 0;
+		/* Look for the neighbor entry */
+		n = neighbor_queue_from_addr(addr);
+		if (n == NULL) {
+			//add new neighbor to list of neighbors
+			if (!add_queue(addr)) {
+				PRINTF("tsch: can't send packet !add_queue(addr)\n");
+				ret = 0;
+			} else if (!add_packet_to_queue(sent, ptr, addr)) { //add new packet to neighbor list
+				PRINTF("tsch: can't send packet !add_packet_to_queue 1\n");
+				ret = 0;
+			}
+		} else {
+			//add new packet to neighbor list
+			if (!add_packet_to_queue(sent, ptr, addr))
+			{
+				PRINTF("tsch: can't send packet !add_packet_to_queue 2\n");
+				ret = 0;
+			}
+		}
 	}
-	return 1;
+	return ret;
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -447,10 +455,11 @@ send_list(mac_callback_t sent, void *ptr, struct rdc_buf_list *buf_list)
 	}
 }
 /*---------------------------------------------------------------------------*/
+
 static void
 packet_input(void)
 {
-	COOJA_DEBUG_STR("tsch packet_input begin\n");
+	PRINTF("tsch packet_input begin\n");
 
 	int original_datalen;
 	uint8_t *original_dataptr;
@@ -501,7 +510,7 @@ packet_input(void)
 
 		if (!duplicate) {
 			NETSTACK_MAC.input();
-			COOJA_DEBUG_STR("tsch packet_input, Not duplicate\n");
+//			PRINTF("tsch packet_input, Not duplicate\n");
 		}
 	}
 //	COOJA_DEBUG_STR("tsch packet_input end\n");
@@ -510,6 +519,7 @@ packet_input(void)
 static int
 on(void)
 {
+	leds_on(LEDS_GREEN);
 	return NETSTACK_RADIO.on();
 }
 /*---------------------------------------------------------------------------*/
@@ -517,6 +527,7 @@ volatile static int keep_radio_on = 0;
 static int
 off(int set_keep_radio_on)
 {
+	leds_off(LEDS_GREEN);
 	keep_radio_on = set_keep_radio_on;
 	if (keep_radio_on) {
 		return NETSTACK_RADIO.on();
@@ -838,15 +849,15 @@ powercycle(struct rtimer *t, void *ptr)
 					} else {
 						/* do not capture start SFD, we are only interested in SFD end which equals TX end time */
 						//I do it in transmit function now
-//						NETSTACK_RADIO_sfd_sync(0, 1);
 						//delay before TX
 #if ENABLE_DELAYED_RF && CONTIKI_TARGET_JN5168
 						t0tx=RTIMER_NOW();
 						//XXX fix potential wrap
-						tx_offset = RTIMER_TO_RADIO(TsTxOffset-(RTIMER_NOW()-ieee154e_vars.start)); //- (uint32_t)(NETSTACK_RADIO_get_time() - cycle_start_radio_clock);
-						NETSTACK_RADIO_transmit_delayed(tx_offset);
+//						tx_offset = RTIMER_TO_RADIO((rtimer_clock_t)(TsTxOffset + ieee154e_vars.start - RTIMER_NOW()));
+						tx_offset = RTIMER_TO_RADIO((rtimer_clock_t)(TsTxOffset - tq - t0prepare));
+						NETSTACK_RADIO_transmit_delayed(tx_offset-1);
 						tx_time = NETSTACK_RADIO_tx_duration(ieee154e_vars.payload_len+1);
-						schedule_fixed(t, ieee154e_vars.start, TsTxOffset + tx_time);
+						schedule_fixed(t, ieee154e_vars.start, TsTxOffset + tx_time+delayTx);
 						PT_YIELD(&ieee154e_vars.mpt);
 						success = NETSTACK_RADIO_get_delayed_transmit_status();
 #else /* Leave CC2420 as default */
@@ -877,7 +888,6 @@ powercycle(struct rtimer *t, void *ptr)
 								PT_YIELD(&ieee154e_vars.mpt);
 #else
 								/* disable capturing sfd */
-//								NETSTACK_RADIO_sfd_sync(0, 0);
 								schedule_fixed(t, ieee154e_vars.start,
 										TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayTx);
 								/* Disabling address decoding so the radio accepts the enhanced ACK */
@@ -1050,9 +1060,11 @@ powercycle(struct rtimer *t, void *ptr)
 						t0rx = RTIMER_NOW();
 						cca_status = 0;
 #if ENABLE_DELAYED_RF && CONTIKI_TARGET_JN5168
-						tx_offset = RTIMER_TO_RADIO(TsTxOffset - TsLongGT-(RTIMER_NOW()-ieee154e_vars.start)); //- (uint32_t)(NETSTACK_RADIO_get_time() - cycle_start_radio_clock);
-						NETSTACK_RADIO_start_rx_delayed(tx_offset, RTIMER_TO_RADIO(TsLongGT*2+wdDataDuration));
-						schedule_fixed(t, ieee154e_vars.start, TsTxOffset + TsLongGT);
+//						tx_offset = RTIMER_TO_RADIO((rtimer_clock_t)(ieee154e_vars.start+TsTxOffset-TsLongGT-RTIMER_NOW()));
+						tx_offset = RTIMER_TO_RADIO((rtimer_clock_t)(TsTxOffset - tq - t0prepare-TsLongGT));
+
+						NETSTACK_RADIO_start_rx_delayed(tx_offset, RTIMER_TO_RADIO(TsLongGT*2+wdDataDuration)+1);
+						schedule_fixed(t, ieee154e_vars.start, TsTxOffset + TsLongGT+delayRx);
 						PT_YIELD(&ieee154e_vars.mpt);
 #else
 						//wait before RX
@@ -1074,9 +1086,13 @@ powercycle(struct rtimer *t, void *ptr)
 							ret = 0;
 						} else {
 #if CONTIKI_TARGET_JN5168
-							//Check if receiving within guard time
-							BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
-									ieee154e_vars.start, TsTxOffset + TsLongGT+wdDataDuration);
+							if(!irq_status) {
+								//Check if receiving within guard time
+//								BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
+//										ieee154e_vars.start, TsTxOffset + TsLongGT+wdDataDuration);
+								BUSYWAIT_UNTIL_ABS((irq_status = NETSTACK_RADIO_pending_irq()),
+									ieee154e_vars.start, TsTxOffset + TsLongGT+wdDataDuration+delayRx);
+							}
 #endif
 							NETSTACK_RADIO_process_packet(irq_status);
 //							PUTCHAR('K');
@@ -1084,9 +1100,6 @@ powercycle(struct rtimer *t, void *ptr)
 							t0rx = RTIMER_NOW() - t0rx;
 							t0rxack = RTIMER_NOW();
 							if(ieee154e_vars.last_rf != NULL) {
-//								PUTCHAR('P');
-
-//								rx_duration = NETSTACK_RADIO_get_rx_end_time() - ieee154e_vars.last_rf->sfd_timestamp;
 								/* wait until ack time */
 								if (ieee154e_vars.need_ack) {
 #if ENABLE_DELAYED_RF && CONTIKI_TARGET_JN5168
@@ -1107,7 +1120,7 @@ powercycle(struct rtimer *t, void *ptr)
 								if (ieee154e_vars.registered_drift) {
 									COOJA_DEBUG_PRINTF("ieee154e_vars.drift seen %d\n", ieee154e_vars.registered_drift);
 									// check the source address for potential time-source match
-									ieee154e_vars.n = neighbor_queue_from_addr(&(ieee154e_vars.last_rf->source_address));
+									ieee154e_vars.n = neighbor_queue_from_addr(&ieee154e_vars.last_rf->source_address);
 									if(ieee154e_vars.n != NULL && ieee154e_vars.n->is_time_source) {
 										// should be the average of drifts to all time sources
 										ieee154e_vars.drift_correction -= ieee154e_vars.registered_drift;
@@ -1279,8 +1292,8 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 	buf[i++] = (sub_id << 1) | (type & 0x01);
 	buf[i++] = ieee154e_vars.asn.asn_4lsb & 0xff;
 	buf[i++] = ieee154e_vars.asn.asn_4lsb >> 8;
-	buf[i++] = ieee154e_vars.asn.asn_4lsb >> 16;
-	buf[i++] = ieee154e_vars.asn.asn_4lsb >> 24;
+	buf[i++] = ieee154e_vars.asn.asn_4lsb >> (uint16_t)16;
+	buf[i++] = ieee154e_vars.asn.asn_4lsb >> (uint32_t)24;
 	buf[i++] = ieee154e_vars.asn.asn_msb;
 	buf[i++] = ieee154e_vars.join_priority;
 
@@ -1450,8 +1463,8 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 			}
 		}
 		/* Reset RPL timers */
-//		rpl_reset_periodic_timer();
-		dis_output(NULL);
+		rpl_reset_periodic_timer();
+//		dis_output(NULL);
 	} else {
 		NETSTACK_RADIO_radio_raw_rx_on();
 	}
@@ -1521,7 +1534,7 @@ PROCESS_THREAD(tsch_associate, ev, data)
 				PRINTF("associate done\n");
 				// XXX for debugging
 				ieee154e_vars.asn.asn_4lsb = 0;
-//				rpl_reset_periodic_timer();
+				rpl_reset_periodic_timer();
 			} else {
 #if CONTIKI_TARGET_JN5168
 				NETSTACK_RADIO_radio_raw_rx_on();
@@ -1535,7 +1548,7 @@ PROCESS_THREAD(tsch_associate, ev, data)
 			}
 		}
 		PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
-		PRINTF("tsch_associate polled");
+		PRINTF("tsch_associate polled\n");
 		NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
 
   }

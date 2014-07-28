@@ -41,6 +41,7 @@
 #define __TSCH_H__
 #include "contiki-conf.h"
 #include "net/mac/rdc.h"
+#include "net/mac/mac.h"
 #include "tsch-parameters.h"
 
 extern const struct rdc_driver tschrdc_driver;
