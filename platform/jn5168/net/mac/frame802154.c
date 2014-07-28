@@ -450,7 +450,7 @@ frame802154_parse(uint8_t *data, int len, frame802154_t *pf)
   /* header length = c*/
 
   /* payload length */
-  pf->payload_len = p->u8PayloadLength - p->u16Unused; //(len - c);
+  pf->payload_len = p->u8PayloadLength; //(len - c);
 	/* payload */
 	pf->payload = p->uPayload.au8Byte;
 
@@ -477,7 +477,6 @@ u16FCF 0x%02x, u16DestPAN 0x%02x, u16SrcPAN 0x%02x, len %d,",
 				p->uDestAddr.u16Short);
 	}
   /* return header length if successful */
-  //return (len < MICROMAC_HEADER_LEN) ? 0 : MICROMAC_HEADER_LEN+c; //c > len ? 0 : c;
   return c > len ? 0 : c;
 }
 /** \}   */

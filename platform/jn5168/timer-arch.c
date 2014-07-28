@@ -44,7 +44,6 @@
 #include "dev/watchdog.h"
 #include "sys/energest.h"
 
-//#define RTIMER_TIMER 					E_AHI_TICK_TIMER
 #define RTIMER_TIMER_ISR_DEV  E_AHI_DEVICE_TICK_TIMER
 
 #define DEBUG 0
@@ -55,12 +54,13 @@
 #define PRINTF(...)
 #endif
 
-static volatile uint32 s_u32CompareTime;
-static volatile uint32 s_u32LastExpiredTime;
+static volatile uint32_t compare_time;
+static volatile uint32_t last_expired_time;
 
 void
 rtimer_arch_run_next(uint32 u32DeviceId, uint32 u32ItemBitmap)
 {
+	uint32_t delta, temp;
 	if(u32DeviceId != RTIMER_TIMER_ISR_DEV) {
 		return;
 	}
@@ -72,14 +72,15 @@ rtimer_arch_run_next(uint32 u32DeviceId, uint32 u32ItemBitmap)
    * compare register is only 28bits wide so make sure the upper 4bits match
    * the set compare point
    */
-  uint32 u32Delta = u32AHI_TickTimerRead() - s_u32CompareTime;
-  if (0 == (u32Delta >> 28))
-  {
-      uint32 u32Temp = s_u32CompareTime;
+  delta = u32AHI_TickTimerRead() - compare_time;
+  if (0 == (delta >> 28)) {
+  		/* compare_time might change after executing rtimer_run_next()
+  		 * as some process might schedule the timer
+  		 */
+      temp = compare_time;
 
       //run scheduled
       watchdog_start();
-
     	rtimer_run_next();
 
     //  if(process_nevents() > 0) {
@@ -87,8 +88,7 @@ rtimer_arch_run_next(uint32 u32DeviceId, uint32 u32ItemBitmap)
     //  }
 
       watchdog_stop();
-      //---
-      s_u32LastExpiredTime = u32Temp;
+      last_expired_time = temp;
   }
   ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
@@ -96,22 +96,10 @@ rtimer_arch_run_next(uint32 u32DeviceId, uint32 u32ItemBitmap)
 void
 rtimer_arch_init(void)
 {
-//  vAHI_TimerEnable(RTIMER_TIMER, RTIMER_PRESCALE, true, false, false);
-//  vAHI_TimerClockSelect(RTIMER_TIMER, false, false);
-//
-//  vAHI_TimerConfigureOutputs(RTIMER_TIMER, false, true);
-//  vAHI_TimerDIOControl(RTIMER_TIMER, false);
-//
-//#if (RTIMER_TIMER==E_AHI_TIMER_0)
-//  vAHI_Timer0RegisterCallback(rtimer_arch_run_next);
-//#else (RTIMER_TIMER==E_AHI_TIMER_1)
-//  vAHI_Timer1RegisterCallback(rtimer_arch_run_next);
-//#endif
-
 	/* Initialise tick timer to run continuously */
 	vAHI_TickTimerIntEnable(false);
 	vAHI_TickTimerConfigure(E_AHI_TICK_TIMER_DISABLE);
-	s_u32LastExpiredTime = s_u32CompareTime = 0;
+	last_expired_time = compare_time = 0;
 	vAHI_TickTimerWrite(0);
 	vAHI_TickTimerRegisterCallback(rtimer_arch_run_next);
 	vAHI_TickTimerConfigure(E_AHI_TICK_TIMER_CONT);
@@ -121,15 +109,15 @@ rtimer_arch_init(void)
 rtimer_clock_t
 rtimer_arch_now(void)
 {
-  /* Disable interrupts */
-  //spl_t s = splhigh();
+  /* Disable interrupts, then */
 
-//  rtimer_clock_t t1, t2;
-//  do {
-//    t1 = u32AHI_TickTimerRead();
-//    t2 = u32AHI_TickTimerRead();
-//  } while(t1 != t2);
-  return u32AHI_TickTimerRead();
+  rtimer_clock_t t1, t2;
+  do {
+    t1 = u32AHI_TickTimerRead();
+    t2 = u32AHI_TickTimerRead();
+  } while(t2 - t1 > 50);
+  return t1;
+//  return u32AHI_TickTimerRead();
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -139,6 +127,6 @@ rtimer_arch_schedule(rtimer_clock_t t)
 	vAHI_TickTimerIntPendClr();
 	vAHI_TickTimerIntEnable(true);
 	vAHI_TickTimerInterval(t);
-	s_u32CompareTime = t;
+	compare_time = t;
 }
 /*---------------------------------------------------------------------------*/
