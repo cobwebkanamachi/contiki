@@ -243,7 +243,7 @@ typedef struct {
 	void * payload;
 	unsigned short payload_len;
 	//1 byte for length if needed as dictated by the radio driver
-	volatile uint8_t ackbuf[STD_ACK_LEN + SYNC_IE_LEN +1];
+	uint8_t ackbuf[STD_ACK_LEN + SYNC_IE_LEN +1];
 } ieee154e_vars_t;
 
 #endif /* __TSCH_PARAMETERS_H__ */

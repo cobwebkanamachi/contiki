@@ -67,6 +67,7 @@
 #define UDP_EXAMPLE_ID  190
 #define SERVER_REPLY 1
 #define MAX_PAYLOAD_LEN		30
+#define UIP_CONF_ROUTER 1
 
 static struct uip_udp_conn *server_conn;
 
@@ -143,7 +144,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
 #if 1
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
-#elif 1
+#elif 0
 /* Mode 2 - 16 bits inline */
   uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
 #else

@@ -134,6 +134,16 @@ set_global_address(void)
   uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
   uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
 
+  uip_ds6_defrt_t * uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
+	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x212, 0x7400, 0x1160, 0xfdbd);
+//	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x215, 0x8d00, 0x46, 0x5f85);
+	uip_ds6_defrt_add(&ipaddr, 0);
+     uip_ds6_nbr_t * uip_ds6_nbr_add(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr,
+                     uint8_t isrouter, uint8_t state);
+//     uip_lladdr_t lladdr = {0x2,0x15, 0x8d,00, 0,0x46, 0x5f,0x85};
+     uip_lladdr_t lladdr = {0x21,0x2, 0x74,00, 0x11,0x60, 0xfd,0xbd};
+     uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
+
 /* The choice of server address determines its 6LoPAN header compression.
  * (Our address will be compressed Mode 3 since it is derived from our link-local address)
  * Obviously the choice made here must also be selected in udp-server.c.
@@ -148,12 +158,14 @@ set_global_address(void)
 #if 1
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
-#elif 1
+#elif 0
 /* Mode 2 - 16 bits inline */
   uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
 #else
 /* Mode 3 - derived from server link-local (MAC) address */
-  uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
+//  uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
+    uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0x215, 0x8d00, 0x46, 0x5f85);
+
 #endif
 }
 /*---------------------------------------------------------------------------*/
@@ -176,7 +188,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
   print_local_addresses();
 
   /* new connection with remote host */
-  client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL);
+  client_conn = udp_new(&server_ipaddr, UIP_HTONS(UDP_SERVER_PORT), NULL);
   if(client_conn == NULL) {
     PRINTF("No UDP connection available, exiting the process!\n");
     PROCESS_EXIT();
