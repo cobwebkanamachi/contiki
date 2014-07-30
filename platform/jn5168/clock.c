@@ -198,7 +198,7 @@ clock_delay_usec(uint16_t i)
 		i-=RTIMER_MAX_TICKS-t;
 		t=0;
 	}
-	while(u32AHI_TickTimerRead()-t < i);
+	while(u32AHI_TickTimerRead()-t < i) {watchdog_periodic();};
 }
 /*---------------------------------------------------------------------------*/
 /**
@@ -214,7 +214,7 @@ clock_delay(unsigned int i)
 		i-=MAX_TICKS-t;
 		t=0;
 	}
-	while(u16AHI_TimerReadCount(CLOCK_TIMER)-t < i);
+	while(u16AHI_TimerReadCount(CLOCK_TIMER)-t < i) {watchdog_periodic();};
 }
 /*---------------------------------------------------------------------------*/
 /**
@@ -227,7 +227,7 @@ clock_wait(clock_time_t i)
   clock_time_t start;
 
   start = clock_time();
-  while(clock_time() - start < (clock_time_t)i);
+  while(clock_time() - start < (clock_time_t)i){watchdog_periodic();};
 }
 /*---------------------------------------------------------------------------*/
 void

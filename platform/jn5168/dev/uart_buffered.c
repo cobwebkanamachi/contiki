@@ -543,12 +543,20 @@ PUBLIC void vUartWriteString(uint8_t u8Uart, uint8_t *pu8String)
  * void
  *
  ****************************************************************************/
+#include "sys/rtimer.h"
+#define BUSYWAIT_UNTIL(cond, max_time)                                  \
+  do {                                                                  \
+    rtimer_clock_t t0;                                                  \
+    t0 = RTIMER_NOW();                                                  \
+    while(!(cond) && RTIMER_CLOCK_LT(RTIMER_NOW(), t0 + (max_time)));   \
+  } while(0)
+
 PUBLIC void vUartWrite(uint8_t u8Uart, uint8_t u8Data)
 {
 	//enable interrupts again
 	vAHI_UartSetInterrupt(u8Uart, FALSE /*bEnableModemStatus*/, FALSE /*bEnableRxLineStatus*/, TRUE /*bEnableTxFifoEmpty*/, TRUE /* bEnableRxData */, E_AHI_UART_FIFO_LEVEL_1);
-
-	while(!bQueue_Write(&asUart_TxQueue[u8Uart], u8Data));
+	BUSYWAIT_UNTIL(bQueue_Write(&asUart_TxQueue[u8Uart], u8Data), RTIMER_SECOND/10000);
+//	while(!bQueue_Write(&asUart_TxQueue[u8Uart], u8Data)) {/*vAHI_UartWriteData(u8Uart, '=');*/};
 
 	/*
 	 * if there is already a tx in progress, we can expect a TX interrupt
@@ -567,7 +575,14 @@ PUBLIC void vUartWrite(uint8_t u8Uart, uint8_t u8Data)
 		}
 	}
 }
-
+PUBLIC void vUartWriteDirect(uint8_t u8Uart, uint8_t cChar)
+{
+		/* Write character */
+		vAHI_UartWriteData(u8Uart, cChar);
+		/* Wait for buffers to empty */
+		while ((u8AHI_UartReadLineStatus(u8Uart) & E_AHI_UART_LS_THRE) == 0);
+		while ((u8AHI_UartReadLineStatus(u8Uart) & E_AHI_UART_LS_TEMT) == 0);
+}
 #ifdef UART_EXTRAS
 /****************************************************************************
  *
@@ -720,7 +735,7 @@ PRIVATE void vUartTxIsr(uint8_t u8Uart)
 	if(!data_available) {
 		/* Disable TX fifo empty interrupt until we get more data to send */
 		vAHI_UartSetInterrupt(u8Uart, FALSE, FALSE, FALSE /*bEnableTxFifoEmpty*/, TRUE /* bEnableRxData */, E_AHI_UART_FIFO_LEVEL_1);
-//		vAHI_UartWriteData(u8Uart, '?');
+		vAHI_UartWriteData(u8Uart, '?');
 	}
 }
 

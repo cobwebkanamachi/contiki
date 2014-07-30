@@ -583,13 +583,13 @@ LDFLAGS += -L$(CHIP_BASE_DIR)/Library
 
 %.elf: $(APPOBJS) $(addsuffix _$(JENNIC_CHIP_FAMILY).a,$(addprefix $(COMPONENTS_BASE_DIR)/Library/lib,$(APPLIBS)))
 	$(info Linking $@ ...)
-	$(CC) -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart $(LDFLAGS) -T$(LINKCMD) -o $@ -Wl,--start-group $(APPOBJS) $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS)) -Wl,--end-group -Wl,-Map,contiki-$(TARGET).map  
+	$(CC) -Wl,--gc-sections $(LDFLAGS) -T$(LINKCMD) -o $@ -Wl,--start-group $(APPOBJS) $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -l,$(LDMYLIBS)) -Wl,--end-group -Wl,-Map,contiki-$(TARGET).map  
 	@echo
 	
-%.nm: %.elf
+%.nm: %.$(TARGET)
 	$(NM) -nS $< > $@
 
-%.dmp: %.elf
+%.dmp: %.$(TARGET) 
 	$(OBJDUMP) -d $< > $@
 
 # OND Disabled ? 
@@ -598,7 +598,7 @@ ALLLIBS = $(addprefix -l,$(LDLIBS)) $(addprefix -l,$(LDSTACKLIBS)) $(addprefix -
 CUSTOM_RULE_LINK=1
 %.$(TARGET): %.co $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) contiki-$(TARGET).a 
 	$(TRACE_LD)
-	$(CC) -Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart -T$(LINKCMD) $(LDFLAGS) -o $@ -Wl,--start-group $(TARGET_STARTFILES) ${filter-out %.a,$^} ${filter %.a,$^} $(ALLLIBS) -Wl,--end-group -Wl,-Map,contiki-$(TARGET).map
+	$(CC) -Wl,--gc-sections -T$(LINKCMD) $(LDFLAGS) -o $@ -Wl,--start-group $(TARGET_STARTFILES) ${filter-out %.a,$^} ${filter %.a,$^} $(ALLLIBS) -Wl,--end-group -Wl,-Map,contiki-$(TARGET).map
 	$(info Generating binary ...)
 	$(OBJCOPY) $@ $$( $(OBJDUMP) -h $< | sed -n 's/^ *[0-9]* \(.rom[._[:alnum:]]*\).*/-R \1/p' )
 	$(OBJCOPY) -S -O binary $@ $@.bin
@@ -618,6 +618,7 @@ CUSTOM_RULE_LINK=1
 	$(info Generating binary ...)
 	$(OBJCOPY) $< $$( $(OBJDUMP) -h $< | sed -n 's/^ *[0-9]* \(.rom[._[:alnum:]]*\).*/-R \1/p' )
 	$(OBJCOPY) -S -O binary $< $@
+#	$(OBJDUMP) -d $< > $@.dmp
 	$(info JENNIC_CHIP     = $(JENNIC_CHIP))
 	$(info OND_CHIPSET     = $(OND_CHIPSET))
 	$(info DEVICE_NAME     = $(DEVICE_NAME))

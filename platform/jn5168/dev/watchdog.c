@@ -33,27 +33,46 @@
 #include "AppHardwareApi.h"
 
 /*---------------------------------------------------------------------------*/
+static int counter = 0;
+
+/*---------------------------------------------------------------------------*/
 void
 watchdog_init(void)
 {
+  counter = 0;
+  watchdog_stop();
+  /* enable WDT interrupt */
+  vAHI_WatchdogException(1);
 }
 /*---------------------------------------------------------------------------*/
 void
 watchdog_start(void)
 {
-  vAHI_WatchdogStart(9); /* about 2s timeout */
+  /* We setup the watchdog to reset the device after two seconds,
+     unless watchdog_periodic() is called. */
+  counter--;
+  if(counter == 0) {
+    vAHI_WatchdogStart(9); /* about 2s timeout */
+  }
 }
 /*---------------------------------------------------------------------------*/
 void
 watchdog_periodic(void)
 {
-  vAHI_WatchdogRestart();
+  /* This function is called periodically to restart the watchdog
+     timer. */
+//  if(counter <= 0) {
+	 vAHI_WatchdogRestart();
+//  }
 }
 /*---------------------------------------------------------------------------*/
 void
 watchdog_stop(void)
 {
-  vAHI_WatchdogStop();
+  counter++;
+  if(counter == 1) {
+    vAHI_WatchdogStop();
+  }
 }
 /*---------------------------------------------------------------------------*/
 void

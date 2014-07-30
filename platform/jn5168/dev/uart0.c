@@ -30,3 +30,8 @@ uart0_init(uint8_t br)
 	vUartInit(u8Uart, br, txbuf_data, TXBUFSIZE, uart0_input);
 }
 
+void
+uart0_write_direct(unsigned char c)
+{
+	vUartWriteDirect(u8Uart, c);
+}

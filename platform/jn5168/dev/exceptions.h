@@ -2,25 +2,26 @@
  *
  * MODULE:             JenNet-IP Border Router
  *
- * COMPONENT:          Buffered, interrupt driven serial I/O
+ * COMPONENT:          Exception handlers
  *
- * VERSION:            $Name:  $
+ * VERSION:            $Name$
  *
- * REVISION:           $Revision: 1.1 $
+ * REVISION:           $Revision: 11579 $
  *
- * DATED:              $Date: 2008/10/17 10:17:56 $
+ * DATED:              $Date: 2009-03-24 08:28:35 +0000 (Tue, 24 Mar 2009) $
  *
- * STATUS:             $State: Exp $
+ * STATUS:             $State$
  *
- * AUTHOR:             LJM
+ * AUTHOR:             Thomas Haydon
  *
  * DESCRIPTION:
- * Just some simple common uart functions (header file)
+ * Exception handlers
  *
  * CHANGE HISTORY:
  *
- * LAST MODIFIED BY:   $Author: lmitch $
+ * LAST MODIFIED BY:   $Author: thayd $
  *                     $Modtime: $
+ *
  *
  ****************************************************************************
  *
@@ -48,80 +49,49 @@
  *
  ***************************************************************************/
 
-#ifndef  UARTBUFFERED_H_INCLUDED
-#define  UARTBUFFERED_H_INCLUDED
-
-#if defined __cplusplus
-extern "C" {
-#endif
+#ifndef  EXCEPTIONS_H_INCLUDED
+#define  EXCEPTIONS_H_INCLUDED
 
 /****************************************************************************/
-/***        Include files                                                 ***/
+/***        Include Files                                                 ***/
 /****************************************************************************/
+
 #include <jendefs.h>
-#include "contiki-conf.h"
+#include <JIP.h>
+
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
-#if !defined PUBLIC
-#define PUBLIC
-#endif
-
-#if !defined PRIVATE
-#define PRIVATE static
-#endif
-
-//#define UART_EXTRAS
 
 /****************************************************************************/
 /***        Type Definitions                                              ***/
 /****************************************************************************/
 
-/****************************************************************************/
-/***        Local Function Prototypes                                     ***/
-/****************************************************************************/
-
-/****************************************************************************/
-/***        Exported Variables                                            ***/
-/****************************************************************************/
-
-/****************************************************************************/
-/***        Local Variables                                               ***/
-/****************************************************************************/
+/** Enumerated type of CPU exception numbers */
+typedef enum {
+	E_EXC_BUS_ERROR				= 0x02,
+	E_EXC_TICK_TIMER			= 0x05,
+	E_EXC_UNALIGNED_ACCESS		= 0x06,
+	E_EXC_ILLEGAL_INSTRUCTION	= 0x07,
+	E_EXC_EXTERNAL_INTERRUPT	= 0x08,
+	E_EXC_SYSCALL				= 0x0C,
+	E_EXC_TRAP					= 0x0E,
+	E_EXC_GENERIC				= 0x0F,
+	E_EXC_STACK_OVERFLOW		= 0x10
+} eExceptionType;
 
 /****************************************************************************/
 /***        Exported Functions                                            ***/
 /****************************************************************************/
 
-//PUBLIC void vUartInit(uint8_t u8Uart, uint32_t u32BaudRate, uint8_t *pu8TxBuffer, uint32_t u32TxBufferLen, uint8_t *pu8RxBuffer, uint32_t u32RxBufferLen);
-PUBLIC void vUartInit(uint8_t u8Uart, uint8_t u8BaudRateEnum, uint8_t *pu8TxBuffer, uint32_t u32TxBufferLen, int (*uart_input_function)(unsigned char c));
-PUBLIC void vUartInitAdvancedBR(uint8_t u8Uart, uint32_t u32BaudRate, uint8_t *pu8TxBuffer, uint32_t u32TxBufferLen, int (*uart_input_function)(unsigned char c));
-PUBLIC void vUartWrite(uint8_t u8Uart, uint8_t u8Data);
-PUBLIC bool bUartRead(uint8_t u8Uart, uint8_t *pu8Data);
+/* Exceptions set up function */
+PUBLIC void vEXC_Register(void);
 
-PUBLIC void vUartClear(uint8_t u8Uart);
-PUBLIC void vUartWriteDirect(uint8_t u8Uart, uint8_t cChar);
-
-#ifdef UART_EXTRAS
-PUBLIC uint8_t u8UartRead(uint8_t u8Uart);
-PUBLIC bool_t bUartReadBinary(uint8_t u8Uart, uint8_t *pu8Ptr, uint32_t u32Len, uint32_t u32TimeoutTime);
-PUBLIC bool_t bUartReadWithTimeout(uint8_t u8Uart, uint8_t *pu8Data, uint32_t u32TimeoutTime);
-PUBLIC bool_t bUartTxInProgress(uint8_t u8Uart);
-PUBLIC bool_t bUartRxDataAvailable(uint8_t u8Uart);
-PUBLIC void vUartWriteBinary(uint8_t u8Uart, uint8_t *pu8Ptr, uint32_t u32Len);
-PUBLIC void vUartWriteString(uint8_t u8Uart, uint8_t *pu8String);
-PUBLIC void vUartDeInit(uint8_t u8Uart);
-PUBLIC void vUartFlush(uint8_t u8Uart);
-#endif
 /****************************************************************************/
-/***        Local Functions                                               ***/
+/***        Exported Variables                                            ***/
 /****************************************************************************/
 
-#if defined __cplusplus
-}
-#endif
-
-#endif  /* UARTBUFFERED_H_INCLUDED */
+#endif  /* EXCEPTIONS_H */
 
 /****************************************************************************/
 /***        END OF FILE                                                   ***/

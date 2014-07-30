@@ -149,6 +149,7 @@ int
 main(void)
 {
   clock_init();
+  watchdog_init();
   leds_init();
   leds_on(LEDS_ALL);
   process_init();
@@ -218,11 +219,9 @@ main(void)
   watchdog_start();
   autostart_start(autostart_processes);
   leds_off(LEDS_ALL);
-
+  int r;
   while(1) {
-
     //etimer_request_poll();
-    int r;
     do {
       /* Reset watchdog. */
     	watchdog_periodic();
@@ -231,7 +230,9 @@ main(void)
     /*
      * Idle processing.
      */
+    watchdog_stop();
     vAHI_CpuDoze();
+    watchdog_start();
   }
 
   return 0;

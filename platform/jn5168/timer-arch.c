@@ -111,13 +111,13 @@ rtimer_arch_now(void)
 {
   /* Disable interrupts, then */
 
-  rtimer_clock_t t1, t2;
-  do {
-    t1 = u32AHI_TickTimerRead();
-    t2 = u32AHI_TickTimerRead();
-  } while(t2 - t1 > 50);
-  return t1;
-//  return u32AHI_TickTimerRead();
+//  rtimer_clock_t t1, t2;
+//  do {
+//    t1 = u32AHI_TickTimerRead();
+//    t2 = u32AHI_TickTimerRead();
+//  } while(t2 - t1 > 16*50);
+//  return t1;
+  return u32AHI_TickTimerRead();
 }
 /*---------------------------------------------------------------------------*/
 void
