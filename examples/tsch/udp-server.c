@@ -36,6 +36,8 @@
 #include "net/rpl/rpl.h"
 
 #include "net/netstack.h"
+#include "tsch.h"
+
 //#include "dev/button-sensor.h"
 //#include <stdio.h>
 //#include <stdlib.h>
@@ -67,7 +69,11 @@
 #define UDP_EXAMPLE_ID  190
 #define SERVER_REPLY 1
 #define MAX_PAYLOAD_LEN		30
-#define UIP_CONF_ROUTER 1
+#define DISABLE_RPL 1
+
+#ifndef SERVER
+#define SERVER 1
+#endif
 
 static struct uip_udp_conn *server_conn;
 
@@ -131,39 +137,53 @@ PROCESS_THREAD(udp_server_process, ev, data)
 
   PRINTF("UDP server started\n");
 
-#if UIP_CONF_ROUTER
-/* The choice of server address determines its 6LoPAN header compression.
- * Obviously the choice made here must also be selected in udp-client.c.
- *
- * For correct Wireshark decoding using a sniffer, add the /64 prefix to the 6LowPAN protocol preferences,
- * e.g. set Context 0 to aaaa::.  At present Wireshark copies Context/128 and then overwrites it.
- * (Setting Context 0 to aaaa::1111:2222:3333:4444 will report a 16 bit compressed address of aaaa::1111:22ff:fe33:xxxx)
- * Note Wireshark's IPCMV6 checksum verification depends on the correct uncompressed addresses.
- */
+  /* The choice of server address determines its 6LoPAN header compression.
+   * Obviously the choice made here must also be selected in udp-client.c.
+   *
+   * For correct Wireshark decoding using a sniffer, add the /64 prefix to the 6LowPAN protocol preferences,
+   * e.g. set Context 0 to aaaa::.  At present Wireshark copies Context/128 and then overwrites it.
+   * (Setting Context 0 to aaaa::1111:2222:3333:4444 will report a 16 bit compressed address of aaaa::1111:22ff:fe33:xxxx)
+   * Note Wireshark's IPCMV6 checksum verification depends on the correct uncompressed addresses.
+   */
 
-#if 1
-/* Mode 1 - 64 bits inline */
-   uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
-#elif 0
-/* Mode 2 - 16 bits inline */
-  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
-#else
-/* Mode 3 - derived from link local (MAC) address */
-  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
-  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-#endif
-
-  uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
-  root_if = uip_ds6_addr_lookup(&ipaddr);
-  if(root_if != NULL) {
-    rpl_dag_t *dag;
-    dag = rpl_set_root(RPL_DEFAULT_INSTANCE,(uip_ip6addr_t *)&ipaddr);
+  #if 1
+  /* Mode 1 - 64 bits inline */
+     uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
+  #elif 0
+  /* Mode 2 - 16 bits inline */
+    uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
+  #else
+  /* Mode 3 - derived from link local (MAC) address */
     uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
-    rpl_set_prefix(dag, &ipaddr, 64);
+    uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
+  #endif
+
+	uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
+
+	uip_ds6_defrt_t *
+	uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
+	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x215, 0x8d00, 0x46, 0x5f12);
+	uip_ds6_defrt_add(&ipaddr, 0);
+	uip_ds6_nbr_t *
+	uip_ds6_nbr_add(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr, uint8_t isrouter,
+			uint8_t state);
+	uip_lladdr_t lladdr = {{ 0x0, 0x15, 0x8d, 0, 0, 0x46, 0x5f, 0x12 }};
+	uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
+
+#if !DISABLE_RPL && UIP_CONF_ROUTER
+
+	root_if = uip_ds6_addr_lookup(&ipaddr);
+	if(root_if != NULL) {
+		rpl_dag_t *dag;
+		dag = rpl_set_root(RPL_DEFAULT_INSTANCE,(uip_ip6addr_t *)&ipaddr);
+		uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
+		rpl_set_prefix(dag, &ipaddr, 64);
     PRINTF("created a new RPL dag\n");
   } else {
     PRINTF("failed to create a new RPL DAG\n");
   }
+#else
+  tsch_server_disable_rpl = 1;
 #endif /* UIP_CONF_ROUTER */
 
   print_local_addresses();
@@ -171,6 +191,8 @@ PROCESS_THREAD(udp_server_process, ev, data)
   /* The data sink runs with a 100% duty cycle in order to ensure high
      packet reception rates. */
   //NETSTACK_MAC.off(1);
+	uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0x215, 0x8d00, 0x46, 0x5f12);
+//  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
 
   server_conn = udp_new(NULL, UIP_HTONS(UDP_CLIENT_PORT), NULL);
   if(server_conn == NULL) {

@@ -63,7 +63,7 @@
 #endif /* DEBUG */
 
 #ifndef PERIOD
-#define PERIOD 15
+#define PERIOD 30
 #endif
 
 #define START_INTERVAL		(15 * CLOCK_SECOND)
@@ -130,19 +130,21 @@ set_global_address(void)
 {
   uip_ipaddr_t ipaddr;
 
-  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
-  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-  uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
+	uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
+	uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
+	uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
 
-  uip_ds6_defrt_t * uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
+	uip_ds6_defrt_t *
+	uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
 	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x212, 0x7400, 0x1160, 0xfdbd);
 //	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x215, 0x8d00, 0x46, 0x5f85);
 	uip_ds6_defrt_add(&ipaddr, 0);
-     uip_ds6_nbr_t * uip_ds6_nbr_add(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr,
-                     uint8_t isrouter, uint8_t state);
-//     uip_lladdr_t lladdr = {0x2,0x15, 0x8d,00, 0,0x46, 0x5f,0x85};
-     uip_lladdr_t lladdr = {0x21,0x2, 0x74,00, 0x11,0x60, 0xfd,0xbd};
-     uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
+	uip_ds6_nbr_t *
+	uip_ds6_nbr_add(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr, uint8_t isrouter,
+			uint8_t state);
+//     uip_lladdr_t lladdr = {{0x0,0x15, 0x8d,00, 0,0x46, 0x5f,0x85}};
+	uip_lladdr_t lladdr = {{ 0x0, 0x12, 0x74, 00, 0x11, 0x60, 0xfd, 0xbd }};
+	uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
 
 /* The choice of server address determines its 6LoPAN header compression.
  * (Our address will be compressed Mode 3 since it is derived from our link-local address)

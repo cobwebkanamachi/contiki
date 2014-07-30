@@ -54,12 +54,13 @@
 #include "sys/ctimer.h"
 #include "net/nbr-table.h"
 #include "net/uip.h"
-
 #include "sys/process.h"
+#include "net/rpl/rpl.h"
 
 //#ifndef CONTIKI_TARGET_JN5168
 //#define CONTIKI_TARGET_JN5168 1
 //#endif
+volatile uint8_t tsch_server_disable_rpl = 0;
 
 void rpl_reset_periodic_timer(void);
 void dis_output(uip_ipaddr_t *addr);
@@ -67,7 +68,7 @@ void dis_output(uip_ipaddr_t *addr);
 #if CONTIKI_TARGET_JN5168
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) ((uint32_t)D * 16UL)/((uint32_t)DC);
 #define RTIMER_TO_US(T)		((T)>>(uint32_t)4)
-#define ENABLE_DELAYED_RF 1
+#define ENABLE_DELAYED_RF 0
 #pragma "CONTIKI_TARGET_JN5168"
 #include "dev/micromac-radio.h"
 #undef putchar
@@ -309,7 +310,8 @@ add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
 		if (((n->put_ptr - n->get_ptr) & (NBR_BUFFER_SIZE - 1)) == (NBR_BUFFER_SIZE - 1)) {
 			PRINTF("queue full %x.%x.%x.%x.%x.%x.%x.%x\n", addr->u8[7],addr->u8[6],addr->u8[5],addr->u8[4],addr->u8[3],addr->u8[2],addr->u8[1],addr->u8[0]);
 			/* send the callback to signal that tx failed */
-			mac_call_sent_callback(sent, ptr, MAC_TX_ERR_FATAL, 0);
+			//XXX drop packet silently
+//			mac_call_sent_callback(sent, ptr, MAC_TX_ERR_FATAL, 0);
 			return 0;
 		}
 		n->buffer[n->put_ptr].pkt = queuebuf_new_from_packetbuf(); // create new packet from packetbuf
@@ -510,7 +512,7 @@ packet_input(void)
 
 		if (!duplicate) {
 			NETSTACK_MAC.input();
-//			PRINTF("tsch packet_input, Not duplicate\n");
+			PRINTF("tsch packet_input, Not duplicate\n");
 		}
 	}
 //	COOJA_DEBUG_STR("tsch packet_input end\n");
@@ -1027,7 +1029,7 @@ powercycle(struct rtimer *t, void *ptr)
 						/* poll MAC TX callback */
 						ieee154e_vars.p->ret=ret;
 
-						while( PROCESS_ERR_OK != process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, ieee154e_vars.p)) {};
+						while( PROCESS_ERR_OK != process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, ieee154e_vars.p)) {PRINTF("PROCESS_ERR_OK != process_post(&tsch_tx_callback_process\n");};
 					}
 					t0post_tx = RTIMER_NOW() - t0post_tx;
 				} else if (ieee154e_vars.cell_decison == CELL_RX) {
@@ -1295,6 +1297,21 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 	buf[i++] = ieee154e_vars.asn.asn_4lsb >> (uint16_t)16;
 	buf[i++] = ieee154e_vars.asn.asn_4lsb >> (uint32_t)24;
 	buf[i++] = ieee154e_vars.asn.asn_msb;
+	/* update join_priority */
+	rpl_instance_t* rpl = rpl_get_instance(RPL_DEFAULT_INSTANCE);
+	static rpl_dag_t * my_rpl_dag = NULL;
+	if (rpl != NULL) {
+		my_rpl_dag = rpl->current_dag;
+		if (my_rpl_dag != NULL) {
+			ieee154e_vars.join_priority = (my_rpl_dag->rank) >> 8;
+		}
+	}
+
+	if(tsch_server_disable_rpl) {
+		ieee154e_vars.join_priority = 0;
+	}
+
+
 	buf[i++] = ieee154e_vars.join_priority;
 
 	/* Append timeslot template IE */
@@ -1463,7 +1480,7 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 			}
 		}
 		/* Reset RPL timers */
-		rpl_reset_periodic_timer();
+//		rpl_reset_periodic_timer();
 //		dis_output(NULL);
 	} else {
 		NETSTACK_RADIO_radio_raw_rx_on();
@@ -1517,6 +1534,11 @@ PROCESS_THREAD(tsch_associate, ev, data)
 					}
 				}
 			}
+
+			if(tsch_server_disable_rpl) {
+				ieee154e_vars.join_priority = 0;
+			}
+
 			//XXX there should be a better way of handling rpl, and erasing rank, dag etc. on resync
 			ieee154e_vars.first_associate = 1;
 			//if this is root start now
@@ -1534,7 +1556,7 @@ PROCESS_THREAD(tsch_associate, ev, data)
 				PRINTF("associate done\n");
 				// XXX for debugging
 				ieee154e_vars.asn.asn_4lsb = 0;
-				rpl_reset_periodic_timer();
+//				rpl_reset_periodic_timer();
 			} else {
 #if CONTIKI_TARGET_JN5168
 				NETSTACK_RADIO_radio_raw_rx_on();
@@ -1632,7 +1654,7 @@ tsch_resynchronize(struct rtimer * tm, void * ptr)
 	tsch_init_variables();
 	NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
 	//try to associate to a network or start one if setup as RPL root
-	while ( PROCESS_ERR_OK != process_post(&tsch_associate, PROCESS_EVENT_POLL, NULL) ) {};
+	while ( PROCESS_ERR_OK != process_post(&tsch_associate, PROCESS_EVENT_POLL, NULL) ) { PRINTF("PROCESS_ERR_OK != process_post(&tsch_associate\n"); };
 }
 /*---------------------------------------------------------------------------*/
 const struct rdc_driver tschrdc_driver = {
