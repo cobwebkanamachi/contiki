@@ -10,14 +10,14 @@ CONTIKI_TARGET_DIRS = . dev net net/mac net/rime
 CONTIKI_TARGET_MAIN = ${addprefix $(OBJECTDIR)/,contiki-main.o}
 
 CONTIKI_TARGET_SOURCEFILES = contiki-main.c clock.c sprintf.c queue.c uart_buffered.c  uart0.c uart1.c watchdog.c timer-arch.c leds-arch.c \
- button-sensor.c sensors.c leds.c slip_uart0.c uip-debug.c
+ button-sensor.c sensors.c leds.c slip_uart0.c uip-debug.c exceptions.c
 
 #For MicroMAC (radio) library
 CONTIKI_TARGET_SOURCEFILES += packetbuf.c frame802154.c framer-802154.c chameleon-bitopt.c
 CONTIKI_TARGET_SOURCEFILES += micromac-radio.c
 APPLIBS += MMAC 
 STACKLIBS += JPT
-JENNIC_STACK = NONE
+JENNIC_STACK = None
 #For reading internal MAC address using pvAppApiGetMacAddrLocation()
 #JENNIC_STACK = MAC ##Not needed anymore. I can read the MAC address with the new MMAC lib or with direct memory access
 

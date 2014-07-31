@@ -154,7 +154,6 @@ main(void)
   leds_on(LEDS_ALL);
   process_init();
   ctimer_init();
-
   queuebuf_init();
   serial_line_init();
   uart0_init(E_AHI_UART_RATE_115200); /* Must come before first PRINTF */
@@ -167,7 +166,6 @@ main(void)
   if (bAHI_WatchdogResetEvent()) {
 		PRINTF("Init: Watchdog timer has reset device!\r\n");
 	}
-	vAHI_WatchdogStop();
 
   /* Wait for clock to stablise */
   while(bAHI_Clock32MHzStable() == FALSE);

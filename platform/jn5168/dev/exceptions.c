@@ -272,9 +272,9 @@ PRIVATE void vExceptionHandler(uint32 *pu32Stack, eExceptionType eType)
 	int i;
 #endif
 	uint32 u32EPCR, u32EEAR, u32Stack;
-
 	char *pcString;
 
+//	vAHI_WatchdogRestart();
 	MICRO_DISABLE_INTERRUPTS();
 
 	switch (eType)
@@ -315,6 +315,7 @@ PRIVATE void vExceptionHandler(uint32 *pu32Stack, eExceptionType eType)
   if(bAHI_WatchdogResetEvent()) {
   	pcString = "WATCHDOG";
   }
+  vAHI_WatchdogStop();
 
 	/* Pull the EPCR and EEAR values from where they've been saved by the ROM exception handler */
 	u32EPCR = pu32Stack[PROGRAM_COUNTER];
@@ -324,7 +325,7 @@ PRIVATE void vExceptionHandler(uint32 *pu32Stack, eExceptionType eType)
 	/* Log the exception */
 //	vLog_Printf(TRACE_EXC, LOG_CRIT, "\n\n\n%s EXCEPTION @ %08x (EA: %08x SK: %08x HP: %08x)", pcString, u32EPCR, u32EEAR, u32Stack, ((uint32 *)&heap_location)[0]);
 //    vSL_LogFlush();
-	printstring("\n\n\n");
+	printstring("\n");
 	printstring(pcString);
 	printstring(" EXCEPTION @ $");
 	hexprint32(u32EPCR);
@@ -334,9 +335,9 @@ PRIVATE void vExceptionHandler(uint32 *pu32Stack, eExceptionType eType)
 	hexprint32(u32Stack);
 	printstring("  HP: ");
 	hexprint32(((uint32 *)&heap_location)[0]);
-	printstring("\n\n\n");
+	printstring("\n");
 #ifdef EXC_DUMP_REGS
-	printstring("\n\nREGS\n");
+	printstring("\nREGS: ");
     /* Pull and print the registers from saved locations */
     for (i = 0; i < REG_COUNT; i += 4)
     {
@@ -360,7 +361,9 @@ PRIVATE void vExceptionHandler(uint32 *pu32Stack, eExceptionType eType)
 
 #ifdef EXC_DUMP_STACK
     /* Print the stack */
-    printstring("\n\nSTACK\n");
+  	printstring("\nRAM top: ");
+  	hexprint32(ram_top);
+    printstring("\nSTACK: ");
     pu32Stack = (uint32 *)(u32Stack & 0xFFFFFFF0);
 	for (i = 0; (pu32Stack + i) < (uint32 *)(ram_top); i += 4)
 	{

@@ -52,7 +52,7 @@ watchdog_start(void)
      unless watchdog_periodic() is called. */
   counter--;
   if(counter == 0) {
-    vAHI_WatchdogStart(9); /* about 2s timeout */
+    vAHI_WatchdogStart(9); /* about 8*2^(9-1)ms=2.048s timeout */
   }
 }
 /*---------------------------------------------------------------------------*/
