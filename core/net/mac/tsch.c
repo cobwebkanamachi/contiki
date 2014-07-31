@@ -560,9 +560,9 @@ hop_channel(uint8_t offset)
 {
 	uint8_t channel = 11 + (offset + ieee154e_vars.asn.asn_4lsb) % 16;
 	//XXX disabling channel hopping
-	channel = RF_CONF_CHANNEL;
-//#if (RF_CONF_CHANNEL != 15)
-//#error "MACRO definition: RF_CONF_CHANNEL is unavailable"
+	channel = RF_CHANNEL;
+//#if (RF_CHANNEL != 15)
+//#error "MACRO definition: RF_CHANNEL is unavailable"
 //#endif
 	if (NETSTACK_RADIO_set_channel(channel)) {
 		return channel;

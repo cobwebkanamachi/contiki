@@ -170,7 +170,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
   int
   cc2420_set_channel(int c);
 
-  cc2420_set_channel(CC2420_CONF_CHANNEL);
+  cc2420_set_channel(RF_CHANNEL);
   set_global_address();
 
   PRINTF("UDP client process started\n");

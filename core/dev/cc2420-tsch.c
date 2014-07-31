@@ -72,9 +72,9 @@ volatile int need_flush=0;
 #undef CC2420_CONF_AUTOACK
 #define CC2420_CONF_AUTOACK 0
 
-#ifndef CC2420_CONF_CHANNEL
-#define CC2420_CONF_CHANNEL 20
-#endif /* CC2420_CONF_CHANNEL */
+#ifndef RF_CHANNEL
+#define RF_CHANNEL 20
+#endif /* RF_CHANNEL */
 
 #ifndef CC2420_CONF_TX_POWER
 #define CC2420_CONF_TX_POWER 15
@@ -352,7 +352,7 @@ cc2420_init(void)
   setreg(CC2420_SECCTRL0, reg);
 
   cc2420_set_pan_addr(0xffff, 0x0000, NULL);
-  cc2420_set_channel(CC2420_CONF_CHANNEL);
+  cc2420_set_channel(RF_CHANNEL);
   cc2420_set_cca_threshold(CC2420_CONF_CCA_THRESH);
   cc2420_set_txpower(CC2420_CONF_TX_POWER);
 

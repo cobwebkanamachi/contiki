@@ -125,7 +125,7 @@ PROCESS_THREAD(unicast_receiver_process, ev, data)
   int
   cc2420_set_channel(int c);
 
-  cc2420_set_channel(CC2420_CONF_CHANNEL);
+  cc2420_set_channel(RF_CHANNEL);
   servreg_hack_init();
 
   ipaddr = set_global_address();
