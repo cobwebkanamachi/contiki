@@ -24,7 +24,7 @@
       org.contikios.cooja.mspmote.SkyMoteType
       <identifier>sky1</identifier>
       <description>server</description>
-      <firmware EXPORT="copy">[CONTIKI_DIR]/examples/hello-world/udp-server.sky</firmware>
+      <firmware EXPORT="copy">[CONFIG_DIR]/udp-server.sky</firmware>
       <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.RimeAddress</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.IPAddress</moteinterface>
@@ -45,7 +45,7 @@
       org.contikios.cooja.mspmote.SkyMoteType
       <identifier>sky2</identifier>
       <description>client</description>
-      <firmware EXPORT="copy">[CONTIKI_DIR]/examples/hello-world/udp-client.sky</firmware>
+      <firmware EXPORT="copy">[CONFIG_DIR]/udp-client.sky</firmware>
       <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.RimeAddress</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.IPAddress</moteinterface>
