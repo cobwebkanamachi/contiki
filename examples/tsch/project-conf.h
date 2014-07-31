@@ -105,18 +105,5 @@
 #undef UIP_CONF_MAX_ROUTES
 #define UIP_CONF_MAX_ROUTES  10
 
-/* Default implementation for logging functions */
-#define RPL_LOG(...) PRINTF(__VA_ARGS__)
-#define RPL_LOG_NULL(...) {RPL_LOG(__VA_ARGS__);RPL_LOG("\n");}
-#define RPL_LOG_FROM_APPDATAPTR(appdataptr, ...) RPL_LOG_NULL(__VA_ARGS__)
-#define RPL_LOG_FROM_UIP(...) RPL_LOG_NULL(__VA_ARGS__)
-#define RPL_LOG_FROM_PACKETBUF(...) RPL_LOG_NULL(__VA_ARGS__)
-#define RPL_LOG_IPADDR(addr) PRINT6ADDR(addr)
-#define RPL_LOG_LLADDR(addr) PRINTLLADDR(addr)
-#define RPL_LOG_NODEID_FROM_RIMEADDR(addr) ((addr)->u8[RIMEADDR_SIZE-1])
-#define RPL_LOG_NODEID_FROM_IPADDR(addr) ((addr)->u8[15])
-#define RPL_LOG_INC_HOPCOUNT_FROM_PACKETBUF()
-#define RPL_LOG_INC_FPCOUNT_FROM_PACKETBUF()
-
 #endif /* PROJECT_H_ */
 
