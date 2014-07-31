@@ -60,6 +60,10 @@ typedef uint32_t rtimer_clock_t;
 #undef UIP_CONF_MAX_ROUTES
 #define UIP_CONF_MAX_ROUTES  16
 
+/* No RPL DIS */
+#undef RPL_CONF_DIS_SEND
+#define RPL_CONF_DIS_SEND 0
+
 /* Space saving */
 #undef UIP_CONF_TCP
 #define UIP_CONF_TCP             0
