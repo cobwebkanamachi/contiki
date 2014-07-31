@@ -574,6 +574,7 @@ tcpip_ipv6_output(void)
 
       /* No route was found - we send to the default route instead. */
       if(route == NULL) {
+      	RPL_LOG_FROM_UIP("Tcpip: fw to default route");
         PRINTF("tcpip_ipv6_output: no route found, using default route\n");
         nexthop = uip_ds6_defrt_choose();
         if(nexthop == NULL) {
@@ -596,6 +597,7 @@ tcpip_ipv6_output(void)
         }
 
       } else {
+      	RPL_LOG_FROM_UIP("Tcpip: fw to next hop");
         /* A route was found, so we look up the nexthop neighbor for
            the route. */
         nexthop = uip_ds6_route_nexthop(route);
