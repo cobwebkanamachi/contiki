@@ -891,7 +891,7 @@ powercycle(struct rtimer *t, void *ptr)
 #else
 								/* disable capturing sfd */
 								schedule_fixed(t, ieee154e_vars.start,
-										TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayTx);
+										TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayRx);
 								/* Disabling address decoding so the radio accepts the enhanced ACK */
 								NETSTACK_RADIO_address_decode(0);
 								PT_YIELD(&ieee154e_vars.mpt);
@@ -1505,6 +1505,7 @@ PROCESS_THREAD(tsch_associate, ev, data)
 	static uint8_t cca_status = 0;
   static struct etimer periodic;
   uint32_t irq_status = 0;
+  rtimer_clock_t t0;
 
   while (ieee154e_vars.state != TSCH_OFF) {
   	COOJA_DEBUG_STR("tsch_associate\n");
@@ -1560,7 +1561,8 @@ PROCESS_THREAD(tsch_associate, ev, data)
 			} else {
 #if CONTIKI_TARGET_JN5168
 				NETSTACK_RADIO_radio_raw_rx_on();
-				while(!(irq_status= NETSTACK_RADIO_pending_irq()));
+				t0 = RTIMER_NOW();
+				BUSYWAIT_UNTIL_ABS(irq_status= NETSTACK_RADIO_pending_irq(), t0, RTIMER_SECOND/10);
 				NETSTACK_RADIO_process_packet( irq_status );
 #else
 				on();
