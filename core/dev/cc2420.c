@@ -332,7 +332,7 @@ cc2420_init(void)
   setreg(CC2420_SECCTRL0, reg);
 
   cc2420_set_pan_addr(0xffff, 0x0000, NULL);
-  cc2420_set_channel(CC2420_CONF_CHANNEL);
+  cc2420_set_channel(RF_CHANNEL);
 
   flushrx();
 
