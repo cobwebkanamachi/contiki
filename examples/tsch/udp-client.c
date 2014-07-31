@@ -71,6 +71,8 @@
 #define SEND_TIME		(random_rand() % (SEND_INTERVAL))
 #define MAX_PAYLOAD_LEN		30
 
+#define DISABLE_RPL 1
+
 static struct uip_udp_conn *client_conn;
 static uip_ipaddr_t server_ipaddr;
 
@@ -134,6 +136,7 @@ set_global_address(void)
 	uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
 	uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
 
+#if DISABLE_RPL
 	uip_ds6_defrt_t *
 	uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
 	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x212, 0x7400, 0x1160, 0xfdbd);
@@ -145,6 +148,7 @@ set_global_address(void)
 //     uip_lladdr_t lladdr = {{0x0,0x15, 0x8d,00, 0,0x46, 0x5f,0x85}};
 	uip_lladdr_t lladdr = {{ 0x0, 0x12, 0x74, 00, 0x11, 0x60, 0xfd, 0xbd }};
 	uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
+#endif
 
 /* The choice of server address determines its 6LoPAN header compression.
  * (Our address will be compressed Mode 3 since it is derived from our link-local address)

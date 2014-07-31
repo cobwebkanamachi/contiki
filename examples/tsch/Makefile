@@ -1,13 +1,11 @@
 TARGET ?= sky
 #DEVICE_NAME ?= DR1198
 #APPS=servreg-hack
-CONTIKIDIRS += dev 
+ 
 ifeq ($(TARGET), sky) 
-CONTIKI_SOURCEFILES += cc2420-tsch.c tsch.c
-else
-CONTIKI_SOURCEFILES += micromac-radio.c tsch.c
+CONTIKI_SOURCEFILES += cc2420-tsch.c
 endif
-
+CONTIKI_SOURCEFILES += tsch.c
 
 CONTIKI_PROJECT = udp-client udp-server rt-leds
 UIP_CONF_IPV6=1

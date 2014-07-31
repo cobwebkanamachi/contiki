@@ -160,16 +160,6 @@ PROCESS_THREAD(udp_server_process, ev, data)
 
 	uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
 
-	uip_ds6_defrt_t *
-	uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
-	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x215, 0x8d00, 0x46, 0x5f12);
-	uip_ds6_defrt_add(&ipaddr, 0);
-	uip_ds6_nbr_t *
-	uip_ds6_nbr_add(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr, uint8_t isrouter,
-			uint8_t state);
-	uip_lladdr_t lladdr = {{ 0x0, 0x15, 0x8d, 0, 0, 0x46, 0x5f, 0x12 }};
-	uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
-
 #if !DISABLE_RPL && UIP_CONF_ROUTER
 
 	root_if = uip_ds6_addr_lookup(&ipaddr);
@@ -183,6 +173,17 @@ PROCESS_THREAD(udp_server_process, ev, data)
     PRINTF("failed to create a new RPL DAG\n");
   }
 #else
+
+	uip_ds6_defrt_t *
+	uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
+	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x215, 0x8d00, 0x46, 0x5f12);
+	uip_ds6_defrt_add(&ipaddr, 0);
+	uip_ds6_nbr_t *
+	uip_ds6_nbr_add(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr, uint8_t isrouter,
+			uint8_t state);
+	uip_lladdr_t lladdr = {{ 0x0, 0x15, 0x8d, 0, 0, 0x46, 0x5f, 0x12 }};
+	uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
+
   tsch_server_disable_rpl = 1;
 #endif /* UIP_CONF_ROUTER */
 
