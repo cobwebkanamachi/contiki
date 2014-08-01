@@ -168,6 +168,18 @@ get_n_nodes()
   return N_NODES;
 }
 
+/* Build a global link-layer address from an IPv6 based on its UUID64 */
+static void
+lladdr_from_ipaddr_uuid(uip_lladdr_t *lladdr, const uip_ipaddr_t *ipaddr)
+{
+#if (UIP_LLADDR_LEN == 8)
+  memcpy(lladdr, ipaddr->u8 + 8, UIP_LLADDR_LEN);
+  lladdr->addr[0] ^= 0x02;
+#else
+#error orpl.c supports only EUI-64 identifiers
+#endif
+}
+
 /* Returns a node-id from a node's rimeaddr */
 uint16_t
 node_id_from_rimeaddr(const rimeaddr_t *addr)
@@ -269,4 +281,6 @@ deployment_init(uip_ipaddr_t *ipaddr) {
     rpl_set_prefix(dag, &prefix, 64);
     tsch_is_coordinator = 1;
   }
+
+  rpl_log_start();
 }

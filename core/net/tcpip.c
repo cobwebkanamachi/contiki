@@ -574,7 +574,6 @@ tcpip_ipv6_output(void)
 
       /* No route was found - we send to the default route instead. */
       if(route == NULL) {
-      	RPL_LOG_FROM_UIP("Tcpip: fw to default route");
         PRINTF("tcpip_ipv6_output: no route found, using default route\n");
         nexthop = uip_ds6_defrt_choose();
         if(nexthop == NULL) {
@@ -588,16 +587,17 @@ tcpip_ipv6_output(void)
 	    /* This should be copied from the ext header... */
 	    UIP_IP_BUF->proto = proto;
 	  }
+	  RPL_LOG_FROM_UIP("Tcpip: fw to fallback interface");
 	  UIP_FALLBACK_INTERFACE.output();
 #else
+	  			RPL_LOG_FROM_UIP("Tcpip: no route, dropping");
           PRINTF("tcpip_ipv6_output: Destination off-link but no route\n");
 #endif /* !UIP_FALLBACK_INTERFACE */
           uip_len = 0;
           return;
         }
-
+        RPL_LOG_FROM_UIP("Tcpip: fw to %d (default)", RPL_LOG_NODEID_FROM_IPADDR(nexthop));
       } else {
-      	RPL_LOG_FROM_UIP("Tcpip: fw to next hop");
         /* A route was found, so we look up the nexthop neighbor for
            the route. */
         nexthop = uip_ds6_route_nexthop(route);
@@ -623,8 +623,10 @@ tcpip_ipv6_output(void)
 
           /* We don't have a nexthop to send the packet to, so we drop
              it. */
+          RPL_LOG_FROM_UIP("Tcpip: next hop is dead");
           return;
         }
+      	RPL_LOG_FROM_UIP("Tcpip: fw to %d", RPL_LOG_NODEID_FROM_IPADDR(nexthop));
       }
 #if TCPIP_CONF_ANNOTATE_TRANSMISSIONS
       if(nexthop != NULL) {

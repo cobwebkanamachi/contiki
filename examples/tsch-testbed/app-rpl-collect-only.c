@@ -39,7 +39,6 @@
 #include "net/netstack.h"
 #include "lib/random.h"
 #include "deployment.h"
-#include "simple-energest.h"
 #include "simple-udp.h"
 #include "cc2420.h"
 #include <stdio.h>
@@ -106,7 +105,6 @@ PROCESS_THREAD(unicast_sender_process, ev, data)
 
   cc2420_set_txpower(RF_POWER);
   cc2420_set_cca_threshold(RSSI_THR);
-  simple_energest_start();
 
   printf("App: %u starting\n", node_id);
 

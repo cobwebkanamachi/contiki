@@ -43,8 +43,20 @@
 #include <stdio.h>
 #include <string.h>
 
-extern int forwarder_set_size;
-extern int neighbor_set_size;
+static neighbor_set_size = 0;
+
+/* Print all neighbors (RPL "parents"), their link metric and rank */
+static void
+rpl_print_neighbor_list() {
+	  rpl_parent_t *p = nbr_table_head(rpl_parents);
+	  printf("RPL: neighbor list\n");
+	  while(p != NULL) {
+		  printf("RPL: nbr %d %u + %u = %u %c\n",
+				  node_id_from_rimeaddr(nbr_table_get_lladdr(rpl_parents, p)), p->rank, p->link_metric, p->rank + p->link_metric, p==default_instance->current_dag->preferred_parent?'*':' ');
+		  p = nbr_table_next(rpl_parents, p);
+	  }
+	  printf("RPL: end of neighbor list\n");
+}
 
 /* Copy an appdata to another with no assumption that the addresses are aligned */
 void
@@ -77,6 +89,7 @@ log_appdataptr(struct app_data *dataptr)
 {
   struct app_data data;
   int curr_dio_interval = default_instance != NULL ? default_instance->dio_intcurrent : 0;
+  int curr_rank = default_instance != NULL ? default_instance->current_dag->rank : 0xffff;
 
   if(dataptr) {
     appdata_copy(&data, dataptr);
@@ -90,11 +103,14 @@ log_appdataptr(struct app_data *dataptr)
         );
   }
 
-  /* TODO */
-  printf(" {0/%u %u %u} \n",
-        0 /* neighbor_set_size */,
-        0 /* rpl_current_rank()*/,
-        0 /* curr_dio_interval */
+  if(neighbor_set_size == 0) {
+  	neighbor_set_size = uip_ds6_nbr_num();
+  }
+
+  printf(" {%u %u %u} \n",
+  		  neighbor_set_size,
+        curr_rank,
+        curr_dio_interval
         );
 }
 
@@ -110,4 +126,35 @@ uint16_t
 log_node_id_from_ipaddr(const void *ipaddr)
 {
   return node_id_from_ipaddr((const uip_ipaddr_t *)ipaddr);
+}
+
+PROCESS(rpl_log_process, "RPL Log");
+/* Starts logging process */
+void
+rpl_log_start() {
+  process_start(&rpl_log_process, NULL);
+}
+
+/* The logging process */
+PROCESS_THREAD(rpl_log_process, ev, data)
+{
+  static struct etimer periodic;
+  PROCESS_BEGIN();
+  etimer_set(&periodic, 60 * CLOCK_SECOND);
+  simple_energest_init();
+
+  while(1) {
+  	static int cnt = 0;
+  	neighbor_set_size = uip_ds6_nbr_num();
+
+    PROCESS_WAIT_UNTIL(etimer_expired(&periodic));
+    etimer_reset(&periodic);
+    simple_energest_step();
+
+    if(cnt++ % 8 == 0) {
+    	rpl_print_neighbor_list();
+    }
+  }
+
+  PROCESS_END();
 }

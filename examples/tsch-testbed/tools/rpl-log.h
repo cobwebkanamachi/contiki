@@ -60,6 +60,8 @@ void log_appdataptr(struct app_data *dataptr);
 uint16_t log_node_id_from_rimeaddr(const void *rimeaddr);
 /* Return node id from its IP address */
 uint16_t log_node_id_from_ipaddr(const void *ipaddr);
+/* Starts logging process */
+void rpl_log_start();
 
 #define RPL_LOG(...) printf(__VA_ARGS__)
 #define RPL_LOG_FROM_APPDATAPTR(appdataptr, ...) { printf(__VA_ARGS__); log_appdataptr(appdataptr); }

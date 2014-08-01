@@ -38,7 +38,7 @@
 #ifndef SIMPLE_ENERGEST_H
 #define SIMPLE_ENERGEST_H
 
-void simple_energest_start();
+void simple_energest_init();
 void simple_energest_step();
 
 #endif /* SIMPLE_ENERGEST_H */
