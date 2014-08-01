@@ -44,11 +44,6 @@
 /* The cc2420 RSSI threshold (-32 is the reset value for -77 dBm) */
 #define RSSI_THR				(-32-14)
 
-/* 32-bit rtimer */
-#define RTIMER_CONF_SECOND (4096UL*8)
-typedef uint32_t rtimer_clock_t;
-#define RTIMER_CLOCK_LT(a,b)     ((int32_t)(((rtimer_clock_t)a)-((rtimer_clock_t)b)) < 0)
-
 /* The ContikiMAC wakeup interval */
 #define CONTIKIMAC_CONF_CYCLE_TIME (RTIMER_ARCH_SECOND / 8)
 
