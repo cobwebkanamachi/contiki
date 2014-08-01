@@ -79,14 +79,19 @@ appdataptr_from_uip()
 struct app_data *
 appdataptr_from_packetbuf()
 {
-	struct app_data *ptr;
-  if(packetbuf_datalen() < sizeof(struct app_data)) return NULL;
-  ptr = (struct app_data *)((char*)packetbuf_dataptr() + ((packetbuf_datalen() - sizeof(struct app_data))));
-  if(ptr->magic == RPL_LOG_MAGIC) {
-  	return ptr;
-  } else {
-  	return NULL;
+	struct app_data data;
+	struct app_data *dataptr;
+
+	if(packetbuf_datalen() < sizeof(struct app_data)) return NULL;
+  dataptr = (struct app_data *)((char*)packetbuf_dataptr() + ((packetbuf_datalen() - sizeof(struct app_data))));
+
+  if(dataptr) {
+      appdata_copy(&data, dataptr);
+      if(data.magic == RPL_LOG_MAGIC) {
+      	return dataptr;
+      }
   }
+  return NULL;
 }
 
 /* Log information about a data packet along with RPL routing information */
