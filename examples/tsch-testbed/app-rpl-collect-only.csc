@@ -24,7 +24,7 @@
       org.contikios.cooja.mspmote.SkyMoteType
       <identifier>sky1</identifier>
       <description>Sky Mote Type #sky1</description>
-      <firmware EXPORT="copy">[CONFIG_DIR]/app-rpl-collect-only.sky</firmware>
+      <firmware EXPORT="copy">[CONTIKI_DIR]-rich/examples/tsch-testbed/app-rpl-collect-only.sky</firmware>
       <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.RimeAddress</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.IPAddress</moteinterface>
@@ -157,7 +157,7 @@
   <plugin>
     org.contikios.cooja.plugins.SimControl
     <width>240</width>
-    <z>3</z>
+    <z>4</z>
     <height>196</height>
     <location_x>0</location_x>
     <location_y>5</location_y>
@@ -173,7 +173,7 @@
       <viewport>1.129585814092554 0.0 0.0 1.129585814092554 -123.93493657461097 154.01275650891176</viewport>
     </plugin_config>
     <width>238</width>
-    <z>0</z>
+    <z>2</z>
     <height>310</height>
     <location_x>6</location_x>
     <location_y>204</location_y>
@@ -185,8 +185,8 @@
       <formatted_time />
       <coloring />
     </plugin_config>
-    <width>572</width>
-    <z>1</z>
+    <width>671</width>
+    <z>0</z>
     <height>504</height>
     <location_x>260</location_x>
     <location_y>3</location_y>
@@ -207,7 +207,7 @@
       <zoomfactor>2127.9736438377167</zoomfactor>
     </plugin_config>
     <width>1297</width>
-    <z>2</z>
+    <z>3</z>
     <height>208</height>
     <location_x>7</location_x>
     <location_y>515</location_y>
@@ -221,10 +221,10 @@
       <hidenodests>false</hidenodests>
       <analyzers name="6lowpan" />
     </plugin_config>
-    <width>450</width>
-    <z>4</z>
+    <width>343</width>
+    <z>1</z>
     <height>511</height>
-    <location_x>826</location_x>
+    <location_x>933</location_x>
     <location_y>-2</location_y>
   </plugin>
 </simconf>
