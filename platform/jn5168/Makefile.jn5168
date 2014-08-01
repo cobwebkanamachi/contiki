@@ -14,7 +14,7 @@ CONTIKI_TARGET_SOURCEFILES = contiki-main.c clock.c sprintf.c queue.c uart_buffe
 
 #For MicroMAC (radio) library
 CONTIKI_TARGET_SOURCEFILES += packetbuf.c frame802154.c framer-802154.c chameleon-bitopt.c
-CONTIKI_TARGET_SOURCEFILES += micromac-radio.c
+CONTIKI_TARGET_SOURCEFILES += micromac-radio.c tsch.c
 APPLIBS += MMAC 
 STACKLIBS += JPT
 JENNIC_STACK = None

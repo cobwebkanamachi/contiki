@@ -61,11 +61,7 @@ void uart0_writeb(unsigned char c);
 #	endif
 #endif
 
-#ifdef RF_CONF_CHANNEL
-#undef RF_CHANNEL
-#define RF_CHANNEL RF_CONF_CHANNEL
-#else
-#undef RF_CHANNEL
+#ifndef RF_CHANNEL
 #define RF_CHANNEL (26)
 #endif
 //#if RF_CHANNEL!= 15
@@ -121,7 +117,7 @@ static volatile uint32_t micromac_radio_rx_garbage = 0,
 
 
 static volatile uint8_t phy_rx_attempt = 0;
-static volatile tsPhyFrame tx_frame_buffer, phy_rx, phy_ackbuf;
+static tsPhyFrame tx_frame_buffer, phy_rx, phy_ackbuf;
 static volatile uint8_t extrabuf[ACK_LEN]={0};
 static volatile struct received_frame_radio_s last_rf;
 #define RX_LIST_SIZE 4
@@ -748,9 +744,10 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 	}
 	GET_LOCK();
 	/* copy payload to (soft) tx buffer */
-	memset(&tx_frame_buffer, 0, sizeof(tx_frame_buffer));
+//	memset(&tx_frame_buffer, 0, sizeof(tx_frame_buffer));
 //	memcpy(&(tx_frame_buffer.uPayload.au8Byte), payload, payload_len);
 	for(i=0;i<payload_len;i++) {
+
 		tx_frame_buffer.uPayload.au8Byte[i] = ((uint8_t*)payload)[i];
 	}
   checksum = crc16_data(payload, payload_len, 0);
