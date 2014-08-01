@@ -90,11 +90,11 @@ app_send_to(uint16_t id, int ping, uint32_t seqno)
   uip_ipaddr_t dest_ipaddr;
   uip_lladdr_t dest_lladdr;
 
+  data.magic = RPL_LOG_MAGIC;
   data.seqno = seqno;
   data.src = node_id;
   data.dest = id;
   data.hop = 0;
-  data.fpcount = 0;
   data.ping = ping;
 
   if(ping) {

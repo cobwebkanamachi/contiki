@@ -79,8 +79,14 @@ appdataptr_from_uip()
 struct app_data *
 appdataptr_from_packetbuf()
 {
-  if(packetbuf_datalen() < sizeof(struct app_data)) return 0;
-  return (struct app_data *)((char*)packetbuf_dataptr() + ((packetbuf_datalen() - sizeof(struct app_data))));
+	struct app_data *ptr;
+  if(packetbuf_datalen() < sizeof(struct app_data)) return NULL;
+  ptr = (struct app_data *)((char*)packetbuf_dataptr() + ((packetbuf_datalen() - sizeof(struct app_data))));
+  if(ptr->magic == RPL_LOG_MAGIC) {
+  	return ptr;
+  } else {
+  	return NULL;
+  }
 }
 
 /* Log information about a data packet along with RPL routing information */
@@ -94,10 +100,9 @@ log_appdataptr(struct app_data *dataptr)
   if(dataptr) {
     appdata_copy(&data, dataptr);
 
-    printf(" [%lx %u_%u %u->%u]",
+    printf(" [%lx %u %u->%u]",
         data.seqno,
         data.hop,
-        data.fpcount,
         data.src,
         data.dest
         );

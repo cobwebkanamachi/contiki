@@ -198,6 +198,8 @@ dis_output(uip_ipaddr_t *addr)
   PRINT6ADDR(addr);
   PRINTF("\n");
 
+  RPL_LOG_NULL("RPL: DIS ouptut to %d", RPL_LOG_NODEID_FROM_IPADDR(addr));
+
   uip_icmp6_send(addr, ICMP6_RPL, RPL_CODE_DIS, 2);
 }
 /*---------------------------------------------------------------------------*/
@@ -534,6 +536,8 @@ dio_output(rpl_instance_t *instance, uip_ipaddr_t *uc_addr)
            dag->prefix_info.length);
   }
 
+  RPL_LOG_NULL("RPL: DIO ouptut to %d, rank %u", RPL_LOG_NODEID_FROM_IPADDR(uc_addr), (unsigned)instance->current_dag->rank);
+
 #if RPL_LEAF_ONLY
 #if (DEBUG) & DEBUG_PRINT
   if(uc_addr == NULL) {
@@ -829,6 +833,9 @@ dao_output_target(rpl_parent_t *parent, uip_ipaddr_t *prefix, uint8_t lifetime)
   PRINT6ADDR(rpl_get_parent_ipaddr(parent));
   PRINTF("\n");
 
+  RPL_LOG_NULL("RPL: DAO ouptut to %d, target %d",
+  		RPL_LOG_NODEID_FROM_IPADDR(rpl_get_parent_ipaddr(parent)), RPL_LOG_NODEID_FROM_IPADDR(prefix));
+
   if(rpl_get_parent_ipaddr(parent) != NULL) {
     uip_icmp6_send(rpl_get_parent_ipaddr(parent), ICMP6_RPL, RPL_CODE_DAO, pos);
   }
@@ -867,6 +874,8 @@ dao_ack_output(rpl_instance_t *instance, uip_ipaddr_t *dest, uint8_t sequence)
   PRINT6ADDR(dest);
   PRINTF("\n");
 
+  RPL_LOG_NULL("RPL: DAO-ACK ouptut to %d, sequence %d", RPL_LOG_NODEID_FROM_IPADDR(dest), sequence);
+
   buffer = UIP_ICMP_PAYLOAD;
 
   buffer[0] = instance->instance_id;
@@ -880,25 +889,31 @@ dao_ack_output(rpl_instance_t *instance, uip_ipaddr_t *dest, uint8_t sequence)
 void
 uip_rpl_input(void)
 {
+	const char *msg_type = NULL;
   PRINTF("Received an RPL control message\n");
   switch(UIP_ICMP_BUF->icode) {
   case RPL_CODE_DIO:
+  	msg_type = "DIO";
     dio_input();
     break;
   case RPL_CODE_DIS:
+  	msg_type = "DIS";
     dis_input();
     break;
   case RPL_CODE_DAO:
+  	msg_type = "DAO";
     dao_input();
     break;
   case RPL_CODE_DAO_ACK:
+  	msg_type = "DAO-ACK";
     dao_ack_input();
     break;
   default:
+  	msg_type = "Unkown ICMP";
     PRINTF("RPL: received an unknown ICMP6 code (%u)\n", UIP_ICMP_BUF->icode);
     break;
   }
-
+  RPL_LOG_NULL("RPL: %s input from %d", msg_type, RPL_LOG_NODEID_FROM_IPADDR(&UIP_IP_BUF->srcipaddr));
   uip_len = 0;
 }
 #endif /* UIP_CONF_IPV6 */

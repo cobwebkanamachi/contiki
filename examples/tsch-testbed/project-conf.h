@@ -81,7 +81,7 @@
 #undef UIP_CONF_FWCACHE_SIZE
 #define UIP_CONF_FWCACHE_SIZE    4
 
-/* Disable UDP checksum, needed as we have mutable fields (hop count and fpcount) in the data packet */
+/* Disable UDP checksum, needed as we have mutable fields (hop count) in the data packet */
 #undef UIP_CONF_UDP_CHECKSUMS
 #define UIP_CONF_UDP_CHECKSUMS   0
 

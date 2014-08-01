@@ -76,11 +76,11 @@ void app_send_broadcast() {
   struct app_data data;
   uip_ipaddr_t dest_ipaddr;
 
+  data.magic = RPL_LOG_MAGIC;
   data.seqno = ((uint32_t)node_id << 16) + cnt;
   data.src = node_id;
   data.dest = 0xffff;
   data.hop = 0;
-  data.fpcount = 0;
 
   RPL_LOG_FROM_APPDATAPTR(&data, "App: sending");
 
