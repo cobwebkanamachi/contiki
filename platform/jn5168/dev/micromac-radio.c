@@ -742,6 +742,11 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 		PUTCHAR('$');
 		return 1;
 	}
+	if(!payload) {
+		PUTCHAR('=');
+		while(1){};//XXX
+		return 1;
+	}
 	GET_LOCK();
 	/* copy payload to (soft) tx buffer */
 //	memset(&tx_frame_buffer, 0, sizeof(tx_frame_buffer));
