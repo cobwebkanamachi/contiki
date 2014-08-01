@@ -50,6 +50,7 @@
 #include "lib/memb.h"
 #include "lib/random.h"
 #include "net/mac/frame802154.h"
+#include "net/rpl/rpl-private.h"
 #include "dev/leds.h"
 #include "sys/ctimer.h"
 #include "net/nbr-table.h"
@@ -60,7 +61,7 @@
 //#ifndef CONTIKI_TARGET_JN5168
 //#define CONTIKI_TARGET_JN5168 1
 //#endif
-volatile uint8_t tsch_server_disable_rpl = 0;
+int tsch_is_coordinator = 0;
 
 void rpl_reset_periodic_timer(void);
 void dis_output(uip_ipaddr_t *addr);
@@ -82,7 +83,7 @@ void uart0_writeb(unsigned char c);
 #pragma "CONTIKI_TARGET_SKY"
 #endif /* CONTIKI_TARGET */
 
-#define DEBUG 1
+#define DEBUG 0
 #undef PUTCHAR
 #if DEBUG
 #define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
@@ -530,12 +531,13 @@ static int
 off(int set_keep_radio_on)
 {
 	leds_off(LEDS_GREEN);
-	keep_radio_on = set_keep_radio_on;
-	if (keep_radio_on) {
-		return NETSTACK_RADIO.on();
-	} else {
-		return NETSTACK_RADIO.off();
-	}
+//	keep_radio_on = set_keep_radio_on;
+//	if (keep_radio_on) {
+//		return NETSTACK_RADIO.on();
+//	} else {
+//		return NETSTACK_RADIO.off();
+//	}
+	return NETSTACK_RADIO.off();
 }
 /*---------------------------------------------------------------------------*/
 static unsigned short
@@ -1307,7 +1309,7 @@ make_eb(uint8_t * buf, uint8_t buf_size)
 		}
 	}
 
-	if(tsch_server_disable_rpl) {
+	if(tsch_is_coordinator) {
 		ieee154e_vars.join_priority = 0;
 	}
 
@@ -1514,7 +1516,9 @@ PROCESS_THREAD(tsch_associate, ev, data)
 		/* setup radio functions for intercepting EB */
 		NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
 		etimer_set(&periodic, CLOCK_SECOND/10);
+
 		while(ieee154e_vars.state == TSCH_SEARCHING) {
+
 			PROCESS_YIELD();
 			etimer_set(&periodic, CLOCK_SECOND/100);
 			NETSTACK_RADIO_sfd_sync(1, 1);
@@ -1525,9 +1529,9 @@ PROCESS_THREAD(tsch_associate, ev, data)
 				if(my_rpl_dag != NULL) {
 					COOJA_DEBUG_PRINTF("rank %d", my_rpl_dag->rank);
 
-					ieee154e_vars.join_priority = (my_rpl_dag->rank) >> 8;
+					ieee154e_vars.join_priority = (my_rpl_dag->rank) / RPL_DAG_MC_ETX_DIVISOR;
 					/* to make sure that this is a root and not just a low ranked node */
-					if(ieee154e_vars.join_priority == 0 && my_rpl_dag->rank > 1) {
+					if(!tsch_is_coordinator) {
 						//TODO choose something else?
 						if(ieee154e_vars.first_associate /* || my_rpl_dag->rank == 256 ??*/) {
 							ieee154e_vars.join_priority = 0xf0;
@@ -1536,14 +1540,15 @@ PROCESS_THREAD(tsch_associate, ev, data)
 				}
 			}
 
-			if(tsch_server_disable_rpl) {
+			if(tsch_is_coordinator) {
 				ieee154e_vars.join_priority = 0;
 			}
 
 			//XXX there should be a better way of handling rpl, and erasing rank, dag etc. on resync
 			ieee154e_vars.first_associate = 1;
+
 			//if this is root start now
-			if(ieee154e_vars.join_priority == 0) {
+			if(tsch_is_coordinator) {
 				PRINTF("rpl root\n");
 				//something other than 0 for now
 				ieee154e_vars.state = TSCH_ASSOCIATED;

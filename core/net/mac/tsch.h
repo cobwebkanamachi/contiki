@@ -45,6 +45,6 @@
 #include "tsch-parameters.h"
 
 extern const struct rdc_driver tschrdc_driver;
-extern volatile uint8_t tsch_server_disable_rpl;
+extern int tsch_is_coordinator;
 
 #endif /* __TSCH_H__ */
