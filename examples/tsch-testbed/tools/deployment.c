@@ -39,6 +39,7 @@
 #include "deployment.h"
 #include "sys/node-id.h"
 #include "net/rpl/rpl.h"
+#include "net/mac/tsch.h"
 #include "random.h"
 #include "ds2411.h"
 #include <string.h>
@@ -266,5 +267,6 @@ deployment_init(uip_ipaddr_t *ipaddr) {
     rpl_set_root(RPL_DEFAULT_INSTANCE, ipaddr);
     dag = rpl_get_any_dag();
     rpl_set_prefix(dag, &prefix, 64);
+    tsch_is_coordinator = 1;
   }
 }

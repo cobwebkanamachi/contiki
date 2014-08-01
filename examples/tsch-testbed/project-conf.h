@@ -34,6 +34,14 @@
 #ifndef __PROJECT_CONF_H__
 #define __PROJECT_CONF_H__
 
+/* Needed for TSCH */
+#undef DCOSYNCH_CONF_ENABLED
+#define DCOSYNCH_CONF_ENABLED 0
+
+/* Needed for TSCH */
+#undef CC2420_CONF_SFD_TIMESTAMPS
+#define CC2420_CONF_SFD_TIMESTAMPS 1
+
 /* The IEEE 802.15.4 channel in use */
 #undef RF_CHANNEL
 #define RF_CHANNEL              15
@@ -44,21 +52,16 @@
 /* The cc2420 RSSI threshold (-32 is the reset value for -77 dBm) */
 #define RSSI_THR				(-32-14)
 
-/* 32-bit rtimer */
-#define RTIMER_CONF_SECOND (4096UL*8)
-typedef uint32_t rtimer_clock_t;
-#define RTIMER_CLOCK_LT(a,b)     ((int32_t)(((rtimer_clock_t)a)-((rtimer_clock_t)b)) < 0)
-
 /* The ContikiMAC wakeup interval */
-#define CONTIKIMAC_CONF_CYCLE_TIME (RTIMER_ARCH_SECOND / 2)
+#define CONTIKIMAC_CONF_CYCLE_TIME (RTIMER_ARCH_SECOND / 8)
 
 /* The neighbor table size */
 #undef NBR_TABLE_CONF_MAX_NEIGHBORS
-#define NBR_TABLE_CONF_MAX_NEIGHBORS 48
+#define NBR_TABLE_CONF_MAX_NEIGHBORS 20
 
 /* The routing table size */
 #undef UIP_CONF_MAX_ROUTES
-#define UIP_CONF_MAX_ROUTES  16
+#define UIP_CONF_MAX_ROUTES  32
 
 /* No RPL DIS */
 #undef RPL_CONF_DIS_SEND
@@ -90,11 +93,30 @@ typedef uint32_t rtimer_clock_t;
 
 /* Contiki netstack: MAC */
 #undef NETSTACK_CONF_MAC
-#define NETSTACK_CONF_MAC     csma_driver
 
 /* Contiki netstack: RDC */
 #undef NETSTACK_CONF_RDC
+
+#if CONFIG == CONFIG_NULLRDC
+
+#define NETSTACK_CONF_MAC     csma_driver
 #define NETSTACK_CONF_RDC     nullrdc_driver
+
+#elif CONFIG == CONFIG_CONTIKIMAC
+
+#define NETSTACK_CONF_MAC     csma_driver
+#define NETSTACK_CONF_RDC     contikimac_driver
+
+#elif CONFIG == CONFIG_TSCH
+
+#define NETSTACK_CONF_MAC     nullmac_driver
+#define NETSTACK_CONF_RDC     tschrdc_driver
+
+#else
+
+#error Unsupported config
+
+#endif
 
 /* Contiki netstack: RADIO */
 #undef NETSTACK_CONF_RADIO

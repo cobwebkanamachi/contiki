@@ -184,8 +184,9 @@ PROCESS_THREAD(udp_server_process, ev, data)
 	uip_lladdr_t lladdr = {{ 0x0, 0x15, 0x8d, 0, 0, 0x46, 0x5f, 0x12 }};
 	uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
 
-  tsch_server_disable_rpl = 1;
 #endif /* UIP_CONF_ROUTER */
+
+	tsch_is_coordinator = 1;
 
   print_local_addresses();
 
