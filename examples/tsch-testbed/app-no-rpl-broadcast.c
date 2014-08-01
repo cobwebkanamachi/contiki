@@ -41,6 +41,7 @@
 #include "contiki-conf.h"
 #include "net/netstack.h"
 #include "net/uip-ds6-nbr.h"
+#include "net/mac/tsch.h"
 #include "lib/random.h"
 #include "deployment.h"
 #include "simple-udp.h"
@@ -49,6 +50,8 @@
 
 #define SEND_INTERVAL   (60 * CLOCK_SECOND)
 #define UDP_PORT 1234
+
+#define COORDINATOR_ID 2
 
 static struct simple_udp_connection broadcast_connection;
 static uint16_t current_cnt = 0;
@@ -116,6 +119,10 @@ PROCESS_THREAD(broadcast_sender_process, ev, data)
   simple_udp_register(&broadcast_connection, UDP_PORT,
                         NULL, UDP_PORT,
                         receiver);
+
+  if(node_id == COORDINATOR_ID) {
+  	tsch_is_coordinator = 1;
+  }
 
 	etimer_set(&periodic_timer, SEND_INTERVAL);
 	while(1) {
