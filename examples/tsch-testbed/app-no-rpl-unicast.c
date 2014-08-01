@@ -41,6 +41,7 @@
 #include "contiki-conf.h"
 #include "net/netstack.h"
 #include "net/uip-ds6-nbr.h"
+#include "net/mac/tsch.h"
 #include "lib/random.h"
 #include "deployment.h"
 #include "simple-udp.h"
@@ -50,12 +51,13 @@
 #define SEND_INTERVAL   (60 * CLOCK_SECOND)
 #define UDP_PORT 1234
 
+#define COORDINATOR_ID 2
+#define DEST_ID 2
+#define SRC_ID 3
+
 static struct simple_udp_connection unicast_connection;
 static uint16_t current_cnt = 0;
 static uip_ipaddr_t llprefix;
-
-#define DEST_ID 2
-#define SRC_ID 3
 
 /*---------------------------------------------------------------------------*/
 PROCESS(unicast_sender_process, "No-RPL Unicast Application");
@@ -137,6 +139,10 @@ PROCESS_THREAD(unicast_sender_process, ev, data)
   deployment_init(&global_ipaddr);
   simple_udp_register(&unicast_connection, UDP_PORT,
                       NULL, UDP_PORT, receiver);
+
+  if(node_id == COORDINATOR_ID) {
+  	tsch_is_coordinator = 1;
+  }
 
   if(node_id == SRC_ID) {
     etimer_set(&periodic_timer, SEND_INTERVAL);
