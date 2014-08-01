@@ -39,6 +39,7 @@
 #endif
 //#include <stdio.h>
 #include <string.h>
+#include "tsch.h"
 
 #define UDP_CLIENT_PORT 4000
 #define UDP_SERVER_PORT 5678
@@ -136,18 +137,22 @@ set_global_address(void)
 	uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
 	uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
 
+	tsch_is_coordinator = 0;
+
 #if DISABLE_RPL
 	uip_ds6_defrt_t *
 	uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
-	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x212, 0x7400, 0x1160, 0xfdbd);
-//	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x215, 0x8d00, 0x46, 0x5f85);
-	uip_ds6_defrt_add(&ipaddr, 0);
 	uip_ds6_nbr_t *
 	uip_ds6_nbr_add(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr, uint8_t isrouter,
 			uint8_t state);
-//     uip_lladdr_t lladdr = {{0x0,0x15, 0x8d,00, 0,0x46, 0x5f,0x85}};
-	uip_lladdr_t lladdr = {{ 0x0, 0x12, 0x74, 00, 0x11, 0x60, 0xfd, 0xbd }};
+
+	uip_lladdr_t lladdr = {{ 0x0, 0x12, 0x74, 00, 0x11, 0x60, 0xfd, 0xbd  }};
+
+	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0, 0, 0, 0);
+	uip_ds6_set_addr_iid(&ipaddr, &lladdr);
+	uip_ds6_defrt_add(&ipaddr, 0);
 	uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
+
 #endif
 
 /* The choice of server address determines its 6LoPAN header compression.
