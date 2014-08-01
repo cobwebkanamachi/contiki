@@ -39,12 +39,11 @@
 #include "net/netstack.h"
 #include "lib/random.h"
 #include "deployment.h"
-#include "simple-energest.h"
 #include "simple-udp.h"
 #include "cc2420.h"
 #include <stdio.h>
 
-#define SEND_INTERVAL   (4 * 60 * CLOCK_SECOND)
+#define SEND_INTERVAL   (60 * CLOCK_SECOND)
 #define UDP_PORT 1234
 
 static struct simple_udp_connection unicast_connection;
@@ -71,11 +70,11 @@ void app_send_to(uint16_t id) {
   struct app_data data;
   uip_ipaddr_t dest_ipaddr;
 
+  data.magic = RPL_LOG_MAGIC;
   data.seqno = ((uint32_t)node_id << 16) + cnt;
   data.src = node_id;
   data.dest = id;
   data.hop = 0;
-  data.fpcount = 0;
 
   RPL_LOG_FROM_APPDATAPTR(&data, "App: sending");
 
@@ -106,7 +105,6 @@ PROCESS_THREAD(unicast_sender_process, ev, data)
 
   cc2420_set_txpower(RF_POWER);
   cc2420_set_cca_threshold(RSSI_THR);
-  simple_energest_start();
 
   printf("App: %u starting\n", node_id);
 

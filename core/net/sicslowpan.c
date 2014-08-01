@@ -1309,6 +1309,12 @@ packet_sent(void *ptr, int status, int transmissions)
     callback->output_callback(status);
   }
   last_tx_status = status;
+
+  rimeaddr_t *dest = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
+
+  RPL_LOG_FROM_PACKETBUF("MAC: %s packet sent to %d, status %d %d",
+  		rimeaddr_cmp(dest, &rimeaddr_null) ? "bc" : "uc",
+  		RPL_LOG_NODEID_FROM_RIMEADDR(dest), status, transmissions);
 }
 /*--------------------------------------------------------------------*/
 /**
@@ -1319,6 +1325,10 @@ packet_sent(void *ptr, int status, int transmissions)
 static void
 send_packet(rimeaddr_t *dest)
 {
+  RPL_LOG_FROM_PACKETBUF("MAC: %s send to %d",
+  		rimeaddr_cmp(dest, &rimeaddr_null) ? "bc" : "uc",
+  		RPL_LOG_NODEID_FROM_RIMEADDR(dest));
+
   /* Set the link layer destination address for the packet as a
    * packetbuf attribute. The MAC layer can access the destination
    * address with the function packetbuf_addr(PACKETBUF_ADDR_RECEIVER).
@@ -1601,6 +1611,10 @@ input(void)
 
   /* The MAC puts the 15.4 payload inside the RIME data buffer */
   rime_ptr = packetbuf_dataptr();
+
+  RPL_LOG_FROM_PACKETBUF("MAC: %s input from %d",
+  		rimeaddr_cmp(packetbuf_addr(PACKETBUF_ADDR_RECEIVER), &rimeaddr_null) ? "bc" : "uc",
+  		RPL_LOG_NODEID_FROM_RIMEADDR(packetbuf_addr(PACKETBUF_ADDR_SENDER)));
 
 #if SICSLOWPAN_CONF_FRAG
   /* if reassembly timed out, cancel it */

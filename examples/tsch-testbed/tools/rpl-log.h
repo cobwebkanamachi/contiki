@@ -37,15 +37,18 @@
 #ifndef RPL_LOG_H
 #define RPL_LOG_H
 
+/* Used to identify packets carrying RPL log */
+#define RPL_LOG_MAGIC 0xcafebabe
+
 /* Data structure copied at the end of all data packets, making it possible
  * to trace packets at every hop, from every layer. */
 struct app_data {
+	uint32_t magic;
   uint32_t seqno;
   uint16_t src;
   uint16_t dest;
   uint8_t hop;
   uint8_t ping;
-  uint8_t fpcount;
 };
 
 /* Copy an appdata to another with no assumption that the addresses are aligned */
@@ -60,6 +63,8 @@ void log_appdataptr(struct app_data *dataptr);
 uint16_t log_node_id_from_rimeaddr(const void *rimeaddr);
 /* Return node id from its IP address */
 uint16_t log_node_id_from_ipaddr(const void *ipaddr);
+/* Starts logging process */
+void rpl_log_start();
 
 #define RPL_LOG(...) printf(__VA_ARGS__)
 #define RPL_LOG_FROM_APPDATAPTR(appdataptr, ...) { printf(__VA_ARGS__); log_appdataptr(appdataptr); }
@@ -69,7 +74,6 @@ uint16_t log_node_id_from_ipaddr(const void *ipaddr);
 #define RPL_LOG_IPADDR(addr) uip_debug_ipaddr_print(addr)
 #define RPL_LOG_LLADDR(addr) uip_debug_lladdr_print(addr)
 #define RPL_LOG_INC_HOPCOUNT_FROM_PACKETBUF() { appdataptr_from_packetbuf()->hop++; }
-#define RPL_LOG_INC_FPCOUNT_FROM_PACKETBUF() { appdataptr_from_packetbuf()->fpcount++; }
 
 #define RPL_LOG_NODEID_FROM_RIMEADDR log_node_id_from_rimeaddr
 #define RPL_LOG_NODEID_FROM_IPADDR log_node_id_from_ipaddr

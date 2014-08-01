@@ -45,6 +45,7 @@
 #include "net/uip-ds6.h"
 #include "sys/ctimer.h"
 
+NBR_TABLE_DECLARE(rpl_parents);
 /*---------------------------------------------------------------------------*/
 /* The amount of parents that this node has in a particular DAG. */
 #define RPL_PARENT_COUNT(dag)   list_length((dag)->parents)
