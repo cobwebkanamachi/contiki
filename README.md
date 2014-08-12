@@ -33,3 +33,7 @@ only basic functionality, such as:
 In order to build an application for jn5168 you need to copy the file 
 'platform/jn5168/App_Stack_Size.ld' to your project directory and 
 modify it according to your project's stack needs.
+
+Disclaimer 
+==========
+This is a work in progress. We do not guarantee anything. 
