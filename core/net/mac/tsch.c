@@ -77,6 +77,7 @@ void uart0_writeb(unsigned char c);
 /* Do the math in 32bits to save precision */
 #define RTIMER_TO_US(T)		(((uint32_t)(T)* 3051UL)/(uint32_t)100UL)
 #include "dev/cc2420-tsch.h"
+#define dbg_printf(...) do {} while(0)
 #pragma message "CONTIKI_TARGET_SKY"
 #endif /* CONTIKI_TARGET */
 
@@ -89,6 +90,8 @@ int dbg_printf(const char *fmt, ...);
 #define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
 #else
 #define PRINTF(...) do {printf(__VA_ARGS__);} while(0)
+#undef dbg_printf
+#define dbg_printf(...) do {printf(__VA_ARGS__);} while(0)
 #endif /*CONTIKI_TARGET_JN5168*/
 #else
 #define PRINTF(...) do {} while (0)

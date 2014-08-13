@@ -774,11 +774,7 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 	}
 	if(payload_len > MICROMAC_RADIO_MAX_PACKET_LEN || payload == NULL) {
 		PUTCHAR('=');
-		dbg_printf("%dB@%x\n", payload_len, ((uint8_t*)payload));
-		for(i=0;i<127;i++) {
-			dbg_printf("%x ",((uint8_t*)payload)[i]);
-		}
-		PUTCHAR('=')
+		dbg_printf("%dB @%x\n", payload_len, ((uint8_t*)payload));
 //		while(1){};//XXX
 		return 1;
 	}
