@@ -776,7 +776,7 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 		PUTCHAR('=');
 		dbg_printf("%dB@%x\n", payload_len, ((uint8_t*)payload));
 		for(i=0;i<127;i++) {
-			dbg_printf("%x ",((uint8_t*)payload)[i-4]);
+			dbg_printf("%x ",((uint8_t*)payload)[i]);
 		}
 		PUTCHAR('=')
 //		while(1){};//XXX

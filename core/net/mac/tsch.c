@@ -104,9 +104,6 @@ int dbg_printf(const char *fmt, ...);
 #define NBR_BUFFER_SIZE 4
 #endif
 
-/* TODO: check */
-#define MAX_QUEUED_PACKETS QUEUEBUF_NUM
-
 #ifdef TSCH_CONF_ADDRESS_FILTER
 #define TSCH_ADDRESS_FILTER TSCH_CONF_ADDRESS_FILTER
 #else
@@ -143,7 +140,6 @@ powercycle(struct rtimer *t, void *ptr);
 #define macMaxBE 4
 
 // TSCH PACKET STRUCTURE
-static volatile uint8_t number_of_queued_packets = 0;
 struct TSCH_packet
 {
 	struct queuebuf * pkt; // pointer to the packet to be sent
@@ -211,8 +207,8 @@ int
 remove_packet_from_queue(const rimeaddr_t *addr);
 struct TSCH_packet*
 read_packet_from_queue(const rimeaddr_t *addr);
-#define QUEUE_NOT_EMPTY(n) (((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) > 0)
-#define QUEUE_FULL(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) == (NBR_BUFFER_SIZE - 1)) && (number_of_queued_packets < MAX_QUEUED_PACKETS))
+#define QUEUE_NOT_EMPTY(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) > 0))
+#define QUEUE_FULL(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) == (NBR_BUFFER_SIZE - 1)))
 /*---------------------------------------------------------------------------*/
 static int make_eb(uint8_t * buf, uint8_t buf_size);
 void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack);
@@ -331,9 +327,8 @@ add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
 		n->buffer[n->put_ptr].ptr = ptr;
 		n->buffer[n->put_ptr].ret = MAC_TX_DEFERRED;
 		n->buffer[n->put_ptr].transmissions = 0;
-		PRINTF("qa0%x p%d @%x\n", addr->u8[7], n->put_ptr, n->buffer[n->put_ptr].pkt);
+		dbg_printf("qa0%x p%d @%x\n", addr->u8[7], n->put_ptr, n->buffer[n->put_ptr].pkt);
 		if(n->buffer[n->put_ptr].pkt != NULL) {
-			number_of_queued_packets++;
 			n->put_ptr = (n->put_ptr + 1) & (NBR_BUFFER_SIZE - 1);
 			return 1;
 		}
@@ -359,7 +354,6 @@ remove_packet_from_queue(const rimeaddr_t *addr)
 			PRINTF("qm0%x p%d @%x\n", addr->u8[7], n->get_ptr, n->buffer[n->get_ptr].pkt);
 			queuebuf_free(n->buffer[n->get_ptr].pkt);
 			n->buffer[n->get_ptr].pkt = NULL;
-			number_of_queued_packets--;
 			n->get_ptr = (n->get_ptr + 1) & (NBR_BUFFER_SIZE - 1);
 			return 1;
 		}
@@ -771,15 +765,17 @@ powercycle(struct rtimer *t, void *ptr)
 							ieee154e_vars.p = get_next_packet_for_shared_slot_tx( &ieee154e_vars.n );
 						}
 						if(ieee154e_vars.p!= NULL) {
-							ieee154e_vars.payload = queuebuf_dataptr(ieee154e_vars.p->pkt);
-							ieee154e_vars.payload_len = queuebuf_datalen(ieee154e_vars.p->pkt);
+							if(ieee154e_vars.p->pkt != NULL) {
+								ieee154e_vars.payload = queuebuf_dataptr(ieee154e_vars.p->pkt);
+								ieee154e_vars.payload_len = queuebuf_datalen(ieee154e_vars.p->pkt);
+							}
 						}
 					}
 				}
 
 				/* Decide whether it is a TX/RX/IDLE or OFF ieee154e_vars.cell */
 				if(ieee154e_vars.cell->link_options & LINK_OPTION_TX) {
-					if(ieee154e_vars.payload != NULL) {
+					if(ieee154e_vars.payload != NULL && ieee154e_vars.payload_len > 0) {
 						// if dedicated slot or shared slot and BW_value=0, we transmit the packet
 						if(!(ieee154e_vars.cell->link_options & LINK_OPTION_SHARED)
 							|| (ieee154e_vars.n != NULL && ieee154e_vars.n->BW_value == 0) || (ieee154e_vars.cell->link_type == LINK_TYPE_ADVERTISING)) {
