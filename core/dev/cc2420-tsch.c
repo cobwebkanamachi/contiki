@@ -78,6 +78,9 @@ volatile int need_flush=0;
 #define CC2420_CONF_TX_POWER 15
 #endif /* CC2420_CONF_TX_POWER */
 
+#ifndef RSSI_THR
+#define RSSI_THR				(-32-14)
+#endif /* RSSI_THR */
 
 #ifndef CC2420_CONF_CCA_THRESH
 #define CC2420_CONF_CCA_THRESH RSSI_THR
