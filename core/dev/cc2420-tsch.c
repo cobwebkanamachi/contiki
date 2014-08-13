@@ -732,7 +732,7 @@ uint16_t cc2420_read_sfd_timer(void) {
 }
 /*---------------------------------------------------------------------------*/
 static uint8_t extrabuf[ACK_LEN]={0};
-volatile struct received_frame_radio_s last_rf;
+struct received_frame_radio_s last_rf;
 int
 cc2420_interrupt(void)
 {
@@ -748,7 +748,6 @@ cc2420_interrupt(void)
   struct received_frame_s *rf = NULL;
   unsigned char* buf_ptr = NULL;
   need_ack=0;
-//  last_rf=NULL;
   last_rf.buf=NULL;
 
 #if CC2420_TIMETABLE_PROFILING
