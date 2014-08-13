@@ -873,7 +873,7 @@ powercycle(struct rtimer *t, void *ptr)
 						success = NETSTACK_RADIO.transmit(ieee154e_vars.payload_len);
 						//tx_time = NETSTACK_RADIO_read_sfd_timer() - tx_time;
 						//XXX check
-						tx_time = RADIO_TO_RTIMER(ieee154e_vars.payload_len+1);
+						tx_time = RADIO_TO_RTIMER((ieee154e_vars.payload_len+1)*2);
 						//limit tx_time in case of something wrong
 						tx_time = MIN(tx_time, wdDataDuration);
 						off(keep_radio_on);
@@ -894,6 +894,8 @@ powercycle(struct rtimer *t, void *ptr)
 								/* disable capturing sfd */
 								schedule_fixed(t, ieee154e_vars.start,
 										TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayRx);
+//								COOJA_DEBUG_PRINTF("NOW: %u, start: %u, tx_time: %u, scheduled %u, payload_len %u RADIO_TO_RTIMER %u\n", RTIMER_NOW(), ieee154e_vars.start, tx_time, ieee154e_vars.start + TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayRx);
+
 								/* Disabling address decoding so the radio accepts the enhanced ACK */
 								NETSTACK_RADIO_address_decode(0);
 								PT_YIELD(&ieee154e_vars.mpt);

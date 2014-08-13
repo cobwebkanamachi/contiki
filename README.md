@@ -18,18 +18,26 @@ For more information, see the Contiki website:
 
 [http://contiki-os.org](http://contiki-os.org)
 
-JN5168 Port - Beta
-==================
+JN5168 Port - Alpha
+===================
 
 It is important to note that this port (under 'platform/jn5168') provides
 only basic functionality, such as:
--UART/printf
--Radio
--Leds
--IPv6 stack 
--Rime stack
--Null mac / Null RDC
+* UART/printf
+* Radio
+* Leds
+* IPv6 stack 
+* Rime stack
+* Null mac / Null RDC
 
 In order to build an application for jn5168 you need to copy the file 
 'platform/jn5168/App_Stack_Size.ld' to your project directory and 
 modify it according to your project's stack needs.
+
+Disclaimer 
+==========
+
+This is a work in progress as part of a project with an ongoing development for 802.15.4e TSCH
+* The code might not compile and is unstable. You have been warned.
+* We do not guarantee anything, plus we will not provide support at the mean time. Use at your own risk.
+* The code is the property of the respective authors/organizations metnioned in the heading of each file.

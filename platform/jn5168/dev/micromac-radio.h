@@ -45,13 +45,14 @@
 #include "rimeaddr.h"
 #include <MMAC.h>
 
-#define RADIO_TO_RTIMER(X) 											((rtimer_clock_t)( (uint32_t)(X) << (uint32_t)9 ))
-#define RTIMER_TO_RADIO(X) 											((uint32_t)( (uint32_t)(X) >> (uint32_t)9 ))
-#define MICROMAC_RADIO_MAX_PACKET_LEN      (127)
+/* RTIMER 16M = 256 * 62500(RADIO)  == 2^8 * 62500 */
+#define RADIO_TO_RTIMER(X) 											((rtimer_clock_t)( (uint32_t)(X) << (uint32_t)8 ))
+#define RTIMER_TO_RADIO(X) 											((uint32_t)( (uint32_t)(X) >> (uint32_t)8 ))
+#define MICROMAC_RADIO_MAX_PACKET_LEN      			(127)
 #define ACK_LEN (3)
 #define MICROMAC_HEADER_LEN (28)
 
-#define MAX_PACKET_DURATION RADIO_TO_RTIMER((MICROMAC_RADIO_MAX_PACKET_LEN+1))
+#define MAX_PACKET_DURATION RADIO_TO_RTIMER(2*(MICROMAC_RADIO_MAX_PACKET_LEN+1))
 
 #define BUSYWAIT_UNTIL(cond, max_time)                                  \
   do {                                                                  \

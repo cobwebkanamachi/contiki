@@ -176,12 +176,15 @@ PROCESS_THREAD(udp_server_process, ev, data)
 
 	uip_ds6_defrt_t *
 	uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
-	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x215, 0x8d00, 0x46, 0x5f12);
-	uip_ds6_defrt_add(&ipaddr, 0);
 	uip_ds6_nbr_t *
 	uip_ds6_nbr_add(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr, uint8_t isrouter,
 			uint8_t state);
+
 	uip_lladdr_t lladdr = {{ 0x0, 0x15, 0x8d, 0, 0, 0x46, 0x5f, 0x12 }};
+
+	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0, 0, 0, 0);
+	uip_ds6_set_addr_iid(&ipaddr, &lladdr);
+	uip_ds6_defrt_add(&ipaddr, 0);
 	uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
 
 #endif /* UIP_CONF_ROUTER */
@@ -193,8 +196,6 @@ PROCESS_THREAD(udp_server_process, ev, data)
   /* The data sink runs with a 100% duty cycle in order to ensure high
      packet reception rates. */
   //NETSTACK_MAC.off(1);
-	uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0x215, 0x8d00, 0x46, 0x5f12);
-//  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
 
   server_conn = udp_new(NULL, UIP_HTONS(UDP_CLIENT_PORT), NULL);
   if(server_conn == NULL) {
