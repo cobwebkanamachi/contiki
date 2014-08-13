@@ -47,7 +47,7 @@
 #include "dev/cc2420_const.h"
 #include "rimeaddr.h"
 
-#undef PUTCHAR(X)
+#undef PUTCHAR
 #define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
 #define RADIO_TO_RTIMER(X) 	((rtimer_clock_t)( (uint32_t)((uint32_t)(X)*524)/(uint32_t)1000 ))
 

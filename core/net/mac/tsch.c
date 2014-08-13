@@ -57,31 +57,28 @@
 #include "net/uip.h"
 #include "sys/process.h"
 #include "net/rpl/rpl.h"
+#include "sys/node-id.h"
 
 //#ifndef CONTIKI_TARGET_JN5168
 //#define CONTIKI_TARGET_JN5168 1
 //#endif
-int tsch_is_coordinator = 0;
-
-void rpl_reset_periodic_timer(void);
-void dis_output(uip_ipaddr_t *addr);
 
 #if CONTIKI_TARGET_JN5168
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) ((uint32_t)(D) * 16UL)/((uint32_t)(DC));
 #define RTIMER_TO_US(T)		((T)>>4UL)
 #define ENABLE_DELAYED_RF 1
-#pragma "CONTIKI_TARGET_JN5168"
+#pragma message "CONTIKI_TARGET_JN5168"
 #include "dev/micromac-radio.h"
 #undef putchar
 void uart0_writeb(unsigned char c);
 #define putchar uart0_writeb
 #else /* Leave CC2420 as default */
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) (((D) * 100UL)/(3051UL * (DC)));
-//do the math in 32bits to save precision
+/* Do the math in 32bits to save precision */
 #define RTIMER_TO_US(T)		(((uint32_t)(T)* 3051UL)/(uint32_t)100UL)
 #include "dev/cc2420-tsch.h"
 #define dbg_printf(...) do {} while(0)
-#pragma "CONTIKI_TARGET_SKY"
+#pragma message "CONTIKI_TARGET_SKY"
 #endif /* CONTIKI_TARGET */
 
 #define DEBUG 0
@@ -101,22 +98,12 @@ int dbg_printf(const char *fmt, ...);
 #define PUTCHAR(X)
 #endif /* DEBUG */
 
-#ifndef True
-#define True (1)
-#endif
-
-#ifndef False
-#define False (0)
-#endif
-
-/* TSCH queue size: is it non-zero and a power of two? */
+/* TSCH queue size: must be power of two to enable atomic put operation */
 #if ( TSCH_NBR_BUFFER_CONF_SIZE && !(TSCH_NBR_BUFFER_CONF_SIZE & (TSCH_NBR_BUFFER_CONF_SIZE-1)) )
-#define NBR_BUFFER_SIZE TSCH_NBR_BUFFER_CONF_SIZE // POWER OF 2 -- queue size
+#define NBR_BUFFER_SIZE TSCH_NBR_BUFFER_CONF_SIZE
 #else
 #define NBR_BUFFER_SIZE 4
-#endif /*  */
-
-#define MAX_QUEUED_PACKETS QUEUEBUF_NUM
+#endif
 
 #ifdef TSCH_CONF_ADDRESS_FILTER
 #define TSCH_ADDRESS_FILTER TSCH_CONF_ADDRESS_FILTER
@@ -147,94 +134,101 @@ struct seqno {
 static struct seqno received_seqnos[MAX_SEQNOS];
 #endif /* TSCH_802154_DUPLICATE_DETECTION */
 
-static int
-powercycle(struct rtimer *t, void *ptr);
-#define macMinBE 1
-#define macMaxFrameRetries 4
-#define macMaxBE 4
+/* TSCH MAC parameters */#define MAC_MIN_BE 1
+#define MAC_MAC_FRAME_RETRIES 4
+#define MAC_MAC_BE 4
 
-// TSCH PACKET STRUCTURE
-struct TSCH_packet
-{
-	volatile struct queuebuf * pkt; // pointer to the packet to be sent
-	mac_callback_t sent; // callback for this packet
-	void *ptr; // parameters for MAC callback ... (usually NULL)
-	uint8_t transmissions; // #transmissions performed for this packet
-	uint8_t ret; //status -- MAC return code
-//	uint16_t dummy;
-};
+/* Schedule: addresses */
+static rimeaddr_t BROADCAST_CELL_ADDRESS = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
+static rimeaddr_t EB_CELL_ADDRESS = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff} };
+static rimeaddr_t CELL_ADDRESS1 = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } };
+static rimeaddr_t CELL_ADDRESS2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
+static rimeaddr_t CELL_ADDRESS3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
 
-struct neighbor_queue
-{
-	struct TSCH_packet buffer[NBR_BUFFER_SIZE]; // circular buffer of packets. Its size should be a power of two
-	uint8_t is_time_source; //is this neighbor a time source?
-	uint8_t BE_value; // current value of backoff exponent
-	uint8_t BW_value; // current value of backoff counter
-	volatile uint8_t put_ptr,
-					get_ptr; // pointers for circular buffer implementation
-//	uint8_t dummy1,dummy2,dummy3;
-};
-/*---------------------------------------------------------------------------*/
-static const rimeaddr_t BROADCAST_CELL_ADDRESS = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const rimeaddr_t EB_CELL_ADDRESS = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff} };
+/* Schedule: cells */
+static const cell_t generic_shared_cell = { 0xffff, 0,
+		LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
+		LINK_TYPE_NORMAL, &BROADCAST_CELL_ADDRESS };
+static const cell_t generic_eb_cell = { 0, 0,
+		LINK_OPTION_TX,
+		LINK_TYPE_ADVERTISING, &EB_CELL_ADDRESS };
+static const cell_t cell_to_1 = { 1, 0,
+		LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING,
+		LINK_TYPE_NORMAL, &CELL_ADDRESS1 };
+static const cell_t cell_to_2 = { 2, 0,
+		LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
+		LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
+static const cell_t cell_to_3 = { 3, 0,
+		LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
+		LINK_TYPE_NORMAL, &CELL_ADDRESS3 };
+static const cell_t cell_3_to_2 = { 4, 0,
+		LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
+		LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
 
-static const rimeaddr_t CELL_ADDRESS1 = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } };
-static const rimeaddr_t CELL_ADDRESS2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
-static const rimeaddr_t CELL_ADDRESS3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
-static const cell_t generic_shared_cell = { 0xffff, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &BROADCAST_CELL_ADDRESS };
-static const cell_t generic_eb_cell = { 0, 0, LINK_OPTION_TX, LINK_TYPE_ADVERTISING,
-		&EB_CELL_ADDRESS };
-static const cell_t cell_to_1 = { 1, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING, LINK_TYPE_NORMAL,
-		&CELL_ADDRESS1 };
-static const cell_t cell_to_2 = { 2, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
-static const cell_t cell_to_3 = { 3, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &CELL_ADDRESS3 };
-static const cell_t cell_3_to_2 = { 4, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
-#define TOTAL_LINKS 6
-#define TSCH_MIN_SIZE 6
+/* Static schedule definitaion */
 static const cell_t * minimum_cells[6] = {
 		&generic_eb_cell, &generic_shared_cell,	&generic_shared_cell,
 		&generic_shared_cell, &generic_shared_cell,	&generic_shared_cell	};
-static const cell_t * links_list[TOTAL_LINKS] = { &generic_eb_cell, &generic_shared_cell,
+static const cell_t * links_list[] = { &generic_eb_cell, &generic_shared_cell,
 		&cell_to_1, &cell_to_2, &cell_to_3, &cell_3_to_2 };
-static const slotframe_t minimum_slotframe = { 0, 101, 6, (cell_t **)minimum_cells };
-//static const slotframe_t minimum_slotframe = { 0, 10, 6, (cell_t **)minimum_cells };
-/*---------------------------------------------------------------------------*/
-static volatile ieee154e_vars_t ieee154e_vars;
-/*---------------------------------------------------------------------------*/
-/* NBR_TABLE_CONF_MAX_NEIGHBORS specifies the size of the table */
-NBR_TABLE(struct neighbor_queue, neighbor_list);
+static slotframe_t minimum_slotframe = { 0, 101, 6, (cell_t **)minimum_cells };
+#define TOTAL_LINKS (sizeof(links_list)/sizeof(cell_t *))
 
-struct neighbor_queue *
-neighbor_queue_from_addr(const rimeaddr_t *addr);
-struct neighbor_queue *
-add_queue(const rimeaddr_t *addr);
-int
-remove_queue(const rimeaddr_t *addr);
-int
-add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr);
-int
-remove_packet_from_queue(const rimeaddr_t *addr);
-const struct TSCH_packet*
-read_packet_from_queue(const rimeaddr_t *addr);
-#define QUEUE_NOT_EMPTY(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) > 0))
-#define QUEUE_FULL(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) == (NBR_BUFFER_SIZE - 1)))
-/*---------------------------------------------------------------------------*/
+/* Other function prototypes */
+static int powercycle(struct rtimer *t, void *ptr);
 static int make_eb(uint8_t * buf, uint8_t buf_size);
 void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack);
 static void tsch_init(void);
 static void tsch_resynchronize(struct rtimer *, void *);
+
+/* Neighbor queue management */
+struct neighbor_queue *neighbor_queue_from_addr(const rimeaddr_t *addr);
+struct neighbor_queue *add_queue(const rimeaddr_t *addr);
+int remove_queue(const rimeaddr_t *addr);
+int add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr);
+int remove_packet_from_queue(const rimeaddr_t *addr);
+const struct TSCH_packet *read_packet_from_queue(const rimeaddr_t *addr);
+
+#define QUEUE_NOT_EMPTY(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) > 0))
+#define QUEUE_FULL(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) == (NBR_BUFFER_SIZE - 1)))
+
+/* TSCH packet information */
+struct TSCH_packet
+{
+	struct queuebuf * pkt; /* pointer to the packet to be sent */
+	mac_callback_t sent; /* callback for this packet */
+	void *ptr; /* MAC callback parameter */
+	uint8_t transmissions; /* #transmissions performed for this packet */
+	uint8_t ret; /* status -- MAC return code */
+};
+
+/* TSCH neighbor information */
+struct neighbor_queue
+{
+	struct TSCH_packet buffer[NBR_BUFFER_SIZE]; /* circular buffer of packets.
+	Its size must be a power of two 	to allow for atomic put */
+	uint8_t is_time_source; /* is this neighbor a time source? */
+	uint8_t BE_value; /* current value of backoff exponent */
+	uint8_t BW_value; /* current value of backoff counter */
+	volatile uint8_t put_ptr,
+					get_ptr; /* pointers for circular buffer implementation */
+};
+
+/* A global variable telling whether we are coordinator of the TSCH network
+ * TODO: have a function to set this */
+int tsch_is_coordinator = 0;
+
+/* IEEE 802.15.4e MAC state */
+static volatile ieee154e_vars_t ieee154e_vars;
+
+/* NBR_TABLE_CONF_MAX_NEIGHBORS specifies the size of the table */
+NBR_TABLE(struct neighbor_queue, neighbor_list);
 /*---------------------------------------------------------------------------*/
 /** This function takes the MSB of gcc generated random number
  * because the LSB alone has very bad random characteristics,
  * while the MSB appears more random.
  * window is the upper limit of the number. It should be a power of two - 1
  **/
-#include "sys/node-id.h"
 
 static uint32_t seed_newg;
 void srand_newg(uint32_t x){
@@ -271,7 +265,7 @@ add_queue(const rimeaddr_t *addr)
 	//if n was actually allocated
 	if (n) {
 		/* Init neighbor entry */
-		n->BE_value = macMinBE;
+		n->BE_value = MAC_MIN_BE;
 		n->BW_value = 0;
 		n->put_ptr = 0;
 		n->get_ptr = 0;
@@ -348,7 +342,7 @@ add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
 		}
 		dbg_printf("qa failed!!\n");
 	} else {
-		n= add_queue(addr);
+		n = add_queue(addr);
 		if(n != NULL) {
 			return add_packet_to_queue(sent, ptr, addr);
 		}
@@ -400,7 +394,7 @@ read_packet_from_queue(const rimeaddr_t *addr)
 /*---------------------------------------------------------------------------*/
 /* get a packet to send in a shared slot, and put the neighbor reference in n */
 static const struct TSCH_packet *
-get_next_packet_for_shared_slot_tx( struct neighbor_queue** n )
+get_next_packet_for_shared_slot_tx(struct neighbor_queue **n)
 {
 	static struct neighbor_queue* last_neighbor_tx = NULL;
 	if(last_neighbor_tx == NULL) {
@@ -496,11 +490,6 @@ packet_input(void)
 {
 	PRINTF("tsch packet_input begin\n");
 
-	int original_datalen;
-	uint8_t *original_dataptr;
-
-	original_datalen = packetbuf_datalen();
-	original_dataptr = packetbuf_dataptr();
 #ifdef NETSTACK_DECRYPT
 	NETSTACK_DECRYPT();
 #endif /* NETSTACK_DECRYPT */
@@ -696,10 +685,10 @@ powercycle(struct rtimer *t, void *ptr)
 	rtimer_clock_t duration;
 	uint16_t dt, next_timeslot;
 	uint16_t ack_status = 0;
-	static uint8_t is_broadcast = 0, len=0, seqno=0, ret=0;
+	static uint8_t is_broadcast = 0, cca_status=1, len=0, seqno=0, ret=0;
 	//to record the duration of packet tx
 	static rtimer_clock_t tx_time;
-	uint8_t success=0, cca_status=1, window=0;
+	uint8_t success=0, window=0;
 #if CONTIKI_TARGET_JN5168
 	static uint32_t cycle_start_radio_clock=0;
 	uint32_t tx_offset=0;
@@ -1003,16 +992,16 @@ powercycle(struct rtimer *t, void *ptr)
 					if(ieee154e_vars.p != NULL && ieee154e_vars.n != NULL) {
 						if (success == RADIO_TX_NOACK) {
 							ieee154e_vars.p->transmissions++;
-							if (ieee154e_vars.p->transmissions >= macMaxFrameRetries) {
+							if (ieee154e_vars.p->transmissions >= MAC_MAC_FRAME_RETRIES) {
 								remove_packet_from_queue(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
-								ieee154e_vars.n->BE_value = macMinBE;
+								ieee154e_vars.n->BE_value = MAC_MIN_BE;
 								ieee154e_vars.n->BW_value = 0;
 							} else if ((ieee154e_vars.cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
 								window = 1 << ieee154e_vars.n->BE_value;
 								ieee154e_vars.n->BW_value = generate_random_byte(window - 1);
 								ieee154e_vars.n->BE_value++;
-								if (ieee154e_vars.n->BE_value > macMaxBE) {
-									ieee154e_vars.n->BE_value = macMaxBE;
+								if (ieee154e_vars.n->BE_value > MAC_MAC_BE) {
+									ieee154e_vars.n->BE_value = MAC_MAC_BE;
 								}
 							}
 							ret = MAC_TX_NOACK;
@@ -1021,7 +1010,7 @@ powercycle(struct rtimer *t, void *ptr)
 							if (!read_packet_from_queue(ieee154e_vars.cell->node_address)) {
 								// if no more packets in the queue
 								ieee154e_vars.n->BW_value = 0;
-								ieee154e_vars.n->BE_value = macMinBE;
+								ieee154e_vars.n->BE_value = MAC_MIN_BE;
 							} else {
 								// if queue is not empty
 								ieee154e_vars.n->BW_value = 0;
@@ -1029,31 +1018,31 @@ powercycle(struct rtimer *t, void *ptr)
 							ret = MAC_TX_OK;
 						} else if (success == RADIO_TX_COLLISION) {
 							ieee154e_vars.p->transmissions++;
-							if (ieee154e_vars.p->transmissions >= macMaxFrameRetries) {
+							if (ieee154e_vars.p->transmissions >= MAC_MAC_FRAME_RETRIES) {
 								remove_packet_from_queue(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
-								ieee154e_vars.n->BE_value = macMinBE;
+								ieee154e_vars.n->BE_value = MAC_MIN_BE;
 								ieee154e_vars.n->BW_value = 0;
 							} else if ((ieee154e_vars.cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
 								window = 1 << ieee154e_vars.n->BE_value;
 								ieee154e_vars.n->BW_value = generate_random_byte(window - 1);
 								ieee154e_vars.n->BE_value++;
-								if (ieee154e_vars.n->BE_value > macMaxBE) {
-									ieee154e_vars.n->BE_value = macMaxBE;
+								if (ieee154e_vars.n->BE_value > MAC_MAC_BE) {
+									ieee154e_vars.n->BE_value = MAC_MAC_BE;
 								}
 							}
 							ret = MAC_TX_COLLISION;
 						} else if (success == RADIO_TX_ERR) {
 							ieee154e_vars.p->transmissions++;
-							if (ieee154e_vars.p->transmissions >= macMaxFrameRetries) {
+							if (ieee154e_vars.p->transmissions >= MAC_MAC_FRAME_RETRIES) {
 								remove_packet_from_queue(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
-								ieee154e_vars.n->BE_value = macMinBE;
+								ieee154e_vars.n->BE_value = MAC_MIN_BE;
 								ieee154e_vars.n->BW_value = 0;
 							} else if ((ieee154e_vars.cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
 								window = 1 << ieee154e_vars.n->BE_value;
 								ieee154e_vars.n->BW_value = generate_random_byte(window - 1);
 								ieee154e_vars.n->BE_value++;
-								if (ieee154e_vars.n->BE_value > macMaxBE) {
-									ieee154e_vars.n->BE_value = macMaxBE;
+								if (ieee154e_vars.n->BE_value > MAC_MAC_BE) {
+									ieee154e_vars.n->BE_value = MAC_MAC_BE;
 								}
 							}
 							ret = MAC_TX_ERR;
@@ -1063,7 +1052,7 @@ powercycle(struct rtimer *t, void *ptr)
 							if (!read_packet_from_queue(ieee154e_vars.cell->node_address)) {
 								// if no more packets in the queue
 								ieee154e_vars.n->BW_value = 0;
-								ieee154e_vars.n->BE_value = macMinBE;
+								ieee154e_vars.n->BE_value = MAC_MIN_BE;
 							} else {
 								// if queue is not empty
 								ieee154e_vars.n->BW_value = 0;
@@ -1428,8 +1417,8 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 {
 	uint16_t dt=0;
 	rtimer_clock_t duration=0;
-	volatile softack_interrupt_exit_callback_f *interrupt_exit = tsch_wait_for_eb;
-	volatile softack_make_callback_f *softack_make = NULL;
+	volatile softack_interrupt_exit_callback_f interrupt_exit = tsch_wait_for_eb;
+	volatile softack_make_callback_f softack_make = NULL;
 	ieee154e_vars.need_ack = need_ack_irq;
 	ieee154e_vars.last_rf = last_rf_irq;
 	COOJA_DEBUG_STR("tsch_wait_eb");
@@ -1523,9 +1512,6 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 				PRINTF("Setting parent as time source : %x.%x\n", ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE-2], ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE-1]);
 			}
 		}
-		/* Reset RPL timers */
-//		rpl_reset_periodic_timer();
-//		dis_output(NULL);
 	} else {
 		NETSTACK_RADIO_radio_raw_rx_on();
 	}
@@ -1546,14 +1532,15 @@ PROCESS_THREAD(tsch_associate, ev, data)
 
 	/* Trying to get the RPL DAG, and polling until it becomes available  */
 	static rpl_dag_t * my_rpl_dag = NULL;
-	static uint8_t cca_status = 0;
   static struct etimer periodic;
+#if CONTIKI_TARGET_JN5168
   uint32_t irq_status = 0;
   rtimer_clock_t t0;
+#endif
 
   while (ieee154e_vars.state != TSCH_OFF) {
   	COOJA_DEBUG_STR("tsch_associate\n");
-  	cca_status = 0;
+
   	my_rpl_dag = NULL;
 		/* setup radio functions for intercepting EB */
 		NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
@@ -1604,7 +1591,6 @@ PROCESS_THREAD(tsch_associate, ev, data)
 				PRINTF("associate done\n");
 				// XXX for debugging
 				ieee154e_vars.asn.asn_4lsb = 0;
-//				rpl_reset_periodic_timer();
 			} else {
 #if CONTIKI_TARGET_JN5168
 				NETSTACK_RADIO_radio_raw_rx_on();
@@ -1652,7 +1638,7 @@ static void tsch_init_variables(void)
 	ieee154e_vars.last_rf = NULL;
 	ieee154e_vars.registered_drift = 0;
 	ieee154e_vars.timeslot = 0;
-	NETSTACK_RADIO_sfd_sync(True, True);
+	NETSTACK_RADIO_sfd_sync(1, 1);
 	NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
 }
 /*---------------------------------------------------------------------------*/
