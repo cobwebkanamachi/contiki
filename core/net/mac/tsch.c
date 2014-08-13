@@ -156,7 +156,7 @@ powercycle(struct rtimer *t, void *ptr);
 // TSCH PACKET STRUCTURE
 struct TSCH_packet
 {
-	struct queuebuf * pkt; // pointer to the packet to be sent
+	volatile struct queuebuf * pkt; // pointer to the packet to be sent
 	mac_callback_t sent; // callback for this packet
 	void *ptr; // parameters for MAC callback ... (usually NULL)
 	uint8_t transmissions; // #transmissions performed for this packet
@@ -219,7 +219,7 @@ int
 add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr);
 int
 remove_packet_from_queue(const rimeaddr_t *addr);
-struct TSCH_packet*
+const struct TSCH_packet*
 read_packet_from_queue(const rimeaddr_t *addr);
 #define QUEUE_NOT_EMPTY(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) > 0))
 #define QUEUE_FULL(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) == (NBR_BUFFER_SIZE - 1)))
@@ -342,11 +342,11 @@ add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
 		n->buffer[n->put_ptr].ret = MAC_TX_DEFERRED;
 		n->buffer[n->put_ptr].transmissions = 0;
 		dbg_printf("qa0%x p%d @%x\n", addr->u8[7], n->put_ptr, n->buffer[n->put_ptr].pkt);
-		if(n->buffer[n->put_ptr].pkt != NULL) {
+		if(n->buffer[n->put_ptr].pkt != NULL ) {
 			n->put_ptr = (n->put_ptr + 1) & (NBR_BUFFER_SIZE - 1);
 			return 1;
 		}
-		PRINTF("qa failed!!\n");
+		dbg_printf("qa failed!!\n");
 	} else {
 		n= add_queue(addr);
 		if(n != NULL) {
@@ -365,10 +365,12 @@ remove_packet_from_queue(const rimeaddr_t *addr)
 	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
 	if (n != NULL) {
 		if (QUEUE_NOT_EMPTY(n)) {
-			PRINTF("qm0%x p%d @%x\n", addr->u8[7], n->get_ptr, n->buffer[n->get_ptr].pkt);
-			queuebuf_free(n->buffer[n->get_ptr].pkt);
-			n->buffer[n->get_ptr].pkt = NULL;
+			uint8_t current_get_ptr = n->get_ptr;
+			struct queuebuf * pkt = n->buffer[current_get_ptr].pkt;
+			n->buffer[current_get_ptr].pkt = NULL;
 			n->get_ptr = (n->get_ptr + 1) & (NBR_BUFFER_SIZE - 1);
+			queuebuf_free(pkt);
+			dbg_printf("qm0%x p%d @%x\n", addr->u8[7], current_get_ptr, pkt);
 			return 1;
 		}
 	}
@@ -376,12 +378,12 @@ remove_packet_from_queue(const rimeaddr_t *addr)
 }
 /*---------------------------------------------------------------------------*/
 /* returns the first packet in the queue of a neighbor */
-struct TSCH_packet*
+const struct TSCH_packet*
 read_packet_from_neighbor_queue(const struct neighbor_queue *n)
 {
 	if(n != NULL) {
 		if (QUEUE_NOT_EMPTY(n)) {
-			PRINTF("qr p%d @%x\n", n->get_ptr, n->buffer[n->get_ptr].pkt);
+			dbg_printf("qr p%d @%x\n", n->get_ptr, n->buffer[n->get_ptr].pkt);
 			return (struct TSCH_packet*)&(n->buffer[n->get_ptr]);
 		}
 	}
@@ -389,15 +391,15 @@ read_packet_from_neighbor_queue(const struct neighbor_queue *n)
 }
 /*---------------------------------------------------------------------------*/
 /* returns the first packet in the queue of neighbor */
-struct TSCH_packet*
+const struct TSCH_packet*
 read_packet_from_queue(const rimeaddr_t *addr)
 {
-	PRINTF("qr0%x\n", addr->u8[7]);
+	dbg_printf("qr0%x\n", addr->u8[7]);
 	return read_packet_from_neighbor_queue( neighbor_queue_from_addr(addr) );
 }
 /*---------------------------------------------------------------------------*/
 /* get a packet to send in a shared slot, and put the neighbor reference in n */
-static struct TSCH_packet *
+static const struct TSCH_packet *
 get_next_packet_for_shared_slot_tx( struct neighbor_queue** n )
 {
 	static struct neighbor_queue* last_neighbor_tx = NULL;
@@ -863,6 +865,12 @@ powercycle(struct rtimer *t, void *ptr)
 					t0prepare=RTIMER_NOW();
 					COOJA_DEBUG_STR("CELL_TX");
 					//TODO There are small timing variations visible in cooja, which needs tuning
+
+					//queuebuf bug, trying to debug
+					if(ieee154e_vars.payload == 2) {
+						dbg_printf("pkt@%x", ieee154e_vars.p->pkt);
+					}
+
 					//read seqno from payload!
 					seqno = ((uint8_t*)(ieee154e_vars.payload))[2];
 					//prepare packet to send
@@ -880,7 +888,7 @@ powercycle(struct rtimer *t, void *ptr)
 					//there is not enough time to turn radio off
 					off(keep_radio_on);
 	#endif /* CCA_ENABLED */
-					if (cca_status == 0) {
+					if (cca_status == 0 || !success) {
 						success = RADIO_TX_COLLISION;
 					} else {
 						/* do not capture start SFD, we are only interested in SFD end which equals TX end time */
