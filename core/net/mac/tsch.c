@@ -779,15 +779,17 @@ powercycle(struct rtimer *t, void *ptr)
 							ieee154e_vars.p = get_next_packet_for_shared_slot_tx( &ieee154e_vars.n );
 						}
 						if(ieee154e_vars.p!= NULL) {
-							ieee154e_vars.payload = queuebuf_dataptr(ieee154e_vars.p->pkt);
-							ieee154e_vars.payload_len = queuebuf_datalen(ieee154e_vars.p->pkt);
+							if(ieee154e_vars.p->pkt != NULL) {
+								ieee154e_vars.payload = queuebuf_dataptr(ieee154e_vars.p->pkt);
+								ieee154e_vars.payload_len = queuebuf_datalen(ieee154e_vars.p->pkt);
+							}
 						}
 					}
 				}
 
 				/* Decide whether it is a TX/RX/IDLE or OFF ieee154e_vars.cell */
 				if(ieee154e_vars.cell->link_options & LINK_OPTION_TX) {
-					if(ieee154e_vars.payload != NULL) {
+					if(ieee154e_vars.payload != NULL && ieee154e_vars.payload_len > 0) {
 						// if dedicated slot or shared slot and BW_value=0, we transmit the packet
 						if(!(ieee154e_vars.cell->link_options & LINK_OPTION_SHARED)
 							|| (ieee154e_vars.n != NULL && ieee154e_vars.n->BW_value == 0) || (ieee154e_vars.cell->link_type == LINK_TYPE_ADVERTISING)) {
