@@ -36,6 +36,12 @@
 //#include <inttypes.h>
 #include <jendefs.h>
 
+#define RADIO_TEST_MODE_HIGH_PWR 1
+#define RADIO_TEST_MODE_ADVANCED 2
+#define RADIO_TEST_MODE_DISABLED 0
+
+#define RADIO_TEST_MODE  RADIO_TEST_MODE_DISABLED
+
 //#define PACKED __attribute((__packed__))
 
 #define CC_CONF_REGISTER_ARGS          1
