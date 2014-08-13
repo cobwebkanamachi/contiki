@@ -136,26 +136,31 @@ static struct seqno received_seqnos[MAX_SEQNOS];
 #define MAC_MAC_BE 4
 
 /* Schedule: addresses */
-static const rimeaddr_t BROADCAST_CELL_ADDRESS = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static const rimeaddr_t EB_CELL_ADDRESS = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff} };
-static const rimeaddr_t CELL_ADDRESS1 = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } };
-static const rimeaddr_t CELL_ADDRESS2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
-static const rimeaddr_t CELL_ADDRESS3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
+static rimeaddr_t BROADCAST_CELL_ADDRESS = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
+static rimeaddr_t EB_CELL_ADDRESS = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff} };
+static rimeaddr_t CELL_ADDRESS1 = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } };
+static rimeaddr_t CELL_ADDRESS2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
+static rimeaddr_t CELL_ADDRESS3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
 
 /* Schedule: cells */
-static const cell_t generic_shared_cell = { 0xffff, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &BROADCAST_CELL_ADDRESS };
-static const cell_t generic_eb_cell = { 0, 0, LINK_OPTION_TX, LINK_TYPE_ADVERTISING,
-		&EB_CELL_ADDRESS };
-static const cell_t cell_to_1 = { 1, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING, LINK_TYPE_NORMAL,
-		&CELL_ADDRESS1 };
-static const cell_t cell_to_2 = { 2, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
-static const cell_t cell_to_3 = { 3, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &CELL_ADDRESS3 };
-static const cell_t cell_3_to_2 = { 4, 0, LINK_OPTION_TX | LINK_OPTION_RX
-		| LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
+static const cell_t generic_shared_cell = { 0xffff, 0,
+		LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
+		LINK_TYPE_NORMAL, &BROADCAST_CELL_ADDRESS };
+static const cell_t generic_eb_cell = { 0, 0,
+		LINK_OPTION_TX,
+		LINK_TYPE_ADVERTISING, &EB_CELL_ADDRESS };
+static const cell_t cell_to_1 = { 1, 0,
+		LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING,
+		LINK_TYPE_NORMAL, &CELL_ADDRESS1 };
+static const cell_t cell_to_2 = { 2, 0,
+		LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
+		LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
+static const cell_t cell_to_3 = { 3, 0,
+		LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
+		LINK_TYPE_NORMAL, &CELL_ADDRESS3 };
+static const cell_t cell_3_to_2 = { 4, 0,
+		LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
+		LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
 
 /* Static schedule definitaion */
 static const cell_t * minimum_cells[6] = {
@@ -163,7 +168,7 @@ static const cell_t * minimum_cells[6] = {
 		&generic_shared_cell, &generic_shared_cell,	&generic_shared_cell	};
 static const cell_t * links_list[] = { &generic_eb_cell, &generic_shared_cell,
 		&cell_to_1, &cell_to_2, &cell_to_3, &cell_3_to_2 };
-static const slotframe_t minimum_slotframe = { 0, 101, 6, (cell_t **)minimum_cells };
+static slotframe_t minimum_slotframe = { 0, 101, 6, (cell_t **)minimum_cells };
 #define TOTAL_LINKS (sizeof(links_list)/sizeof(cell_t *))
 
 /* Other function prototypes */
@@ -387,7 +392,7 @@ read_packet_from_queue(const rimeaddr_t *addr)
 /*---------------------------------------------------------------------------*/
 /* get a packet to send in a shared slot, and put the neighbor reference in n */
 static struct TSCH_packet *
-get_next_packet_for_shared_slot_tx( struct neighbor_queue** n )
+get_next_packet_for_shared_slot_tx(struct neighbor_queue **n)
 {
 	static struct neighbor_queue* last_neighbor_tx = NULL;
 	if(last_neighbor_tx == NULL) {
@@ -483,11 +488,6 @@ packet_input(void)
 {
 	PRINTF("tsch packet_input begin\n");
 
-	int original_datalen;
-	uint8_t *original_dataptr;
-
-	original_datalen = packetbuf_datalen();
-	original_dataptr = packetbuf_dataptr();
 #ifdef NETSTACK_DECRYPT
 	NETSTACK_DECRYPT();
 #endif /* NETSTACK_DECRYPT */
@@ -683,10 +683,10 @@ powercycle(struct rtimer *t, void *ptr)
 	rtimer_clock_t duration;
 	uint16_t dt, next_timeslot;
 	uint16_t ack_status = 0;
-	static uint8_t is_broadcast = 0, len=0, seqno=0, ret=0;
+	static uint8_t is_broadcast = 0, cca_status=1, len=0, seqno=0, ret=0;
 	//to record the duration of packet tx
 	static rtimer_clock_t tx_time;
-	uint8_t success=0, cca_status=1, window=0;
+	uint8_t success=0, window=0;
 #if CONTIKI_TARGET_JN5168
 	static uint32_t cycle_start_radio_clock=0;
 	uint32_t tx_offset=0;
@@ -1409,8 +1409,8 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 {
 	uint16_t dt=0;
 	rtimer_clock_t duration=0;
-	volatile softack_interrupt_exit_callback_f *interrupt_exit = tsch_wait_for_eb;
-	volatile softack_make_callback_f *softack_make = NULL;
+	volatile softack_interrupt_exit_callback_f interrupt_exit = tsch_wait_for_eb;
+	volatile softack_make_callback_f softack_make = NULL;
 	ieee154e_vars.need_ack = need_ack_irq;
 	ieee154e_vars.last_rf = last_rf_irq;
 	COOJA_DEBUG_STR("tsch_wait_eb");
@@ -1524,14 +1524,15 @@ PROCESS_THREAD(tsch_associate, ev, data)
 
 	/* Trying to get the RPL DAG, and polling until it becomes available  */
 	static rpl_dag_t * my_rpl_dag = NULL;
-	static uint8_t cca_status = 0;
   static struct etimer periodic;
+#if CONTIKI_TARGET_JN5168
   uint32_t irq_status = 0;
   rtimer_clock_t t0;
+#endif
 
   while (ieee154e_vars.state != TSCH_OFF) {
   	COOJA_DEBUG_STR("tsch_associate\n");
-  	cca_status = 0;
+
   	my_rpl_dag = NULL;
 		/* setup radio functions for intercepting EB */
 		NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
