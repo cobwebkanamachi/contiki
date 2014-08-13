@@ -72,28 +72,33 @@ appdata_copy(struct app_data *dst, struct app_data *src)
 struct app_data *
 appdataptr_from_uip()
 {
-  return (struct app_data *)((char*)uip_buf + ((uip_len - sizeof(struct app_data))));
+  struct app_data *ptr;
+  struct app_data data;
+  if(uip_len < sizeof(struct app_data)) return NULL;
+  ptr = (struct app_data *)((char*)uip_buf + ((uip_len - sizeof(struct app_data))));
+  appdata_copy(&data, ptr);
+  if(data.magic == RPL_LOG_MAGIC) {
+    return ptr;
+  } else {
+    return NULL;
+  }
 }
 
 /* Get dataptr from the current packetbuf */
 struct app_data *
 appdataptr_from_packetbuf()
 {
-	struct app_data data;
-	struct app_data *dataptr;
-
-	if(packetbuf_datalen() < sizeof(struct app_data)) return NULL;
-  dataptr = (struct app_data *)((char*)packetbuf_dataptr() + ((packetbuf_datalen() - sizeof(struct app_data))));
-
-  if(dataptr) {
-      appdata_copy(&data, dataptr);
-      if(data.magic == RPL_LOG_MAGIC) {
-      	return dataptr;
-      }
+  struct app_data *ptr;
+  struct app_data data;
+  if(packetbuf_datalen() < sizeof(struct app_data)) return NULL;
+  ptr = (struct app_data *)((char*)packetbuf_dataptr() + ((packetbuf_datalen() - sizeof(struct app_data))));
+  appdata_copy(&data, ptr);
+  if(data.magic == RPL_LOG_MAGIC) {
+    return ptr;
+  } else {
+    return NULL;
   }
-  return NULL;
 }
-
 /* Log information about a data packet along with RPL routing information */
 void
 log_appdataptr(struct app_data *dataptr)
