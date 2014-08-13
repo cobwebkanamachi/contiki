@@ -30,6 +30,10 @@ void uart0_writeb(unsigned char c);
 #define putchar uart0_writeb
 #define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
 
+#undef RADIO_TEST_MODE
+//#define RADIO_TEST_MODE  RADIO_TEST_MODE_HIGH_PWR
+#define RADIO_TEST_MODE  RADIO_TEST_MODE_ADVANCED
+
 #define CHECKSUM_LEN 2
 
 #if MICROMAC_RADIO_CONF_NO_IRQ
@@ -76,9 +80,9 @@ void uart0_writeb(unsigned char c);
 
 #define WITH_SEND_CCA 0
 
+int dbg_printf(const char *fmt, ...);
 #define DEBUG 0
 #if DEBUG
-int dbg_printf(const char *fmt, ...);
 #define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
 #else
 #define PRINTF(...) do {} while (0)
@@ -560,7 +564,33 @@ micromac_radio_init(void)
 	rf=memb_alloc(&rf_memb);
 	process_start(&micromac_radio_process, NULL);
 	PRINTF("micromac_radio init: RXAddress %04x == %08x.%08x @ PAN %04x, channel: %d, u32JPT_Init: %d\n", u16ShortAddress, psExtAddress.u32H, psExtAddress.u32L, u16PanId, channel, jpt_ver);
-	return 1;
+
+
+#if RADIO_TEST_MODE == RADIO_TEST_MODE_HIGH_PWR
+	#include "HardwareApi/include/PeripheralRegs.h"
+//	uint32 u32Inputs = 0;
+//	uint32 u32Outputs = (1UL<<2UL) | (1UL<<3UL);
+//	vAHI_DioSetDirection(u32Inputs, u32Outputs);
+//	uint32 u32On = 0;
+//	uint32 u32Off = u32Outputs;
+//	vAHI_DioSetPullup(u32On, u32Off);
+	/* Enable high power mode.
+	 * In this mode DIO2 goes high during RX
+	 * and DIO3 goes high during TX
+	 **/
+	vREG_SysWrite(REG_SYS_PWR_CTRL,
+			u32REG_SysRead(REG_SYS_PWR_CTRL)
+			| REG_SYSCTRL_PWRCTRL_RFRXEN_MASK
+	    | REG_SYSCTRL_PWRCTRL_RFTXEN_MASK);
+#elif RADIO_TEST_MODE == RADIO_TEST_MODE_ADVANCED
+	#include "HardwareApi/include/PeripheralRegs.h"
+	/* test mode
+	 * */
+  vREG_SysWrite(REG_SYS_PWR_CTRL,
+  		u32REG_SysRead(REG_SYS_PWR_CTRL) | (1UL << 26UL));
+#endif /* TEST_MODE */
+
+  return 1;
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -733,7 +763,7 @@ micromac_radio_raw_transmit(tsPhyFrame *psFrame)
 static int
 micromac_radio_prepare(const void *payload, unsigned short payload_len)
 {
-	int i;
+	uint8_t i;
 	uint16_t checksum;
 
 	RIMESTATS_ADD(lltx);
@@ -742,17 +772,22 @@ micromac_radio_prepare(const void *payload, unsigned short payload_len)
 		PUTCHAR('$');
 		return 1;
 	}
-	if(!payload) {
+	if(payload_len > MICROMAC_RADIO_MAX_PACKET_LEN || payload == NULL) {
 		PUTCHAR('=');
-		while(1){};//XXX
+		dbg_printf("%dB@%x\n", payload_len, ((uint8_t*)payload));
+		for(i=0;i<127;i++) {
+			dbg_printf("%x ",((uint8_t*)payload)[i-4]);
+		}
+		PUTCHAR('=')
+//		while(1){};//XXX
 		return 1;
 	}
+//	dbg_printf("%d\n", payload_len);
 	GET_LOCK();
 	/* copy payload to (soft) tx buffer */
-//	memset(&tx_frame_buffer, 0, sizeof(tx_frame_buffer));
+	memset(&tx_frame_buffer, 0, sizeof(tx_frame_buffer));
 //	memcpy(&(tx_frame_buffer.uPayload.au8Byte), payload, payload_len);
-	for(i=0;i<payload_len;i++) {
-
+	for(i=0; i<payload_len; i++) {
 		tx_frame_buffer.uPayload.au8Byte[i] = ((uint8_t*)payload)[i];
 	}
   checksum = crc16_data(payload, payload_len, 0);
