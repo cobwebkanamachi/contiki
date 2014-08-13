@@ -62,8 +62,6 @@
 
 volatile int need_flush=0;
 
-#define RSSI_THR -14
-
 #define WITH_SEND_CCA 0
 
 #define FIFOP_THRESHOLD (ACK_LEN)
@@ -82,7 +80,7 @@ volatile int need_flush=0;
 
 
 #ifndef CC2420_CONF_CCA_THRESH
-#define CC2420_CONF_CCA_THRESH (RSSI_THR-32)
+#define CC2420_CONF_CCA_THRESH RSSI_THR
 #endif /* CC2420_CONF_CCA_THRESH */
 
 
