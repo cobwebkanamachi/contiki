@@ -62,8 +62,6 @@
 
 volatile int need_flush=0;
 
-#define RSSI_THR -14
-
 #define WITH_SEND_CCA 0
 
 #define FIFOP_THRESHOLD (ACK_LEN)
@@ -82,7 +80,7 @@ volatile int need_flush=0;
 
 
 #ifndef CC2420_CONF_CCA_THRESH
-#define CC2420_CONF_CCA_THRESH (RSSI_THR-32)
+#define CC2420_CONF_CCA_THRESH RSSI_THR
 #endif /* CC2420_CONF_CCA_THRESH */
 
 
@@ -734,7 +732,7 @@ uint16_t cc2420_read_sfd_timer(void) {
 }
 /*---------------------------------------------------------------------------*/
 static uint8_t extrabuf[ACK_LEN]={0};
-volatile struct received_frame_radio_s last_rf;
+struct received_frame_radio_s last_rf;
 int
 cc2420_interrupt(void)
 {
@@ -750,7 +748,6 @@ cc2420_interrupt(void)
   struct received_frame_s *rf = NULL;
   unsigned char* buf_ptr = NULL;
   need_ack=0;
-//  last_rf=NULL;
   last_rf.buf=NULL;
 
 #if CC2420_TIMETABLE_PROFILING

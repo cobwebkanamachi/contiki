@@ -73,7 +73,8 @@ void rpl_log_start();
 #define RPL_LOG_FROM_PACKETBUF(...) RPL_LOG_FROM_APPDATAPTR(appdataptr_from_packetbuf(), __VA_ARGS__)
 #define RPL_LOG_IPADDR(addr) uip_debug_ipaddr_print(addr)
 #define RPL_LOG_LLADDR(addr) uip_debug_lladdr_print(addr)
-#define RPL_LOG_INC_HOPCOUNT_FROM_PACKETBUF() { appdataptr_from_packetbuf()->hop++; }
+#define RPL_LOG_INC_HOPCOUNT_FROM_PACKETBUF() { struct app_data *dataptr = appdataptr_from_packetbuf(); \
+	if(dataptr != NULL) dataptr->hop++; }
 
 #define RPL_LOG_NODEID_FROM_RIMEADDR log_node_id_from_rimeaddr
 #define RPL_LOG_NODEID_FROM_IPADDR log_node_id_from_ipaddr

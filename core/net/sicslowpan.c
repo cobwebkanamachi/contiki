@@ -1612,6 +1612,8 @@ input(void)
   /* The MAC puts the 15.4 payload inside the RIME data buffer */
   rime_ptr = packetbuf_dataptr();
 
+  RPL_LOG_INC_HOPCOUNT_FROM_PACKETBUF();
+
   RPL_LOG_FROM_PACKETBUF("MAC: %s input from %d",
   		rimeaddr_cmp(packetbuf_addr(PACKETBUF_ADDR_RECEIVER), &rimeaddr_null) ? "bc" : "uc",
   		RPL_LOG_NODEID_FROM_RIMEADDR(packetbuf_addr(PACKETBUF_ADDR_SENDER)));
