@@ -11,8 +11,6 @@
 #define MICROMAC_RADIO_CONF_ALWAYS_ON 0
 #if CONTIKI_TARGET_JN5168
 
-
-
 #else /* Leave CC2420 as default */
 
 #undef CC2420_CONF_TX_POWER
@@ -49,11 +47,13 @@
 #undef UIP_CONF_ND6_SEND_RA
 #define UIP_CONF_ND6_SEND_RA 0
 
-#undef QUEUEBUF_CONF_NUM
-#define QUEUEBUF_CONF_NUM 8 /* should be a power of two */
-
 #undef NBR_TABLE_CONF_MAX_NEIGHBORS
 #define NBR_TABLE_CONF_MAX_NEIGHBORS	20
+
+#define TSCH_NBR_BUFFER_CONF_SIZE 8
+
+#undef QUEUEBUF_CONF_NUM
+#define QUEUEBUF_CONF_NUM (8) /* should be a power of two */
 
 #undef TSCH_CONF_802154_DUPLICATE_DETECTION
 #define TSCH_CONF_802154_DUPLICATE_DETECTION 0

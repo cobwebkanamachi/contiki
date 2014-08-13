@@ -30,19 +30,19 @@
 //164*3 as PORT_TsSlotDuration causes 147.9448us drift every slotframe ==4.51 ticks
 // 15000us
 #define PORT_TsSlotDuration (16*15000UL)
-//   1200us
+//   100us
 #define PORT_maxTxDataPrepare (1600)
-//   600us
+//   100us
 #define PORT_maxRxAckPrepare (1600)
-//   600us
+//   100us
 #define PORT_maxRxDataPrepare (1600)
 
 #define PORT_maxTxAckPrepare (1600)
 
 // ~327us+129preample
-#define PORT_delayTx (16*260)
+#define PORT_delayTx (16*260UL)
 //~50us delay + 129preample + ??
-#define PORT_delayRx (16*50)
+#define PORT_delayRx (16*50UL)
 
 	// time-slot related
 #define	TsCCAOffset (16*1000UL) //1000us //98,										//3000us

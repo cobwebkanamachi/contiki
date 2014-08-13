@@ -67,18 +67,18 @@ void rpl_reset_periodic_timer(void);
 void dis_output(uip_ipaddr_t *addr);
 
 #if CONTIKI_TARGET_JN5168
-#define CONVERT_DRIFT_US_TO_RTIMER(D, DC) ((uint32_t)D * 16UL)/((uint32_t)DC);
-#define RTIMER_TO_US(T)		((T)>>(uint32_t)4)
-#define ENABLE_DELAYED_RF 0
+#define CONVERT_DRIFT_US_TO_RTIMER(D, DC) ((uint32_t)(D) * 16UL)/((uint32_t)(DC));
+#define RTIMER_TO_US(T)		((T)>>4UL)
+#define ENABLE_DELAYED_RF 1
 #pragma "CONTIKI_TARGET_JN5168"
 #include "dev/micromac-radio.h"
 #undef putchar
 void uart0_writeb(unsigned char c);
 #define putchar uart0_writeb
 #else /* Leave CC2420 as default */
-#define CONVERT_DRIFT_US_TO_RTIMER(D, DC) (D * 100)/(3051 * DC);
+#define CONVERT_DRIFT_US_TO_RTIMER(D, DC) (((D) * 100UL)/(3051UL * (DC)));
 //do the math in 32bits to save precision
-#define RTIMER_TO_US(T)		(((uint32_t)T* 3051UL)/(uint32_t)100UL)
+#define RTIMER_TO_US(T)		(((uint32_t)(T)* 3051UL)/(uint32_t)100UL)
 #include "dev/cc2420-tsch.h"
 #pragma "CONTIKI_TARGET_SKY"
 #endif /* CONTIKI_TARGET */
@@ -107,11 +107,13 @@ int dbg_printf(const char *fmt, ...);
 #endif
 
 /* TSCH queue size: is it non-zero and a power of two? */
-#if ( QUEUEBUF_CONF_NUM && !(QUEUEBUF_CONF_NUM & (QUEUEBUF_CONF_NUM-1)) )
-#define NBR_BUFFER_SIZE QUEUEBUF_CONF_NUM // POWER OF 2 -- queue size
+#if ( TSCH_NBR_BUFFER_CONF_SIZE && !(TSCH_NBR_BUFFER_CONF_SIZE & (TSCH_NBR_BUFFER_CONF_SIZE-1)) )
+#define NBR_BUFFER_SIZE TSCH_NBR_BUFFER_CONF_SIZE // POWER OF 2 -- queue size
 #else
-#define NBR_BUFFER_SIZE 8
-#endif /* !(QUEUEBUF_CONF_NUM & (QUEUEBUF_CONF_NUM-1)) */
+#define NBR_BUFFER_SIZE 4
+#endif /*  */
+
+#define MAX_QUEUED_PACKETS QUEUEBUF_NUM
 
 #ifdef TSCH_CONF_ADDRESS_FILTER
 #define TSCH_ADDRESS_FILTER TSCH_CONF_ADDRESS_FILTER
@@ -149,22 +151,26 @@ powercycle(struct rtimer *t, void *ptr);
 #define macMaxBE 4
 
 // TSCH PACKET STRUCTURE
+static volatile uint8_t number_of_queued_packets = 0;
 struct TSCH_packet
 {
 	struct queuebuf * pkt; // pointer to the packet to be sent
-	uint8_t transmissions; // #transmissions performed for this packet
 	mac_callback_t sent; // callback for this packet
 	void *ptr; // parameters for MAC callback ... (usually NULL)
+	uint8_t transmissions; // #transmissions performed for this packet
 	uint8_t ret; //status -- MAC return code
+//	uint16_t dummy;
 };
 
 struct neighbor_queue
 {
+	struct TSCH_packet buffer[NBR_BUFFER_SIZE]; // circular buffer of packets. Its size should be a power of two
 	uint8_t is_time_source; //is this neighbor a time source?
 	uint8_t BE_value; // current value of backoff exponent
 	uint8_t BW_value; // current value of backoff counter
-	struct TSCH_packet buffer[NBR_BUFFER_SIZE]; // circular buffer of packets. Its size should be a power of two
-	uint8_t put_ptr, get_ptr; // pointers for circular buffer implementation
+	volatile uint8_t put_ptr,
+					get_ptr; // pointers for circular buffer implementation
+//	uint8_t dummy1,dummy2,dummy3;
 };
 /*---------------------------------------------------------------------------*/
 static const rimeaddr_t BROADCAST_CELL_ADDRESS = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
@@ -213,6 +219,8 @@ int
 remove_packet_from_queue(const rimeaddr_t *addr);
 struct TSCH_packet*
 read_packet_from_queue(const rimeaddr_t *addr);
+#define QUEUE_NOT_EMPTY(n) (((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) > 0)
+#define QUEUE_FULL(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) == (NBR_BUFFER_SIZE - 1)) && (number_of_queued_packets < MAX_QUEUED_PACKETS))
 /*---------------------------------------------------------------------------*/
 static int make_eb(uint8_t * buf, uint8_t buf_size);
 void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack);
@@ -290,8 +298,10 @@ remove_queue(const rimeaddr_t *addr)
 	if (n != NULL) {
 		for (i = 0; i < NBR_BUFFER_SIZE; i++) {      // free packets of neighbor
 			queuebuf_free(n->buffer[i].pkt);
+			n->buffer[i].pkt = NULL;
 		}
 		nbr_table_remove(neighbor_list, n);
+		n = NULL;
 		ieee154e_vars.working_on_queue = 0;
 		return 1;
 	}
@@ -305,10 +315,20 @@ remove_queue(const rimeaddr_t *addr)
 int
 add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
 {
+  /* Check if buffer is full. If it is full, return 0 to indicate that
+     the element was not inserted into the buffer.
+
+     XXX: there is a potential risk for a race condition here, because
+     the ->get_ptr field may be written concurrently by the
+     ringbuf_get() function. To avoid this, access to ->get_ptr must
+     be atomic. We use an uint8_t type, which makes access atomic on
+     most platforms, but C does not guarantee this.
+  */
+
 	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
 	if (n != NULL) {
 		//is queue full?
-		if (((n->put_ptr - n->get_ptr) & (NBR_BUFFER_SIZE - 1)) == (NBR_BUFFER_SIZE - 1)) {
+		if (QUEUE_FULL(n)) {
 			PRINTF("queue full %x.%x.%x.%x.%x.%x.%x.%x\n", addr->u8[7],addr->u8[6],addr->u8[5],addr->u8[4],addr->u8[3],addr->u8[2],addr->u8[1],addr->u8[0]);
 			/* send the callback to signal that tx failed */
 			//XXX drop packet silently
@@ -319,8 +339,13 @@ add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
 		n->buffer[n->put_ptr].ptr = ptr;
 		n->buffer[n->put_ptr].ret = MAC_TX_DEFERRED;
 		n->buffer[n->put_ptr].transmissions = 0;
-		n->put_ptr = (n->put_ptr + 1) & (NBR_BUFFER_SIZE - 1);
-		return 1;
+		PRINTF("qa0%x p%d @%x\n", addr->u8[7], n->put_ptr, n->buffer[n->put_ptr].pkt);
+		if(n->buffer[n->put_ptr].pkt != NULL) {
+			number_of_queued_packets++;
+			n->put_ptr = (n->put_ptr + 1) & (NBR_BUFFER_SIZE - 1);
+			return 1;
+		}
+		PRINTF("qa failed!!\n");
 	} else {
 		n= add_queue(addr);
 		if(n != NULL) {
@@ -338,8 +363,11 @@ remove_packet_from_queue(const rimeaddr_t *addr)
 {
 	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
 	if (n != NULL) {
-		if (((n->put_ptr - n->get_ptr) & (NBR_BUFFER_SIZE - 1)) > 0) {
+		if (QUEUE_NOT_EMPTY(n)) {
+			PRINTF("qm0%x p%d @%x\n", addr->u8[7], n->get_ptr, n->buffer[n->get_ptr].pkt);
 			queuebuf_free(n->buffer[n->get_ptr].pkt);
+			n->buffer[n->get_ptr].pkt = NULL;
+			number_of_queued_packets--;
 			n->get_ptr = (n->get_ptr + 1) & (NBR_BUFFER_SIZE - 1);
 			return 1;
 		}
@@ -352,7 +380,8 @@ struct TSCH_packet*
 read_packet_from_neighbor_queue(const struct neighbor_queue *n)
 {
 	if(n != NULL) {
-		if (((n->put_ptr - n->get_ptr) & (NBR_BUFFER_SIZE - 1)) > 0) {
+		if (QUEUE_NOT_EMPTY(n)) {
+			PRINTF("qr p%d @%x\n", n->get_ptr, n->buffer[n->get_ptr].pkt);
 			return (struct TSCH_packet*)&(n->buffer[n->get_ptr]);
 		}
 	}
@@ -363,6 +392,7 @@ read_packet_from_neighbor_queue(const struct neighbor_queue *n)
 struct TSCH_packet*
 read_packet_from_queue(const rimeaddr_t *addr)
 {
+	PRINTF("qr0%x\n", addr->u8[7]);
 	return read_packet_from_neighbor_queue( neighbor_queue_from_addr(addr) );
 }
 /*---------------------------------------------------------------------------*/
