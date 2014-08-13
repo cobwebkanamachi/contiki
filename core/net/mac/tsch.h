@@ -44,7 +44,10 @@
 #include "net/mac/mac.h"
 #include "tsch-parameters.h"
 
-extern const struct rdc_driver tschrdc_driver;
+/* A global variable telling whether we are coordinator of the TSCH network */
 extern int tsch_is_coordinator;
+/* The TSCH radio driver */
+extern const struct rdc_driver tschrdc_driver;
+
 
 #endif /* __TSCH_H__ */

@@ -61,10 +61,9 @@
 //#ifndef CONTIKI_TARGET_JN5168
 //#define CONTIKI_TARGET_JN5168 1
 //#endif
-int tsch_is_coordinator = 0;
 
-void rpl_reset_periodic_timer(void);
-void dis_output(uip_ipaddr_t *addr);
+/* A global variable telling whether we are coordinator of the TSCH network */
+int tsch_is_coordinator = 0;
 
 #if CONTIKI_TARGET_JN5168
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) ((uint32_t)(D) * 16UL)/((uint32_t)(DC));
@@ -77,7 +76,7 @@ void uart0_writeb(unsigned char c);
 #define putchar uart0_writeb
 #else /* Leave CC2420 as default */
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) (((D) * 100UL)/(3051UL * (DC)));
-//do the math in 32bits to save precision
+/* Do the math in 32bits to save precision */
 #define RTIMER_TO_US(T)		(((uint32_t)(T)* 3051UL)/(uint32_t)100UL)
 #include "dev/cc2420-tsch.h"
 #pragma "CONTIKI_TARGET_SKY"
@@ -98,21 +97,14 @@ int dbg_printf(const char *fmt, ...);
 #define PUTCHAR(X)
 #endif /* DEBUG */
 
-#ifndef True
-#define True (1)
-#endif
-
-#ifndef False
-#define False (0)
-#endif
-
-/* TSCH queue size: is it non-zero and a power of two? */
+/* TSCH queue size: must be power of two to enable atomic put operation */
 #if ( TSCH_NBR_BUFFER_CONF_SIZE && !(TSCH_NBR_BUFFER_CONF_SIZE & (TSCH_NBR_BUFFER_CONF_SIZE-1)) )
-#define NBR_BUFFER_SIZE TSCH_NBR_BUFFER_CONF_SIZE // POWER OF 2 -- queue size
+#define NBR_BUFFER_SIZE TSCH_NBR_BUFFER_CONF_SIZE
 #else
 #define NBR_BUFFER_SIZE 4
-#endif /*  */
+#endif
 
+/* TODO: check */
 #define MAX_QUEUED_PACKETS QUEUEBUF_NUM
 
 #ifdef TSCH_CONF_ADDRESS_FILTER
@@ -347,7 +339,7 @@ add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
 		}
 		PRINTF("qa failed!!\n");
 	} else {
-		n= add_queue(addr);
+		n = add_queue(addr);
 		if(n != NULL) {
 			return add_packet_to_queue(sent, ptr, addr);
 		}
@@ -1513,9 +1505,6 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 				PRINTF("Setting parent as time source : %x.%x\n", ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE-2], ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE-1]);
 			}
 		}
-		/* Reset RPL timers */
-//		rpl_reset_periodic_timer();
-//		dis_output(NULL);
 	} else {
 		NETSTACK_RADIO_radio_raw_rx_on();
 	}
@@ -1594,7 +1583,6 @@ PROCESS_THREAD(tsch_associate, ev, data)
 				PRINTF("associate done\n");
 				// XXX for debugging
 				ieee154e_vars.asn.asn_4lsb = 0;
-//				rpl_reset_periodic_timer();
 			} else {
 #if CONTIKI_TARGET_JN5168
 				NETSTACK_RADIO_radio_raw_rx_on();
@@ -1642,7 +1630,7 @@ static void tsch_init_variables(void)
 	ieee154e_vars.last_rf = NULL;
 	ieee154e_vars.registered_drift = 0;
 	ieee154e_vars.timeslot = 0;
-	NETSTACK_RADIO_sfd_sync(True, True);
+	NETSTACK_RADIO_sfd_sync(1, 1);
 	NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
 }
 /*---------------------------------------------------------------------------*/
