@@ -57,7 +57,7 @@
 #include "lib/list.h"
 
 #include "cooja-debug.h"
-#include "tsch-parameters.h"
+#include "tsch-private.h"
 #include "dev/leds.h"
 
 volatile int need_flush=0;

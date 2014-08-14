@@ -32,42 +32,31 @@
 
 /**
  * \file
- *         TSCH.
+ *         IEEE 802.15.4 TSCH MAC implementation. Must be used with nullmac as NETSTACK_CONF_MAC
  * \author
  *         Beshr Al Nahas <beshr@sics.se>
  */
+
 #include "contiki.h"
-#include "contiki-conf.h"
-#include "tsch.h"
+#include "cooja-debug.h"
+#include "dev/leds.h"
+#include "net/nbr-table.h"
 #include "net/packetbuf.h"
 #include "net/queuebuf.h"
-#include "net/netstack.h"
-#include "net/rime/rimestats.h"
-#include <string.h>
-#include "sys/rtimer.h"
-#include "cooja-debug.h"
-#include "lib/list.h"
-#include "lib/memb.h"
-#include "lib/random.h"
+#include "net/mac/tsch.h"
+#include "net/mac/tsch-queue.h"
+#include "net/mac/tsch-private.h"
 #include "net/mac/frame802154.h"
-#include "net/rpl/rpl-private.h"
-#include "dev/leds.h"
-#include "sys/ctimer.h"
-#include "net/nbr-table.h"
-#include "net/uip.h"
 #include "sys/process.h"
-#include "net/rpl/rpl.h"
-#include "sys/node-id.h"
-
-//#ifndef CONTIKI_TARGET_JN5168
-//#define CONTIKI_TARGET_JN5168 1
-//#endif
+#include "sys/rtimer.h"
+/* TODO: remove dependencies to RPL */
+#include "net/rpl/rpl-private.h"
+#include <string.h>
 
 #if CONTIKI_TARGET_JN5168
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) ((uint32_t)(D) * 16UL)/((uint32_t)(DC));
 #define RTIMER_TO_US(T)		((T)>>4UL)
 #define ENABLE_DELAYED_RF 1
-#pragma message "CONTIKI_TARGET_JN5168"
 #include "dev/micromac-radio.h"
 #undef putchar
 void uart0_writeb(unsigned char c);
@@ -78,7 +67,6 @@ void uart0_writeb(unsigned char c);
 #define RTIMER_TO_US(T)		(((uint32_t)(T)* 3051UL)/(uint32_t)100UL)
 #include "dev/cc2420-tsch.h"
 #define dbg_printf(...) do {} while(0)
-#pragma message "CONTIKI_TARGET_SKY"
 #endif /* CONTIKI_TARGET */
 
 #define DEBUG 0

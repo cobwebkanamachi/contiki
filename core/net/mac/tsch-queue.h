@@ -32,20 +32,14 @@
 
 /**
  * \file
- *         IEEE 802.15.4 TSCH MAC implementation. Must be used with nullmac as NETSTACK_CONF_MAC
+ *         Per-neighbor packet queues for TSCH MAC
  * \author
  *         Beshr Al Nahas <beshr@sics.se>
  */
 
-#ifndef __TSCH_H__
-#define __TSCH_H__
+#ifndef __TSCH_QUEUE_H__
+#define __TSCH_QUEUE_H_
 
 #include "contiki.h"
-#include "net/mac/rdc.h"
 
-/* A global variable telling whether we are coordinator of the TSCH network */
-extern int tsch_is_coordinator;
-/* The TSCH radio driver */
-extern const struct rdc_driver tschrdc_driver;
-
-#endif /* __TSCH_H__ */
+#endif /* __TSCH_QUEUE_H__ */
