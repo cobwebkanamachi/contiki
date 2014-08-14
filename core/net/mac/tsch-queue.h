@@ -76,9 +76,9 @@ struct neighbor_queue
 };
 
 /* Add a TSCH neighbor */
-struct neighbor_queue * tsch_queue_add_nbr(const rimeaddr_t *addr);
+struct neighbor_queue *tsch_queue_add_nbr(const rimeaddr_t *addr);
 /* Get a TSCH neighbor */
-struct neighbor_queue * tsch_queue_get_nbr(const rimeaddr_t *addr);
+struct neighbor_queue *tsch_queue_get_nbr(const rimeaddr_t *addr);
 /* Remove TSCH neighbor queue */
 void tsch_queue_remove_nbr(struct neighbor_queue *n);
 /* Add packet to neighbor queue. Use same lockfree implementation as ringbuf.c (put is atomic) */
