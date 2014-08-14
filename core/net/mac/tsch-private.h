@@ -287,4 +287,11 @@ typedef struct {
 	uint8_t ackbuf[STD_ACK_LEN + SYNC_IE_LEN +1];
 } ieee154e_vars_t;
 
+extern volatile ieee154e_vars_t ieee154e_vars;
+
+/* TSCH MAC parameters */
+#define MAC_MIN_BE 1
+#define MAC_MAC_FRAME_RETRIES 4
+#define MAC_MAC_BE 4
+
 #endif /* __TSCH_PRIVATE_H__ */

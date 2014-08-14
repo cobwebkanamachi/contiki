@@ -41,5 +41,47 @@
 #define __TSCH_QUEUE_H_
 
 #include "contiki.h"
+#include "net/rime/rimeaddr.h"
+
+/* TSCH queue size: must be power of two to enable atomic put operation */
+#if ( TSCH_NBR_BUFFER_CONF_SIZE && !(TSCH_NBR_BUFFER_CONF_SIZE & (TSCH_NBR_BUFFER_CONF_SIZE-1)) )
+#define NBR_BUFFER_SIZE TSCH_NBR_BUFFER_CONF_SIZE
+#else
+#define NBR_BUFFER_SIZE 4
+#endif
+
+/* TSCH packet information */
+struct TSCH_packet
+{
+	struct queuebuf * pkt; /* pointer to the packet to be sent */
+	mac_callback_t sent; /* callback for this packet */
+	void *ptr; /* MAC callback parameter */
+	uint8_t transmissions; /* #transmissions performed for this packet */
+	uint8_t ret; /* status -- MAC return code */
+};
+
+/* TSCH neighbor information */
+struct neighbor_queue
+{
+	struct TSCH_packet buffer[NBR_BUFFER_SIZE]; /* circular buffer of packets.
+	Its size must be a power of two 	to allow for atomic put */
+	uint8_t is_time_source; /* is this neighbor a time source? */
+	uint8_t BE_value; /* current value of backoff exponent */
+	uint8_t BW_value; /* current value of backoff counter */
+	volatile uint8_t put_ptr,
+					get_ptr; /* pointers for circular buffer implementation */
+};
+
+struct neighbor_queue *neighbor_queue_from_addr(const rimeaddr_t *addr);
+struct neighbor_queue *add_queue(const rimeaddr_t *addr);
+int remove_queue(const rimeaddr_t *addr);
+int add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr);
+int remove_packet_from_queue(const rimeaddr_t *addr);
+const struct TSCH_packet *read_packet_from_queue(const rimeaddr_t *addr);
+/* get a packet to send in a shared slot, and put the neighbor reference in n */
+const struct TSCH_packet *get_next_packet_for_shared_slot_tx(struct neighbor_queue **n);
+/* returns the first packet in the queue of a neighbor */
+const struct TSCH_packet* read_packet_from_neighbor_queue(const struct neighbor_queue *n);
+void tsch_queue_init(void);
 
 #endif /* __TSCH_QUEUE_H__ */

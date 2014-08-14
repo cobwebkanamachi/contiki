@@ -77,21 +77,14 @@ void uart0_writeb(unsigned char c);
 int dbg_printf(const char *fmt, ...);
 #define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
 #else
-#define PRINTF(...) do {printf(__VA_ARGS__);} while(0)
-#undef dbg_printf
-#define dbg_printf(...) do {printf(__VA_ARGS__);} while(0)
+#define PRINTF printf
+#define dbg_printf PRINTF
 #endif /*CONTIKI_TARGET_JN5168*/
 #else
-#define PRINTF(...) do {} while (0)
+#define PRINTF(...)
+#define dbg_printf PRINTF
 #define PUTCHAR(X)
 #endif /* DEBUG */
-
-/* TSCH queue size: must be power of two to enable atomic put operation */
-#if ( TSCH_NBR_BUFFER_CONF_SIZE && !(TSCH_NBR_BUFFER_CONF_SIZE & (TSCH_NBR_BUFFER_CONF_SIZE-1)) )
-#define NBR_BUFFER_SIZE TSCH_NBR_BUFFER_CONF_SIZE
-#else
-#define NBR_BUFFER_SIZE 4
-#endif
 
 #ifdef TSCH_CONF_ADDRESS_FILTER
 #define TSCH_ADDRESS_FILTER TSCH_CONF_ADDRESS_FILTER
@@ -122,10 +115,6 @@ struct seqno {
 static struct seqno received_seqnos[MAX_SEQNOS];
 #endif /* TSCH_802154_DUPLICATE_DETECTION */
 
-/* TSCH MAC parameters */#define MAC_MIN_BE 1
-#define MAC_MAC_FRAME_RETRIES 4
-#define MAC_MAC_BE 4
-
 /* Schedule: addresses */
 static rimeaddr_t BROADCAST_CELL_ADDRESS = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
 static rimeaddr_t EB_CELL_ADDRESS = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff} };
@@ -153,7 +142,7 @@ static const cell_t cell_3_to_2 = { 4, 0,
 		LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
 		LINK_TYPE_NORMAL, &CELL_ADDRESS2 };
 
-/* Static schedule definitaion */
+/* Static schedule definition */
 static const cell_t * minimum_cells[6] = {
 		&generic_eb_cell, &generic_shared_cell,	&generic_shared_cell,
 		&generic_shared_cell, &generic_shared_cell,	&generic_shared_cell	};
@@ -169,48 +158,13 @@ void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet
 static void tsch_init(void);
 static void tsch_resynchronize(struct rtimer *, void *);
 
-/* Neighbor queue management */
-struct neighbor_queue *neighbor_queue_from_addr(const rimeaddr_t *addr);
-struct neighbor_queue *add_queue(const rimeaddr_t *addr);
-int remove_queue(const rimeaddr_t *addr);
-int add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr);
-int remove_packet_from_queue(const rimeaddr_t *addr);
-const struct TSCH_packet *read_packet_from_queue(const rimeaddr_t *addr);
-
-#define QUEUE_NOT_EMPTY(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) > 0))
-#define QUEUE_FULL(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) == (NBR_BUFFER_SIZE - 1)))
-
-/* TSCH packet information */
-struct TSCH_packet
-{
-	struct queuebuf * pkt; /* pointer to the packet to be sent */
-	mac_callback_t sent; /* callback for this packet */
-	void *ptr; /* MAC callback parameter */
-	uint8_t transmissions; /* #transmissions performed for this packet */
-	uint8_t ret; /* status -- MAC return code */
-};
-
-/* TSCH neighbor information */
-struct neighbor_queue
-{
-	struct TSCH_packet buffer[NBR_BUFFER_SIZE]; /* circular buffer of packets.
-	Its size must be a power of two 	to allow for atomic put */
-	uint8_t is_time_source; /* is this neighbor a time source? */
-	uint8_t BE_value; /* current value of backoff exponent */
-	uint8_t BW_value; /* current value of backoff counter */
-	volatile uint8_t put_ptr,
-					get_ptr; /* pointers for circular buffer implementation */
-};
-
 /* A global variable telling whether we are coordinator of the TSCH network
  * TODO: have a function to set this */
 int tsch_is_coordinator = 0;
 
 /* IEEE 802.15.4e MAC state */
-static volatile ieee154e_vars_t ieee154e_vars;
+volatile ieee154e_vars_t ieee154e_vars;
 
-/* NBR_TABLE_CONF_MAX_NEIGHBORS specifies the size of the table */
-NBR_TABLE(struct neighbor_queue, neighbor_list);
 /*---------------------------------------------------------------------------*/
 /** This function takes the MSB of gcc generated random number
  * because the LSB alone has very bad random characteristics,
@@ -227,175 +181,6 @@ static uint8_t generate_random_byte(uint8_t window) {
 	// XXX this is not good enough --> return (random_rand() >> 8) & window;
   seed_newg = seed_newg * 1103515245 + 12345;
   return ((uint32_t)(seed_newg / 65536) % 32768) & window;
-}
-/*---------------------------------------------------------------------------*/
-// This function returns a pointer to the queue of neighbor whose address is equal to addr
-inline struct neighbor_queue *
-neighbor_queue_from_addr(const rimeaddr_t *addr)
-{
-	struct neighbor_queue *n = nbr_table_get_from_lladdr(neighbor_list, addr);
-	return n;
-}
-/*---------------------------------------------------------------------------*/
-// This function adds one queue for neighbor whose address is equal to addr
-// uses working_on_queue to protect data-structures from race conditions
-// return 1 ok, 0 failed to allocate
-struct neighbor_queue *
-add_queue(const rimeaddr_t *addr)
-{
-	ieee154e_vars.working_on_queue = 1;
-	struct neighbor_queue *n;
-	/* If we have an entry for this neighbor already, we renew it. */
-	n = neighbor_queue_from_addr(addr);
-	if (n == NULL) {
-		n = nbr_table_add_lladdr(neighbor_list, addr);
-	}
-	//if n was actually allocated
-	if (n) {
-		/* Init neighbor entry */
-		n->BE_value = MAC_MIN_BE;
-		n->BW_value = 0;
-		n->put_ptr = 0;
-		n->get_ptr = 0;
-		n->is_time_source = 0;
-		uint8_t i;
-		for (i = 0; i < NBR_BUFFER_SIZE; i++) {
-			n->buffer[i].pkt = 0;
-			n->buffer[i].transmissions = 0;
-		}
-		ieee154e_vars.working_on_queue = 0;
-		return n;
-	}
-	ieee154e_vars.working_on_queue = 0;
-	return n;
-}
-/*---------------------------------------------------------------------------*/
-// This function remove the queue of neighbor whose address is equal to addr
-// uses working_on_queue to protect data-structures from race conditions
-// return 1 ok, 0 failed to find the queue
-int
-remove_queue(const rimeaddr_t *addr)
-{
-	ieee154e_vars.working_on_queue = 1;
-	int i;
-	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
-	if (n != NULL) {
-		for (i = 0; i < NBR_BUFFER_SIZE; i++) {      // free packets of neighbor
-			queuebuf_free(n->buffer[i].pkt);
-			n->buffer[i].pkt = NULL;
-		}
-		nbr_table_remove(neighbor_list, n);
-		n = NULL;
-		ieee154e_vars.working_on_queue = 0;
-		return 1;
-	}
-	ieee154e_vars.working_on_queue = 0;
-	return 0;
-}
-/*---------------------------------------------------------------------------*/
-// This function adds one packet to the queue of neighbor whose address is addr
-// return 1 ok, 0 failed to allocate
-// the packet to be inserted is in packetbuf
-int
-add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
-{
-  /* Check if buffer is full. If it is full, return 0 to indicate that
-     the element was not inserted into the buffer.
-
-     XXX: there is a potential risk for a race condition here, because
-     the ->get_ptr field may be written concurrently by the
-     ringbuf_get() function. To avoid this, access to ->get_ptr must
-     be atomic. We use an uint8_t type, which makes access atomic on
-     most platforms, but C does not guarantee this.
-  */
-
-	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
-	if (n != NULL) {
-		//is queue full?
-		if (QUEUE_FULL(n)) {
-			PRINTF("queue full %x.%x.%x.%x.%x.%x.%x.%x\n", addr->u8[7],addr->u8[6],addr->u8[5],addr->u8[4],addr->u8[3],addr->u8[2],addr->u8[1],addr->u8[0]);
-			/* send the callback to signal that tx failed */
-			//XXX drop packet silently
-//			mac_call_sent_callback(sent, ptr, MAC_TX_ERR_FATAL, 0);
-			return 0;
-		}
-		n->buffer[n->put_ptr].pkt = queuebuf_new_from_packetbuf(); // create new packet from packetbuf
-		n->buffer[n->put_ptr].ptr = ptr;
-		n->buffer[n->put_ptr].ret = MAC_TX_DEFERRED;
-		n->buffer[n->put_ptr].transmissions = 0;
-		dbg_printf("qa0%x p%d @%x\n", addr->u8[7], n->put_ptr, n->buffer[n->put_ptr].pkt);
-		if(n->buffer[n->put_ptr].pkt != NULL ) {
-			n->put_ptr = (n->put_ptr + 1) & (NBR_BUFFER_SIZE - 1);
-			return 1;
-		}
-		dbg_printf("qa failed!!\n");
-	} else {
-		n = add_queue(addr);
-		if(n != NULL) {
-			return add_packet_to_queue(sent, ptr, addr);
-		}
-	}
-	return 0;
-}
-/*---------------------------------------------------------------------------*/
-// This function removes the head-packet of the queue of neighbor whose address is addr
-// return 1 ok, 0 failed
-// remove one packet from the queue
-int
-remove_packet_from_queue(const rimeaddr_t *addr)
-{
-	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
-	if (n != NULL) {
-		if (QUEUE_NOT_EMPTY(n)) {
-			uint8_t current_get_ptr = n->get_ptr;
-			struct queuebuf * pkt = n->buffer[current_get_ptr].pkt;
-			n->buffer[current_get_ptr].pkt = NULL;
-			n->get_ptr = (n->get_ptr + 1) & (NBR_BUFFER_SIZE - 1);
-			queuebuf_free(pkt);
-			dbg_printf("qm0%x p%d @%x\n", addr->u8[7], current_get_ptr, pkt);
-			return 1;
-		}
-	}
-	return 0;
-}
-/*---------------------------------------------------------------------------*/
-/* returns the first packet in the queue of a neighbor */
-const struct TSCH_packet*
-read_packet_from_neighbor_queue(const struct neighbor_queue *n)
-{
-	if(n != NULL) {
-		if (QUEUE_NOT_EMPTY(n)) {
-			dbg_printf("qr p%d @%x\n", n->get_ptr, n->buffer[n->get_ptr].pkt);
-			return (struct TSCH_packet*)&(n->buffer[n->get_ptr]);
-		}
-	}
-	return NULL;
-}
-/*---------------------------------------------------------------------------*/
-/* returns the first packet in the queue of neighbor */
-const struct TSCH_packet*
-read_packet_from_queue(const rimeaddr_t *addr)
-{
-	dbg_printf("qr0%x\n", addr->u8[7]);
-	return read_packet_from_neighbor_queue( neighbor_queue_from_addr(addr) );
-}
-/*---------------------------------------------------------------------------*/
-/* get a packet to send in a shared slot, and put the neighbor reference in n */
-static const struct TSCH_packet *
-get_next_packet_for_shared_slot_tx(struct neighbor_queue **n)
-{
-	static struct neighbor_queue* last_neighbor_tx = NULL;
-	if(last_neighbor_tx == NULL) {
-		last_neighbor_tx = nbr_table_head(neighbor_list);
-		*n = last_neighbor_tx;
-	}
-	struct TSCH_packet * p = NULL;
-	while(p==NULL && last_neighbor_tx != NULL) {
-		*n = last_neighbor_tx;
-		p = read_packet_from_neighbor_queue( last_neighbor_tx );
-		last_neighbor_tx = nbr_table_next(neighbor_list, last_neighbor_tx);
-	}
-	return p;
 }
 /*---------------------------------------------------------------------------*/
 // Function send for TSCH-MAC, puts the packet in packetbuf in the MAC queue
@@ -1639,7 +1424,7 @@ tsch_init(void)
 	/* on resynchronization, the node has already joined a RPL network and it is mistaking it with root
 	 * this flag is used to prevent this */
 	ieee154e_vars.first_associate = 0;
-	nbr_table_register(neighbor_list, NULL);
+	tsch_queue_init();
 	process_start(&tsch_tx_callback_process, NULL);
 	//try to associate to a network or start one if setup as RPL root
 	process_start(&tsch_associate, NULL);
