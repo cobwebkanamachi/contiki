@@ -405,38 +405,6 @@ get_next_on_timeslot(uint16_t timeslot)
 {
 	return (timeslot >= ieee154e_vars.current_slotframe->on_size - 1) ? 0 : timeslot + 1;
 }
-/*---------------------------------------------------------------------------*/
-/* Schedule a wakeup from a reference time for a specific duration.
- * Provides basic protection against missed deadlines and timer overflows
- * A non-zero return value signals to powercycle a missed deadline */
-static uint8_t
-schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
-		rtimer_clock_t duration)
-{
-	int r, status = 0;
-	rtimer_clock_t now = RTIMER_NOW();
-	ref_time += duration;
-//	RTIMER_CLOCK_LT(ref_time - now > duration+5)
-//	!RTIMER_CLOCK_LT(now,ref_time)
-	if (ref_time - now > duration) {
-		COOJA_DEBUG_STR("schedule_fixed: missed deadline");
-//		PRINTF("schedule_fixed: missed deadline: %u, %u, %u, %u\n", ref_time, now, now - ref_time, duration );
-		ref_time = now + TRIVIAL_DELAY;
-	}
-	r = rtimer_set(tm, ref_time, 1, (void
-	(*)(struct rtimer *, void *)) powercycle, NULL /*(void*)&status*/);
-	if (r != RTIMER_OK) {
-		COOJA_DEBUG_STR("schedule_fixed: could not set rtimer\n");
-		status = 2;
-	}
-	return status;
-}
-/*---------------------------------------------------------------------------*/
-/* schedule only if deadline not passed.
- * A non-zero return value signals to powercycle a missed deadline */
-#include "dev/watchdog.h"
-static rtimer_clock_t t0prepare =0, t0tx=0, t0txack=0, t0post_tx=0, t0rx=0, t0rxack=0, tq=0, tn=0;
-
 /* Checks if the current time has past a ref time + duration. Assumes
  * a single overflow and ref time prior to now. */
 static uint8_t
@@ -457,6 +425,40 @@ check_timer_miss(rtimer_clock_t ref_time, rtimer_clock_t duration, rtimer_clock_
 		return now_has_overflowed;
 	}
 }
+
+/*---------------------------------------------------------------------------*/
+/* Schedule a wakeup from a reference time for a specific duration.
+ * Provides basic protection against missed deadlines and timer overflows
+ * A non-zero return value signals to powercycle a missed deadline */
+static uint8_t
+schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
+		rtimer_clock_t duration)
+{
+	int r, status = 0;
+	rtimer_clock_t now = RTIMER_NOW();
+
+//	RTIMER_CLOCK_LT(ref_time - now > duration+5)
+//	!RTIMER_CLOCK_LT(now,ref_time)
+	if(check_timer_miss(ref_time, duration, now)) {
+		COOJA_DEBUG_STR("schedule_fixed: missed deadline");
+//		PRINTF("schedule_fixed: missed deadline: %u, %u, %u, %u\n", ref_time, now, now - ref_time, duration );
+		ref_time = now + TRIVIAL_DELAY;
+	} else {
+		ref_time += duration;
+	}
+	r = rtimer_set(tm, ref_time, 1, (void
+	(*)(struct rtimer *, void *)) powercycle, NULL /*(void*)&status*/);
+	if (r != RTIMER_OK) {
+		COOJA_DEBUG_STR("schedule_fixed: could not set rtimer\n");
+		status = 2;
+	}
+	return status;
+}
+/*---------------------------------------------------------------------------*/
+/* schedule only if deadline not passed.
+ * A non-zero return value signals to powercycle a missed deadline */
+#include "dev/watchdog.h"
+static rtimer_clock_t t0prepare =0, t0tx=0, t0txack=0, t0post_tx=0, t0rx=0, t0rxack=0, tq=0, tn=0;
 
 static uint8_t
 schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
