@@ -37,6 +37,7 @@
 
 #include "contiki-conf.h"
 #include "net/netstack.h"
+#include "net/rpl/rpl-private.h"
 #include "lib/random.h"
 #include "deployment.h"
 #include "simple-udp.h"
@@ -120,8 +121,7 @@ PROCESS_THREAD(unicast_sender_process, ev, data)
       etimer_set(&send_timer, random_rand() % (SEND_INTERVAL));
       PROCESS_WAIT_UNTIL(etimer_expired(&send_timer));
 
-      /* TODO */
-      if(1 /*rpl_current_rank() != 0xffff*/) {
+      if(default_instance != NULL) {
         app_send_to(ROOT_ID);
       } else {
         printf("App: not in DODAG\n");
