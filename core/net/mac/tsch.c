@@ -69,22 +69,8 @@ void uart0_writeb(unsigned char c);
 #define dbg_printf(...) do {} while(0)
 #endif /* CONTIKI_TARGET */
 
-#define DEBUG 0
-#undef PUTCHAR
-#if DEBUG
-#define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
-#if CONTIKI_TARGET_JN5168
-int dbg_printf(const char *fmt, ...);
-#define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
-#else
-#define PRINTF printf
-#define dbg_printf PRINTF
-#endif /*CONTIKI_TARGET_JN5168*/
-#else
-#define PRINTF(...)
-#define dbg_printf PRINTF
-#define PUTCHAR(X)
-#endif /* DEBUG */
+#define DEBUG DEBUG_NONE
+#include "net/uip-debug.h"
 
 #ifdef TSCH_CONF_ADDRESS_FILTER
 #define TSCH_ADDRESS_FILTER TSCH_CONF_ADDRESS_FILTER
@@ -162,26 +148,61 @@ static void tsch_resynchronize(struct rtimer *, void *);
  * TODO: have a function to set this */
 int tsch_is_coordinator = 0;
 
-/* IEEE 802.15.4e MAC state */
-volatile ieee154e_vars_t ieee154e_vars;
+/* IEEE 802.154e TSCH state */
+typedef struct {
+	volatile asn_t asn;                // current absolute slot number
+	volatile uint8_t state;              // state of the FSM
+	uint8_t dsn;                // data sequence number
+	uint16_t sync_timeout;        // how many slots left before loosing sync
+	uint8_t mac_ebsn;						//EB sequence number
+	uint8_t join_priority;			//inherit from RPL - for PAN coordinator: 0 -- lower is better
+	slotframe_t * current_slotframe;
+	volatile rtimer_clock_t start; //cell start time
+	uint8_t slot_template_id;
+	uint8_t hop_sequence_id;
+	volatile uint16_t timeslot;
+	volatile int16_t registered_drift;
+	volatile struct received_frame_radio_s *last_rf;
+	volatile struct rtimer t;
+	volatile struct pt mpt;
+	volatile uint8_t need_ack;
+	/* variable to protect queue structure */
+	volatile uint8_t working_on_queue;
+	uint8_t eb_buf[TSCH_MAX_PACKET_LEN+1]; /* a buffer for EB packets, last byte for length */
 
-/*---------------------------------------------------------------------------*/
-/** This function takes the MSB of gcc generated random number
- * because the LSB alone has very bad random characteristics,
- * while the MSB appears more random.
- * window is the upper limit of the number. It should be a power of two - 1
+	/* on resynchronization, the node has already joined a RPL network and it is mistaking it with root
+	 * this flag is used to prevent this */
+	volatile uint8_t first_associate;
+	volatile int32_t drift_correction;
+	volatile int32_t drift; //estimated drift to all time source neighbors
+	volatile uint16_t drift_counter; //number of received drift corrections source neighbors
+	uint8_t cell_decison;
+	cell_t * cell;
+	struct TSCH_packet* p;
+	struct neighbor_queue *n;
+	void * payload;
+	unsigned short payload_len;
+	//1 byte for length if needed as dictated by the radio driver
+	uint8_t ackbuf[STD_ACK_LEN + SYNC_IE_LEN +1];
+} ieee154e_vars_t;
+
+static volatile ieee154e_vars_t ieee154e_vars;
+
+/**
+ *  A pseudo-random generator with better properties than msp430-libc's default
  **/
 
-static uint32_t seed_newg;
-void srand_newg(uint32_t x){
-     seed_newg=x;
+static uint32_t tsch_random_seed;
+
+static void tsch_random_init(uint32_t x){
+     tsch_random_seed = x;
 }
 
-static uint8_t generate_random_byte(uint8_t window) {
-	// XXX this is not good enough --> return (random_rand() >> 8) & window;
-  seed_newg = seed_newg * 1103515245 + 12345;
-  return ((uint32_t)(seed_newg / 65536) % 32768) & window;
+static uint8_t tsch_random_byte(uint8_t window) {
+  tsch_random_seed = tsch_random_seed * 1103515245 + 12345;
+  return ((uint32_t)(tsch_random_seed / 65536) % 32768) & window;
 }
+
 /*---------------------------------------------------------------------------*/
 // Function send for TSCH-MAC, puts the packet in packetbuf in the MAC queue
 static int
@@ -189,7 +210,7 @@ send_one_packet(mac_callback_t sent, void *ptr)
 {
 	//send_one_packet(sent, ptr);
 	PRINTF("TSCH send_one_packet\n");
-	int ret = 1;
+	int ret = MAC_TX_DEFERRED;
 	uint16_t seqno;
 	struct neighbor_queue *n;
 
@@ -204,27 +225,30 @@ send_one_packet(mac_callback_t sent, void *ptr)
 	packetbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, seqno);
 	if (NETSTACK_FRAMER.create() < 0) {
 		PRINTF("tsch: can't send packet due to framer error\n");
-		ret = 0;
+		ret = MAC_TX_ERR;
 	} else {
 		/* Look for the neighbor entry */
-		n = neighbor_queue_from_addr(addr);
+		n = tsch_queue_get_nbr(addr);
 		if (n == NULL) {
 			//add new neighbor to list of neighbors
-			if (!add_queue(addr)) {
-				PRINTF("tsch: can't send packet !add_queue(addr)\n");
-				ret = 0;
-			} else if (!add_packet_to_queue(sent, ptr, addr)) { //add new packet to neighbor list
-				PRINTF("tsch: can't send packet !add_packet_to_queue 1\n");
-				ret = 0;
+			if (!tsch_queue_add_nbr(addr)) {
+				PRINTF("tsch: can't send packet !tsch_queue_add_nbr(addr)\n");
+				ret = MAC_TX_ERR;
+			} else if (!tsch_queue_add_packet(addr, sent, ptr)) { //add new packet to neighbor list
+				PRINTF("tsch: can't send packet !tsch_queue_add_packet 1\n");
+				ret = MAC_TX_ERR;
 			}
 		} else {
 			//add new packet to neighbor list
-			if (!add_packet_to_queue(sent, ptr, addr))
+			if (!tsch_queue_add_packet(addr, sent, ptr))
 			{
-				PRINTF("tsch: can't send packet !add_packet_to_queue 2\n");
-				ret = 0;
+				PRINTF("tsch: can't send packet !tsch_queue_add_packet 2\n");
+				ret = MAC_TX_ERR;
 			}
 		}
+	}
+	if(ret != MAC_TX_DEFERRED) {
+		mac_call_sent_callback(sent, ptr, ret, 1);
 	}
 	return ret;
 }
@@ -412,29 +436,53 @@ schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
  * A non-zero return value signals to powercycle a missed deadline */
 #include "dev/watchdog.h"
 static rtimer_clock_t t0prepare =0, t0tx=0, t0txack=0, t0post_tx=0, t0rx=0, t0rxack=0, tq=0, tn=0;
+
+/* Checks if the current time has past a ref time + duration. Assumes
+ * a single overflow and ref time prior to now. */
+static uint8_t
+check_timer_miss(rtimer_clock_t ref_time, rtimer_clock_t duration, rtimer_clock_t now)
+{
+	rtimer_clock_t target = ref_time + duration;
+	int now_has_overflowed = now < ref_time;
+	int target_has_overflowed = target < ref_time;
+
+	if(now_has_overflowed == target_has_overflowed) {
+		/* Both or none have overflowed, just compare now to the target */
+		return target <= now;
+	} else {
+		/* Either now or target of overflowed.
+		 * If it is now, then it has passed the target.
+		 * If it is target, then we haven't reached it yet.
+		 *  */
+		return now_has_overflowed;
+	}
+}
+
 static uint8_t
 schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 		rtimer_clock_t duration)
 {
 	int r, status = 0;
 	rtimer_clock_t now = RTIMER_NOW();
-	ref_time += duration;
-	if (ref_time - now > duration) {
+
+	if(check_timer_miss(ref_time, duration, now)) {
 		COOJA_DEBUG_STR("schedule_strict: missed deadline");
-		PRINTF("schedule_strict: missed deadline: %u, %u, %u, %u\n", ref_time, now, now - ref_time, duration );
+		extern rtimer_clock_t start_of_powercycle;
+		PRINTF("schedule_strict: missed deadline: %u, %u, %u (%u)\n", ref_time, duration, now, start_of_powercycle);
 		PRINTF("tq: %u, t0prepare %u, t0tx %u, t0txack %u, t0post_tx %u, t0rx %u, t0rxack %u, tn %u\n", tq, t0prepare, t0tx, t0txack, t0post_tx, t0rx, t0rxack, tn );
 		PUTCHAR('!');
 		status = 1;
 	} else {
-		r = rtimer_set(tm, ref_time, 1, (void
+		r = rtimer_set(tm, ref_time + duration, 1, (void
 		(*)(struct rtimer *, void *)) powercycle, NULL /*(void*)&status*/);
 		if (r != RTIMER_OK) {
 			COOJA_DEBUG_STR("schedule_strict: could not set rtimer\n");
 			status = 2;
 		}
+		PRINTF("schedule_strict: scheduled: %u, %u, %u (%u)\n", ref_time, duration, now, ref_time + duration);
 	}
 
-//	PRINTF("tq: %u, t0prepare %u, t0tx %u, t0txack %u, t0post_tx %u, t0rx %u, t0rxack %u, tn %u\n", tq, t0prepare, t0tx, t0txack, t0post_tx, t0rx, t0rxack, tn );
+	//COOJA_DEBUG_PRINTF("tq: %u, t0prepare %u, t0tx %u, t0txack %u, t0post_tx %u, t0rx %u, t0rxack %u, tn %u\n", tq, t0prepare, t0tx, t0txack, t0post_tx, t0rx, t0rxack, tn );
 	tn=RTIMER_NOW();
 	return status;
 }
@@ -446,6 +494,7 @@ tsch_resume_powercycle(uint8_t need_ack_irq, struct received_frame_radio_s * las
 	ieee154e_vars.last_rf = last_rf_irq;
 	leds_off(LEDS_RED);
 }
+rtimer_clock_t start_of_powercycle;
 /*---------------------------------------------------------------------------*/
 static int
 powercycle(struct rtimer *t, void *ptr)
@@ -454,6 +503,8 @@ powercycle(struct rtimer *t, void *ptr)
 	 * else if timeslot for rx, call timeslot_rx
 	 * otherwise, schedule next wakeup
 	 */
+	COOJA_DEBUG_PRINTF("hi %u %u\n", ieee154e_vars.start, RTIMER_NOW());
+	start_of_powercycle = RTIMER_NOW();
 	PT_BEGIN(&ieee154e_vars.mpt);
 	rtimer_clock_t duration;
 	uint16_t dt, next_timeslot;
@@ -494,6 +545,7 @@ powercycle(struct rtimer *t, void *ptr)
 		}
 		//while MAC-RDC is not disabled, and while its synchronized
 		while (ieee154e_vars.state == TSCH_ASSOCIATED) {
+
 			tq=RTIMER_NOW();
 #if CONTIKI_TARGET_JN5168
 			cycle_start_radio_clock = NETSTACK_RADIO_get_time();
@@ -503,7 +555,8 @@ powercycle(struct rtimer *t, void *ptr)
 			leds_on(LEDS_RED);
 
 			ieee154e_vars.cell = get_cell(ieee154e_vars.timeslot);
-			if (ieee154e_vars.cell == NULL || ieee154e_vars.working_on_queue) {
+
+			if (ieee154e_vars.cell == NULL || tsch_queue_is_locked()) {
 				COOJA_DEBUG_STR("Off CELL\n");
 				//off cell
 				off(keep_radio_on);
@@ -522,9 +575,9 @@ powercycle(struct rtimer *t, void *ptr)
 					//is it for ADV/EB?
 					if (ieee154e_vars.cell->link_type == LINK_TYPE_ADVERTISING) {
 						//TODO fetch adv/EB packets
-						ieee154e_vars.n = neighbor_queue_from_addr(&EB_CELL_ADDRESS);
+						ieee154e_vars.n = tsch_queue_get_nbr(&EB_CELL_ADDRESS);
 						//XXX limit EB rate
-						if(generate_random_byte(8-1) >= 4) {
+						if(tsch_random_byte(8-1) >= 4) {
 							ieee154e_vars.payload_len = make_eb((uint8_t *)ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN+1); //last byte in eb buf is for length
 							ieee154e_vars.payload = (void *)ieee154e_vars.eb_buf;
 						} else {
@@ -532,15 +585,15 @@ powercycle(struct rtimer *t, void *ptr)
 						}
 					} else { //NORMAL link
 						//pick a packet from the neighbors queue who is associated with this cell
-						ieee154e_vars.n = neighbor_queue_from_addr(ieee154e_vars.cell->node_address);
+						ieee154e_vars.n = tsch_queue_get_nbr(ieee154e_vars.cell->node_address);
 						if (ieee154e_vars.n != NULL) {
-							ieee154e_vars.p = read_packet_from_neighbor_queue(ieee154e_vars.n);
+							ieee154e_vars.p = tsch_queue_get_packet_from_dest_addr(ieee154e_vars.cell->node_address);
 						}
 						//if there it is a shared broadcast slot and there were no broadcast packets, pick any unicast packet
-						if(ieee154e_vars.p==NULL
+						if(ieee154e_vars.p == NULL
 								&& rimeaddr_cmp(ieee154e_vars.cell->node_address, &BROADCAST_CELL_ADDRESS)
 								&& (ieee154e_vars.cell->link_options & LINK_OPTION_SHARED)) {
-							ieee154e_vars.p = get_next_packet_for_shared_slot_tx( &ieee154e_vars.n );
+							ieee154e_vars.p = tsch_queue_get_any_packet( &ieee154e_vars.n );
 						}
 						if(ieee154e_vars.p!= NULL) {
 							if(ieee154e_vars.p->pkt != NULL) {
@@ -766,12 +819,12 @@ powercycle(struct rtimer *t, void *ptr)
 						if (success == RADIO_TX_NOACK) {
 							ieee154e_vars.p->transmissions++;
 							if (ieee154e_vars.p->transmissions >= MAC_MAC_FRAME_RETRIES) {
-								remove_packet_from_queue(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
+								tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
 								ieee154e_vars.n->BE_value = MAC_MIN_BE;
 								ieee154e_vars.n->BW_value = 0;
 							} else if ((ieee154e_vars.cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
 								window = 1 << ieee154e_vars.n->BE_value;
-								ieee154e_vars.n->BW_value = generate_random_byte(window - 1);
+								ieee154e_vars.n->BW_value = tsch_random_byte(window - 1);
 								ieee154e_vars.n->BE_value++;
 								if (ieee154e_vars.n->BE_value > MAC_MAC_BE) {
 									ieee154e_vars.n->BE_value = MAC_MAC_BE;
@@ -779,8 +832,8 @@ powercycle(struct rtimer *t, void *ptr)
 							}
 							ret = MAC_TX_NOACK;
 						} else if (success == RADIO_TX_OK) {
-							remove_packet_from_queue(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
-							if (!read_packet_from_queue(ieee154e_vars.cell->node_address)) {
+							tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
+							if (!tsch_queue_get_packet_from_dest_addr(ieee154e_vars.cell->node_address)) {
 								// if no more packets in the queue
 								ieee154e_vars.n->BW_value = 0;
 								ieee154e_vars.n->BE_value = MAC_MIN_BE;
@@ -792,12 +845,12 @@ powercycle(struct rtimer *t, void *ptr)
 						} else if (success == RADIO_TX_COLLISION) {
 							ieee154e_vars.p->transmissions++;
 							if (ieee154e_vars.p->transmissions >= MAC_MAC_FRAME_RETRIES) {
-								remove_packet_from_queue(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
+								tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
 								ieee154e_vars.n->BE_value = MAC_MIN_BE;
 								ieee154e_vars.n->BW_value = 0;
 							} else if ((ieee154e_vars.cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
 								window = 1 << ieee154e_vars.n->BE_value;
-								ieee154e_vars.n->BW_value = generate_random_byte(window - 1);
+								ieee154e_vars.n->BW_value = tsch_random_byte(window - 1);
 								ieee154e_vars.n->BE_value++;
 								if (ieee154e_vars.n->BE_value > MAC_MAC_BE) {
 									ieee154e_vars.n->BE_value = MAC_MAC_BE;
@@ -807,12 +860,12 @@ powercycle(struct rtimer *t, void *ptr)
 						} else if (success == RADIO_TX_ERR) {
 							ieee154e_vars.p->transmissions++;
 							if (ieee154e_vars.p->transmissions >= MAC_MAC_FRAME_RETRIES) {
-								remove_packet_from_queue(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
+								tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
 								ieee154e_vars.n->BE_value = MAC_MIN_BE;
 								ieee154e_vars.n->BW_value = 0;
 							} else if ((ieee154e_vars.cell->link_options & LINK_OPTION_SHARED) && !is_broadcast) {
 								window = 1 << ieee154e_vars.n->BE_value;
-								ieee154e_vars.n->BW_value = generate_random_byte(window - 1);
+								ieee154e_vars.n->BW_value = tsch_random_byte(window - 1);
 								ieee154e_vars.n->BE_value++;
 								if (ieee154e_vars.n->BE_value > MAC_MAC_BE) {
 									ieee154e_vars.n->BE_value = MAC_MAC_BE;
@@ -821,8 +874,8 @@ powercycle(struct rtimer *t, void *ptr)
 							ret = MAC_TX_ERR;
 						} else {
 							// successful transmission
-							remove_packet_from_queue(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
-							if (!read_packet_from_queue(ieee154e_vars.cell->node_address)) {
+							tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(ieee154e_vars.p->pkt, PACKETBUF_ADDR_RECEIVER));
+							if (!tsch_queue_get_packet_from_dest_addr(ieee154e_vars.cell->node_address)) {
 								// if no more packets in the queue
 								ieee154e_vars.n->BW_value = 0;
 								ieee154e_vars.n->BE_value = MAC_MIN_BE;
@@ -834,7 +887,6 @@ powercycle(struct rtimer *t, void *ptr)
 						}
 						/* poll MAC TX callback */
 						ieee154e_vars.p->ret=ret;
-
 						while( PROCESS_ERR_OK != process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, ieee154e_vars.p)) {PRINTF("PROCESS_ERR_OK != process_post(&tsch_tx_callback_process\n");};
 					}
 					t0post_tx = RTIMER_NOW() - t0post_tx;
@@ -855,7 +907,7 @@ powercycle(struct rtimer *t, void *ptr)
 						// TODO
 						/* Check if we need to send keep-alive request */
 						//TODO fetch adv/EB packets
-//						n = neighbor_queue_from_addr(&EB_CELL_ADDRESS);
+//						n = tsch_queue_get_nbr(&EB_CELL_ADDRESS);
 //						{
 //							payload_len = make_eb(ieee154e_vars.eb_buf, TSCH_MAX_PACKET_LEN+1); //last byte in eb buf is for length
 //							payload = ieee154e_vars.eb_buf;
@@ -928,7 +980,7 @@ powercycle(struct rtimer *t, void *ptr)
 								if (ieee154e_vars.registered_drift) {
 									COOJA_DEBUG_PRINTF("ieee154e_vars.drift seen %d\n", ieee154e_vars.registered_drift);
 									// check the source address for potential time-source match
-									ieee154e_vars.n = neighbor_queue_from_addr(&ieee154e_vars.last_rf->source_address);
+									ieee154e_vars.n = tsch_queue_get_nbr(&ieee154e_vars.last_rf->source_address);
 									if(ieee154e_vars.n != NULL && ieee154e_vars.n->is_time_source) {
 										// should be the average of drifts to all time sources
 										ieee154e_vars.drift_correction -= ieee154e_vars.registered_drift;
@@ -944,13 +996,16 @@ powercycle(struct rtimer *t, void *ptr)
 					}
 				}
 			}
-//			COOJA_DEBUG_PRINTF("ASN %lu TS %u", ieee154e_vars.asn.asn_4lsb, ieee154e_vars.timeslot);
+
 			tn=RTIMER_NOW();
 			next_timeslot = get_next_on_timeslot(ieee154e_vars.timeslot);
+
 			dt =
 					next_timeslot ? next_timeslot - ieee154e_vars.timeslot :
 							ieee154e_vars.current_slotframe->length - ieee154e_vars.timeslot;
 			duration = dt * TsSlotDuration;
+
+//			COOJA_DEBUG_PRINTF("ASN %lu TS %u NTS %u duration %lu", ieee154e_vars.asn.asn_4lsb, ieee154e_vars.timeslot, next_timeslot, duration);
 			/* increase the timeout counter because we will reset it in case of successful TX or RX */
 			ieee154e_vars.sync_timeout += dt;
 			ieee154e_vars.timeslot = next_timeslot;
@@ -993,6 +1048,7 @@ powercycle(struct rtimer *t, void *ptr)
 				tn=RTIMER_NOW()-tn;
 				PUTCHAR('S');
 			} else { /* Schedule wakeup for next slot */
+
 				/* skip slot if missed the deadline */
 				while ( schedule_strict(t, ieee154e_vars.start, duration) ) {
 //					watchdog_periodic();
@@ -1222,9 +1278,9 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 				//XXX schedule to run after sometime
 				/* check if missed deadline, try a new one */
 				if(ieee154e_vars.current_slotframe) {
-					dt=20+generate_random_byte(16-1);
+					dt=20+tsch_random_byte(16-1);
 				} else {
-					dt = 50+generate_random_byte(32-1);
+					dt = 50+tsch_random_byte(32-1);
 				}
 				duration=0;
 				do {
@@ -1235,9 +1291,11 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 					if(!ieee154e_vars.asn.asn_4lsb) {
 						ieee154e_vars.asn.asn_msb++;
 					}
-					dt=15+generate_random_byte(16-1);
+					dt=15+tsch_random_byte(16-1);
+					PRINTF("Debutg timing: %u %u %u\n", ieee154e_vars.start, duration, RTIMER_NOW());
 				} while ( schedule_strict(&ieee154e_vars.t, ieee154e_vars.start, duration) );
 				ieee154e_vars.start += duration;
+				PRINTF("Debutg timing final: %u %u %u\n", ieee154e_vars.start, duration, RTIMER_NOW());
 			}
 		}
 	}
@@ -1249,8 +1307,8 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 
 		//process the schedule, to create queues and find time-sources (time-keeping)
 		//wait until queue is free
-//		while(ieee154e_vars.working_on_queue){}
-		if(!ieee154e_vars.working_on_queue) {
+//		while(tsch_queue_is_locked()){}
+		if(!tsch_queue_is_locked()) {
 			struct neighbor_queue *n;
 			uint8_t i = 0;
 			for(i=0; i<TOTAL_LINKS; i++) {
@@ -1259,10 +1317,10 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 						|| (links_list[i]->link_options & LINK_OPTION_TX) ) {
 					rimeaddr_t *addr = links_list[i]->node_address;
 					/* Look for the neighbor entry */
-					n = neighbor_queue_from_addr(addr);
+					n = tsch_queue_get_nbr(addr);
 					if (n == NULL) {
 						//add new neighbor to list of neighbors
-						n=add_queue(addr);
+						n=tsch_queue_add_nbr(addr);
 					}
 					if( n!= NULL ) {
 						n->is_time_source = (links_list[i]->link_options & LINK_OPTION_TIME_KEEPING) ? 1 : n->is_time_source;
@@ -1275,10 +1333,10 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s * last_rf_i
 		/* XXX HACK this should be set in sent schedule
 		 * --Set parent as timesource */
 		if((ieee154e_vars.last_rf)) {
-			struct neighbor_queue *n = neighbor_queue_from_addr(&ieee154e_vars.last_rf->source_address);
-			if (n == NULL && !ieee154e_vars.working_on_queue) {
+			struct neighbor_queue *n = tsch_queue_get_nbr(&ieee154e_vars.last_rf->source_address);
+			if (n == NULL && !tsch_queue_is_locked()) {
 				//add new neighbor to list of neighbors
-				n=add_queue(&ieee154e_vars.last_rf->source_address);
+				n=tsch_queue_add_nbr(&ieee154e_vars.last_rf->source_address);
 			}
 			if( n!= NULL ) {
 				n->is_time_source = 1;
@@ -1391,7 +1449,7 @@ static void tsch_init_variables(void)
 {
 
 	//setting seed for the random generator
-	srand_newg(clock_time()  * RTIMER_NOW());
+	tsch_random_init(clock_time()  * RTIMER_NOW());
 	NETSTACK_RADIO_softack_subscribe(NULL, NULL);
 	//look for a root to sync with
 	ieee154e_vars.current_slotframe = &minimum_slotframe;
@@ -1400,13 +1458,12 @@ static void tsch_init_variables(void)
 	ieee154e_vars.asn.asn_4lsb = 0;
 	ieee154e_vars.asn.asn_msb = 0;
 	// start with a random sequence number
-	ieee154e_vars.dsn = generate_random_byte(127);
+	ieee154e_vars.dsn = tsch_random_byte(127);
 	ieee154e_vars.state = TSCH_SEARCHING;
 	//we need to sync
 	ieee154e_vars.sync_timeout = 0; //30sec/slotDuration - (asn-asn0)*slotDuration
 	ieee154e_vars.mac_ebsn = 0;
 	ieee154e_vars.join_priority = 0xff; /* inherit from RPL - PAN coordinator: 0 -- lower is better */
-	ieee154e_vars.working_on_queue = 0;
 	ieee154e_vars.need_ack = 0;
 	ieee154e_vars.last_rf = NULL;
 	ieee154e_vars.registered_drift = 0;
@@ -1432,6 +1489,7 @@ tsch_init(void)
 	hop_channel(0);
 //	NETSTACK_RADIO.on();
 	powercycle(&ieee154e_vars.t, NULL);
+	//schedule_fixed(&ieee154e_vars.t, RTIMER_NOW(), 0);
 }
 /*---------------------------------------------------------------------------*/
 /* a polled-process to invoke the MAC tx callback asynchronously */

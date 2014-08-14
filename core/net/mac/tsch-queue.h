@@ -63,8 +63,11 @@ struct TSCH_packet
 /* TSCH neighbor information */
 struct neighbor_queue
 {
+	struct neighbor_queue *next;
+	/* TODO: have only one array for the whole system */
 	struct TSCH_packet buffer[NBR_BUFFER_SIZE]; /* circular buffer of packets.
 	Its size must be a power of two 	to allow for atomic put */
+	rimeaddr_t addr; /* link-layer address of the neighbor */
 	uint8_t is_time_source; /* is this neighbor a time source? */
 	uint8_t BE_value; /* current value of backoff exponent */
 	uint8_t BW_value; /* current value of backoff counter */
@@ -72,16 +75,24 @@ struct neighbor_queue
 					get_ptr; /* pointers for circular buffer implementation */
 };
 
-struct neighbor_queue *neighbor_queue_from_addr(const rimeaddr_t *addr);
-struct neighbor_queue *add_queue(const rimeaddr_t *addr);
-int remove_queue(const rimeaddr_t *addr);
-int add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr);
-int remove_packet_from_queue(const rimeaddr_t *addr);
-const struct TSCH_packet *read_packet_from_queue(const rimeaddr_t *addr);
-/* get a packet to send in a shared slot, and put the neighbor reference in n */
-const struct TSCH_packet *get_next_packet_for_shared_slot_tx(struct neighbor_queue **n);
-/* returns the first packet in the queue of a neighbor */
-const struct TSCH_packet* read_packet_from_neighbor_queue(const struct neighbor_queue *n);
+/* Add a TSCH neighbor */
+struct neighbor_queue * tsch_queue_add_nbr(const rimeaddr_t *addr);
+/* Get a TSCH neighbor */
+struct neighbor_queue * tsch_queue_get_nbr(const rimeaddr_t *addr);
+/* Remove TSCH neighbor queue */
+void tsch_queue_remove_nbr(struct neighbor_queue *n);
+/* Add packet to neighbor queue. Use same lockfree implementation as ringbuf.c (put is atomic) */
+int tsch_queue_add_packet(const rimeaddr_t *addr, mac_callback_t sent, void *ptr);
+/* Remove first packet from a neighbor queue */
+int tsch_queue_remove_packet_from_dest_addr(const rimeaddr_t *addr);
+/* Returns the first packet from a neighbor queue */
+struct TSCH_packet *tsch_queue_get_packet_from_neighbor(const struct neighbor_queue *n);
+/* Returns the head packet from a neighbor queue (from neighbor address) */
+struct TSCH_packet *tsch_queue_get_packet_from_dest_addr(const rimeaddr_t *addr);
+/* Returns the head packet of any neighbor queue.
+ * Writes pointer to the neighbor in *n */
+struct TSCH_packet *tsch_queue_get_any_packet(struct neighbor_queue **n);
+/* Initialize TSCH queue module */
 void tsch_queue_init(void);
 
 #endif /* __TSCH_QUEUE_H__ */

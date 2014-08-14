@@ -78,10 +78,12 @@ void uip_debug_lladdr_print(const uip_lladdr_t *addr);
 #endif
 #define PRINT6ADDR(addr) uip_debug_ipaddr_print(addr)
 #define PRINTLLADDR(lladdr) uip_debug_lladdr_print(lladdr)
+#define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
 #else
 #define PRINTF(...)
 #define PRINT6ADDR(addr)
 #define PRINTLLADDR(lladdr)
+#define PUTCHAR(X)
 #endif /* (DEBUG) & DEBUG_PRINT */
 
 #endif

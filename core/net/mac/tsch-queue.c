@@ -38,208 +38,188 @@
  */
 
 #include "contiki.h"
+#include "net/queuebuf.h"
 #include "net/nbr-table.h"
 #include "net/mac/rdc.h"
 #include "net/mac/tsch-private.h"
 #include "net/mac/tsch-queue.h"
+#include <string.h>
 
-#define DEBUG 0
-#undef PUTCHAR
-#if DEBUG
-#define PUTCHAR(X) do { putchar(X); putchar('\n'); } while(0);
-#if CONTIKI_TARGET_JN5168
-int dbg_printf(const char *fmt, ...);
-#define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
-#else
-#define PRINTF printf
-#define dbg_printf PRINTF
-#endif /*CONTIKI_TARGET_JN5168*/
-#else
-#define PRINTF(...)
-#define dbg_printf PRINTF
-#define PUTCHAR(X)
-#endif /* DEBUG */
+#define DEBUG DEBUG_NONE
+#include "net/uip-debug.h"
 
-/* Is this neighbor queue not empty? */
-#define QUEUE_NOT_EMPTY(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) > 0))
+/* Is this neighbor queue empty? */
+#define QUEUE_EMPTY(n) (!((((n)->put_ptr - (n)->get_ptr) & (NBR_BUFFER_SIZE - 1)) > 0))
 /* Is this neighbor queue full? */
 #define QUEUE_FULL(n) ((((((n)->put_ptr - (n)->get_ptr)) & (NBR_BUFFER_SIZE - 1)) == (NBR_BUFFER_SIZE - 1)))
+
+/* We lock the whole module whenever manipulating the neighbor list.
+ * Note that adding/removing packets from a neighbor queue is done using
+ * a ringbuf with atomic insert, and does not require to take the lock. */
+static int locked = 0;
+
+/* Is the TSCH queue module locked? */
+int
+tsch_queue_is_locked()
+{
+	return locked;
+}
 
 /* Per-neighbor queue */
 NBR_TABLE(struct neighbor_queue, neighbor_queues);
 
-/*---------------------------------------------------------------------------*/
-// This function returns a pointer to the queue of neighbor whose address is equal to addr
-inline struct neighbor_queue *
-neighbor_queue_from_addr(const rimeaddr_t *addr)
-{
-	struct neighbor_queue *n = nbr_table_get_from_lladdr(neighbor_queues, addr);
-	return n;
-}
-/*---------------------------------------------------------------------------*/
-// This function adds one queue for neighbor whose address is equal to addr
-// uses working_on_queue to protect data-structures from race conditions
-// return 1 ok, 0 failed to allocate
+/* Add a TSCH neighbor */
 struct neighbor_queue *
-add_queue(const rimeaddr_t *addr)
+tsch_queue_add_nbr(const rimeaddr_t *addr)
 {
-	ieee154e_vars.working_on_queue = 1;
-	struct neighbor_queue *n;
-	/* If we have an entry for this neighbor already, we renew it. */
-	n = neighbor_queue_from_addr(addr);
-	if (n == NULL) {
-		n = nbr_table_add_lladdr(neighbor_queues, addr);
-	}
-	//if n was actually allocated
-	if (n) {
-		/* Init neighbor entry */
-		n->BE_value = MAC_MIN_BE;
-		n->BW_value = 0;
-		n->put_ptr = 0;
-		n->get_ptr = 0;
-		n->is_time_source = 0;
-		uint8_t i;
-		for (i = 0; i < NBR_BUFFER_SIZE; i++) {
-			n->buffer[i].pkt = 0;
-			n->buffer[i].transmissions = 0;
+	struct neighbor_queue *n = NULL;
+
+	if(!locked) {
+		locked = 1;
+
+		/* If we have an entry for this neighbor already, we simply update it */
+		n = tsch_queue_get_nbr(addr);
+		if(n != NULL) {
+			/* Reset neighbor entry */
+			memset(n, 0, sizeof(struct neighbor_queue));
+		} else {
+			/* Add neighbor (will be zeroed initially) */
+			n = nbr_table_add_lladdr(neighbor_queues, addr);
 		}
-		ieee154e_vars.working_on_queue = 0;
-		return n;
+
+		if(n != NULL) {
+			/* Initialize neighbor entry */
+			n->BE_value = MAC_MIN_BE;
+		}
+
+		locked = 0;
 	}
-	ieee154e_vars.working_on_queue = 0;
 	return n;
 }
-/*---------------------------------------------------------------------------*/
-// This function remove the queue of neighbor whose address is equal to addr
-// uses working_on_queue to protect data-structures from race conditions
-// return 1 ok, 0 failed to find the queue
-int
-remove_queue(const rimeaddr_t *addr)
+
+/* Get a TSCH neighbor */
+struct neighbor_queue *
+tsch_queue_get_nbr(const rimeaddr_t *addr)
 {
-	ieee154e_vars.working_on_queue = 1;
-	int i;
-	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
-	if (n != NULL) {
-		for (i = 0; i < NBR_BUFFER_SIZE; i++) {      // free packets of neighbor
+	if(!locked) {
+		return nbr_table_get_from_lladdr(neighbor_queues, addr);
+	}
+	return NULL;
+}
+
+/* Remove TSCH neighbor queue */
+void
+tsch_queue_remove_nbr(struct neighbor_queue *n)
+{
+	if(n != NULL && !locked) {
+		int i;
+		locked = 1;
+
+		/* Free queuebufs */
+		for(i = 0; i < NBR_BUFFER_SIZE; i++) {
 			queuebuf_free(n->buffer[i].pkt);
-			n->buffer[i].pkt = NULL;
 		}
 		nbr_table_remove(neighbor_queues, n);
-		n = NULL;
-		ieee154e_vars.working_on_queue = 0;
-		return 1;
+
+		locked = 0;
 	}
-	ieee154e_vars.working_on_queue = 0;
-	return 0;
 }
-/*---------------------------------------------------------------------------*/
-// This function adds one packet to the queue of neighbor whose address is addr
-// return 1 ok, 0 failed to allocate
-// the packet to be inserted is in packetbuf
+
+/* Add packet to neighbor queue. Use same lockfree implementation as ringbuf.c (put is atomic) */
 int
-add_packet_to_queue(mac_callback_t sent, void* ptr, const rimeaddr_t *addr)
+tsch_queue_add_packet(const rimeaddr_t *addr, mac_callback_t sent, void *ptr)
 {
-  /* Check if buffer is full. If it is full, return 0 to indicate that
-     the element was not inserted into the buffer.
-
-     XXX: there is a potential risk for a race condition here, because
-     the ->get_ptr field may be written concurrently by the
-     ringbuf_get() function. To avoid this, access to ->get_ptr must
-     be atomic. We use an uint8_t type, which makes access atomic on
-     most platforms, but C does not guarantee this.
-  */
-
-	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
-	if (n != NULL) {
-		//is queue full?
-		if (QUEUE_FULL(n)) {
-			PRINTF("queue full %x.%x.%x.%x.%x.%x.%x.%x\n", addr->u8[7],addr->u8[6],addr->u8[5],addr->u8[4],addr->u8[3],addr->u8[2],addr->u8[1],addr->u8[0]);
-			/* send the callback to signal that tx failed */
-			//XXX drop packet silently
-//			mac_call_sent_callback(sent, ptr, MAC_TX_ERR_FATAL, 0);
-			return 0;
+	if(!locked) {
+		struct neighbor_queue *n = tsch_queue_get_nbr(addr);
+		if(n == NULL) {
+			n = tsch_queue_add_nbr(addr);
 		}
-		n->buffer[n->put_ptr].pkt = queuebuf_new_from_packetbuf(); // create new packet from packetbuf
-		n->buffer[n->put_ptr].ptr = ptr;
-		n->buffer[n->put_ptr].ret = MAC_TX_DEFERRED;
-		n->buffer[n->put_ptr].transmissions = 0;
-		dbg_printf("qa0%x p%d @%x\n", addr->u8[7], n->put_ptr, n->buffer[n->put_ptr].pkt);
-		if(n->buffer[n->put_ptr].pkt != NULL ) {
-			n->put_ptr = (n->put_ptr + 1) & (NBR_BUFFER_SIZE - 1);
-			return 1;
-		}
-		dbg_printf("qa failed!!\n");
-	} else {
-		n = add_queue(addr);
-		if(n != NULL) {
-			return add_packet_to_queue(sent, ptr, addr);
+		if(n != NULL && !QUEUE_FULL(n)) {
+			/* Enqueue packet */
+			n->buffer[n->put_ptr].pkt = queuebuf_new_from_packetbuf();
+			if(n->buffer[n->put_ptr].pkt != NULL) {
+				n->buffer[n->put_ptr].ptr = ptr;
+				n->buffer[n->put_ptr].ret = MAC_TX_DEFERRED;
+				n->buffer[n->put_ptr].transmissions = 0;
+				PRINTF("TSCH-queue: packet enqueued 0%x p%d @%p\n", addr->u8[7], n->put_ptr, n->buffer[n->put_ptr].pkt);
+				/* The following line must be atomic */
+				n->put_ptr = (n->put_ptr + 1) & (NBR_BUFFER_SIZE - 1);
+				return 1;
+			}
 		}
 	}
+	PRINTF("TSCH-queue: failed to enqueue packet\n");
 	return 0;
 }
-/*---------------------------------------------------------------------------*/
-// This function removes the head-packet of the queue of neighbor whose address is addr
-// return 1 ok, 0 failed
-// remove one packet from the queue
+
+/* Remove first packet from a neighbor queue */
 int
-remove_packet_from_queue(const rimeaddr_t *addr)
+tsch_queue_remove_packet_from_dest_addr(const rimeaddr_t *addr)
 {
-	struct neighbor_queue *n = neighbor_queue_from_addr(addr); // retrieve the queue from address
-	if (n != NULL) {
-		if (QUEUE_NOT_EMPTY(n)) {
-			uint8_t current_get_ptr = n->get_ptr;
-			struct queuebuf * pkt = n->buffer[current_get_ptr].pkt;
-			n->buffer[current_get_ptr].pkt = NULL;
+	if(!locked) {
+		struct neighbor_queue *n = tsch_queue_get_nbr(addr);
+		if(n != NULL && !QUEUE_EMPTY(n)) {
+			uint8_t prev_get_ptr = n->get_ptr;
+			/* Actually remove form the ringbuf. Must be atomic. */
 			n->get_ptr = (n->get_ptr + 1) & (NBR_BUFFER_SIZE - 1);
-			queuebuf_free(pkt);
-			dbg_printf("qm0%x p%d @%x\n", addr->u8[7], current_get_ptr, pkt);
+			/* Deallocate the queuebuf only now that it is not accessible anymore */
+			queuebuf_free(n->buffer[prev_get_ptr].pkt);
+			PRINTF("TSCH-queue: remove packet 0%x p%d @%p\n", addr->u8[7], prev_get_ptr, n->buffer[prev_get_ptr].pkt);
 			return 1;
 		}
 	}
 	return 0;
 }
-/*---------------------------------------------------------------------------*/
-/* returns the first packet in the queue of a neighbor */
-const struct TSCH_packet*
-read_packet_from_neighbor_queue(const struct neighbor_queue *n)
+
+/* Returns the first packet from a neighbor queue */
+struct TSCH_packet *
+tsch_queue_get_packet_from_neighbor(const struct neighbor_queue *n)
 {
-	if(n != NULL) {
-		if (QUEUE_NOT_EMPTY(n)) {
-			dbg_printf("qr p%d @%x\n", n->get_ptr, n->buffer[n->get_ptr].pkt);
-			return (struct TSCH_packet*)&(n->buffer[n->get_ptr]);
+	if(!locked) {
+		if(n != NULL && !QUEUE_EMPTY(n)) {
+			PRINTF("TSCH-queue: p%d @%p\n", n->get_ptr, n->buffer[n->get_ptr].pkt);
+			return (struct TSCH_packet *)&n->buffer[n->get_ptr];
 		}
 	}
 	return NULL;
 }
-/*---------------------------------------------------------------------------*/
-/* returns the first packet in the queue of neighbor */
-const struct TSCH_packet*
-read_packet_from_queue(const rimeaddr_t *addr)
+
+/* Returns the head packet from a neighbor queue (from neighbor address) */
+struct TSCH_packet *
+tsch_queue_get_packet_from_dest_addr(const rimeaddr_t *addr)
 {
-	dbg_printf("qr0%x\n", addr->u8[7]);
-	return read_packet_from_neighbor_queue( neighbor_queue_from_addr(addr) );
-}
-/*---------------------------------------------------------------------------*/
-/* get a packet to send in a shared slot, and put the neighbor reference in n */
-const struct TSCH_packet *
-get_next_packet_for_shared_slot_tx(struct neighbor_queue **n)
-{
-	static struct neighbor_queue* last_neighbor_tx = NULL;
-	if(last_neighbor_tx == NULL) {
-		last_neighbor_tx = nbr_table_head(neighbor_queues);
-		*n = last_neighbor_tx;
+	if(!locked) {
+		return tsch_queue_get_packet_from_neighbor(tsch_queue_get_nbr(addr));
 	}
-	struct TSCH_packet * p = NULL;
-	while(p==NULL && last_neighbor_tx != NULL) {
-		*n = last_neighbor_tx;
-		p = read_packet_from_neighbor_queue( last_neighbor_tx );
-		last_neighbor_tx = nbr_table_next(neighbor_queues, last_neighbor_tx);
-	}
-	return p;
+	return NULL;
 }
 
+/* Returns the head packet of any neighbor queue.
+ * Writes pointer to the neighbor in *n */
+struct TSCH_packet *
+tsch_queue_get_any_packet(struct neighbor_queue **n)
+{
+	if(!locked) {
+		/* TODO: round-robin among neighbors */
+		struct neighbor_queue *curr_nbr = nbr_table_head(neighbor_queues);
+		struct TSCH_packet *p = NULL;
+
+		while(curr_nbr != NULL) {
+			p = tsch_queue_get_packet_from_neighbor(curr_nbr);
+			if(p != NULL) {
+				*n = curr_nbr;
+				return p;
+			}
+			curr_nbr = nbr_table_next(neighbor_queues, curr_nbr);
+		}
+
+	}
+	return NULL;
+}
+
+/* Initialize TSCH queue module */
 void
 tsch_queue_init(void)
 {
-	nbr_table_register(neighbor_queues, NULL);
+	nbr_table_register(neighbor_queues, (nbr_table_callback *)tsch_queue_remove_nbr);
 }

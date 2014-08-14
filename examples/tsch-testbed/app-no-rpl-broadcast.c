@@ -45,6 +45,7 @@
 #include "lib/random.h"
 #include "deployment.h"
 #include "simple-udp.h"
+#include "net/uip-debug.h"
 #include "cc2420.h"
 #include <stdio.h>
 
@@ -54,7 +55,6 @@
 #define COORDINATOR_ID 2
 
 static struct simple_udp_connection broadcast_connection;
-static uint16_t current_cnt = 0;
 static uip_ipaddr_t llprefix;
 
 /*---------------------------------------------------------------------------*/
@@ -104,7 +104,7 @@ PROCESS_THREAD(broadcast_sender_process, ev, data)
   if(node_id == 0) {
     NETSTACK_RDC.off(0);
     printf("Node id unset, my mac is ");
-    uip_debug_lladdr_print(&rimeaddr_node_addr);
+    uip_debug_lladdr_print((const uip_lladdr_t *)&rimeaddr_node_addr);
     printf("\n");
     PROCESS_EXIT();
   }

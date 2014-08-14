@@ -42,11 +42,13 @@
 #include "net/netstack.h"
 #include "net/uip-ds6-nbr.h"
 #include "net/mac/tsch.h"
+#include "net/uip-debug.h"
 #include "lib/random.h"
 #include "deployment.h"
 #include "simple-udp.h"
 #include "cc2420.h"
 #include <stdio.h>
+#include <string.h>
 
 #define SEND_INTERVAL   (60 * CLOCK_SECOND)
 #define UDP_PORT 1234
@@ -108,7 +110,7 @@ app_send_to(uint16_t id, int ping, uint32_t seqno)
   set_ipaddr_from_id(&dest_ipaddr, id);
   /* Convert global address into link-local */
   memcpy(&dest_ipaddr, &llprefix, 8);
-  set_rimeaddr_from_id(&dest_lladdr, id);
+  set_rimeaddr_from_id((rimeaddr_t *)&dest_lladdr, id);
 	uip_ds6_nbr_add(&dest_ipaddr, &dest_lladdr, 1, ADDR_MANUAL);
 
   simple_udp_sendto(&unicast_connection, &data, sizeof(data), &dest_ipaddr);
@@ -117,7 +119,6 @@ app_send_to(uint16_t id, int ping, uint32_t seqno)
 PROCESS_THREAD(unicast_sender_process, ev, data)
 {
   static struct etimer periodic_timer;
-  static struct etimer send_timer;
   uip_ipaddr_t global_ipaddr;
 
   PROCESS_BEGIN();
@@ -125,7 +126,7 @@ PROCESS_THREAD(unicast_sender_process, ev, data)
   if(node_id == 0) {
     NETSTACK_RDC.off(0);
     printf("Node id unset, my mac is ");
-    uip_debug_lladdr_print(&rimeaddr_node_addr);
+    uip_debug_lladdr_print((const uip_lladdr_t *)&rimeaddr_node_addr);
     printf("\n");
     PROCESS_EXIT();
   }
