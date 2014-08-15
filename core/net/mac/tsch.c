@@ -159,6 +159,7 @@ static rtimer_clock_t t0prepare = 0, t0tx = 0, t0txack = 0, t0post_tx = 0, t0rx 
 /* Contiki processes */
 PROCESS(tsch_tx_callback_process, "tsch_tx_callback_process");
 PROCESS(tsch_associate, "tsch_associate");
+PROCESS(tsch_process, "TSCH process");
 
 /**
  *  A pseudo-random generator with better properties than msp430-libc's default
@@ -197,7 +198,7 @@ turn_on(void)
 }
 /*---------------------------------------------------------------------------*/
 static void
-turn_off(void)
+turn_off(int keep_radio_on)
 {
   PRINTF("TSCH: turn_off not supported\n");
 }
@@ -281,7 +282,13 @@ get_cell(uint16_t timeslot)
   return (timeslot >= ieee154e_vars.current_slotframe->on_size) ?
          NULL : ieee154e_vars.current_slotframe->cells[timeslot];
 }
-/* Return the first active (not OFF) timeslot after a given timeslot */
+/* Return the first active (not OFF) timeslot */
+static uint16_t
+get_first_active_timeslot()
+{
+  return 0;
+}
+/* Return the next active (not OFF) timeslot after a given timeslot */
 static uint16_t
 get_next_active_timeslot(uint16_t timeslot)
 {
@@ -295,7 +302,7 @@ send_packet(mac_callback_t sent, void *ptr)
   PRINTF("TSCH send_packet\n");
   int ret = MAC_TX_DEFERRED;
   uint16_t seqno;
-  struct neighbor_queue *n;
+  struct tsch_neighbor *n;
 
   const rimeaddr_t *addr = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
   /* Ask for ACK if we are sending anything other than broadcast */
@@ -995,7 +1002,7 @@ powercycle(struct rtimer *t, void *ptr)
 
       /* Check if we need to resynchronize */
       if(ieee154e_vars.join_priority != 0
-         && ieee154e_vars.sync_timeout > RESYNCH_TIMEOUT) {
+         && ieee154e_vars.sync_timeout > DESYNC_THRESHOLD) {
         tsch_state = TSCH_SEARCHING;
         ieee154e_vars.timeslot = 0;
         /* schedule init function to run again */
@@ -1103,7 +1110,7 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s *last_rf_ir
     /* wait until queue is free */
     /*		while(tsch_queue_is_locked()){} */
     if(!tsch_queue_is_locked()) {
-      struct neighbor_queue *n;
+      struct tsch_neighbor *n;
       uint8_t i = 0;
       for(i = 0; i < TOTAL_LINKS; i++) {
         /* add queues for neighbors with tx links and for time-sources */
@@ -1127,7 +1134,7 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s *last_rf_ir
        * --Set parent as timesource */
     }
     if((ieee154e_vars.last_rf)) {
-      struct neighbor_queue *n = tsch_queue_get_nbr(&ieee154e_vars.last_rf->source_address);
+      struct tsch_neighbor *n = tsch_queue_get_nbr(&ieee154e_vars.last_rf->source_address);
       if(n == NULL && !tsch_queue_is_locked()) {
         /* add new neighbor to list of neighbors */
         n = tsch_queue_add_nbr(&ieee154e_vars.last_rf->source_address);
@@ -1257,13 +1264,198 @@ PROCESS_THREAD(tsch_tx_callback_process, ev, data)
     /*		PRINTF("tsch_tx_callback_process: calling mac tx callback\n"); */
     COOJA_DEBUG_STR("tsch_tx_callback_process: calling mac tx callback\n");
     if(data != NULL) {
-      struct TSCH_packet *p = (struct TSCH_packet *)data;
+      struct tsch_packet *p = (struct tsch_packet *)data;
       /* XXX callback -- do we need to restore the packet to packetbuf? */
       mac_call_sent_callback(p->sent, p->ptr, p->ret, p->transmissions);
     }
   }
   PROCESS_END();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Get EB, broadcast or unicast packet to be sent, and target neighbor.
+ * TODO: Update EB fields.
+ *  */
+static struct tsch_packet *
+get_packet_and_neighbor_for_cell(cell_t *cell, struct tsch_neighbor **target_neighbor)
+{
+/* TODO */
+  *target_neighbor = NULL;
+  return NULL;
+}
+
+static int associated = 0;
+static struct pt cell_operation_pt;
+
+static asn_t current_asn;
+static rtimer_clock_t current_cell_start;
+static uint16_t current_timeslot;
+slotframe_t *current_slotframe;
+
+static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
+
+static
+PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
+{
+  PT_BEGIN(pt);
+
+  rtimer_set(t, current_cell_start + TRIVIAL_DELAY,
+              0, (rtimer_callback_t)tsch_cell_operation, NULL);
+  //printf("TSCH: before yield\n");
+  PT_YIELD(pt);
+  //printf("TSCH: after yield\n");
+
+  PT_END(pt);
+}
+
+static
+PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
+{
+  PT_BEGIN(pt);
+
+  rtimer_set(t, current_cell_start + TRIVIAL_DELAY,
+              0, (rtimer_callback_t)tsch_cell_operation, NULL);
+  //printf("TSCH: before yield\n");
+  PT_YIELD(pt);
+  //printf("TSCH: after yield\n");
+
+  PT_END(pt);
+}
+
+static
+PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
+{
+  static asn_t last_sync_asn;
+  static int32_t drift_correction;
+
+  PT_BEGIN(&cell_operation_pt);
+
+  /* Loop over all active cells */
+  while(associated) {
+      static struct tsch_packet *current_packet;
+      static struct tsch_neighbor *current_neighbor;
+      static cell_t *current_cell;
+
+      current_cell = get_cell(current_timeslot);
+
+      if(current_cell->link_options & LINK_OPTION_SHARED) {
+/* TODO       update_backoff(all); */
+      }
+
+      if(current_cell->link_options & LINK_OPTION_TX) {
+        current_packet = get_packet_and_neighbor_for_cell(current_cell, &current_neighbor);
+      }
+
+      /* Actual slot operation */
+      if(current_packet != NULL) {
+        /* We have something to transmit */
+        static struct pt cell_tx_pt;
+        PT_SPAWN(&cell_operation_pt, &cell_tx_pt, tsch_tx_cell(&cell_tx_pt, t));
+        /* TODO
+                  update_backoff_state(current_neighbor)
+                  post tx callback */
+      } else if(current_cell->link_options & LINK_OPTION_RX) {
+        /* Listen */
+        static struct pt cell_rx_pt;
+        PT_SPAWN(&cell_operation_pt, &cell_rx_pt, tsch_rx_cell(&cell_rx_pt, t));
+      }
+
+      /* End of slot operation, schedule next slot */
+      if(!tsch_is_coordinator && ASN_DIFF(current_asn, last_sync_asn) > DESYNC_THRESHOLD) {
+        associated = 0;
+        process_post(&tsch_process, PROCESS_EVENT_POLL, NULL);
+      } else {
+        /* Get next active timeslot */
+        uint16_t next_timeslot = get_next_active_timeslot(current_timeslot);
+        /* Calculate number of slots between current and next */
+        uint16_t timeslot_diff = next_timeslot > current_timeslot ? next_timeslot - current_timeslot:
+            current_slotframe->length - (current_timeslot - next_timeslot);
+        /* Update ASN */
+        ASN_INC(current_asn, timeslot_diff);
+
+        /* Update timeslot and cell start, schedule next wakeup */
+        current_timeslot = next_timeslot;
+        current_cell_start +=  timeslot_diff * TsSlotDuration + drift_correction;
+        rtimer_set(t, current_cell_start,
+            0, (rtimer_callback_t)tsch_cell_operation, NULL);
+        printf("TSCH: end of cell %u\n", timeslot_diff);
+      }
+
+      PT_YIELD(&cell_operation_pt);
+  }
+
+  PT_END(&cell_operation_pt);
+}
+
+static
+PT_THREAD(tsch_associate_dummy(struct pt *pt))
+{
+  static struct etimer a_timer;
+
+  PT_BEGIN(pt);
+
+  printf("TSCH: associate\n");
+  if(tsch_is_coordinator) {
+    associated = 1;
+    current_slotframe = &minimum_slotframe;
+    current_timeslot = get_first_active_timeslot();
+    ASN_SET(current_asn, current_timeslot);
+    current_cell_start = RTIMER_NOW() + TRIVIAL_DELAY;
+    printf("TSCH: associate [done as coordinator]\n");
+  } else {
+    /* TODO */
+    etimer_set(&a_timer, CLOCK_SECOND);
+    PT_WAIT_UNTIL(pt, etimer_expired(&a_timer));
+  }
+
+  PT_END(pt);
+}
+
+/* The main TSCH process */
+PROCESS_THREAD(tsch_process, ev, data)
+{
+  static struct rtimer cell_operation_timer;
+  static struct pt associate_pt;
+
+  PROCESS_BEGIN();
+
+  while(1) {
+
+    /* Associate */
+    while(!associated) {
+      PROCESS_PT_SPAWN(&associate_pt, tsch_associate_dummy(&associate_pt));
+    }
+
+    /* Operate */
+    printf("TSCH: starting cell operation\n");
+    rtimer_set(&cell_operation_timer, current_cell_start,
+        0, (rtimer_callback_t)tsch_cell_operation, NULL);
+
+    PROCESS_WAIT_UNTIL(!associated);
+  }
+
+  PROCESS_END();
+}
+
+
+
+
+
+
+
+
 
 /*---------------------------------------------------------------------------*/
 static void
@@ -1308,14 +1500,16 @@ tsch_init(void)
    * this flag is used to prevent this */
   ieee154e_vars.first_associate = 0;
   tsch_queue_init();
-  process_start(&tsch_tx_callback_process, NULL);
+//  process_start(&tsch_tx_callback_process, NULL);
   /* try to associate to a network or start one if setup as RPL root */
-  process_start(&tsch_associate, NULL);
+//  process_start(&tsch_associate, NULL);
   /* XXX for debugging */
   hop_channel(0);
   /*	NETSTACK_RADIO.on(); */
-  powercycle(&ieee154e_vars.t, NULL);
+//  powercycle(&ieee154e_vars.t, NULL);
   /* schedule_fixed(&ieee154e_vars.t, RTIMER_NOW(), 0); */
+
+  process_start(&tsch_process, NULL);
 }
 /*---------------------------------------------------------------------------*/
 const struct rdc_driver tschrdc_driver = {

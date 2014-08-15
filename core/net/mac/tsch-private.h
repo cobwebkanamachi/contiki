@@ -68,7 +68,7 @@ void uart0_writeb(unsigned char c);
 #define NACK_FLAG 0x8000
 
 /* number of slots to wait before initiating resynchronization */
-#define RESYNCH_TIMEOUT ieee154e_vars.current_slotframe->length * 30
+#define DESYNC_THRESHOLD ieee154e_vars.current_slotframe->length * 30
 /* number of slots to wait before activating keep-alive mechanism */
 #define KEEPALIVE_TIMEOUT ieee154e_vars.current_slotframe->length * 3
 /* number of slots to wait before applying drift correction */
@@ -259,6 +259,22 @@ typedef struct {
   uint32_t asn_4lsb;
 } asn_t;
 
+#define ASN_SET(asn, val) do { \
+    (asn).asn_msb = 0; \
+    (asn).asn_4lsb = (uint32_t)(val); \
+  } while(0);
+
+#define ASN_INC(asn, val) do { \
+    uint32_t old_4lsb = (asn).asn_4lsb; \
+    (asn).asn_4lsb += (uint32_t)(val); \
+    if((asn).asn_4lsb < old_4lsb) { \
+      (asn).asn_msb++; \
+    } \
+  } while(0);
+
+/* TODO: do it over 5 bytes */
+#define ASN_DIFF(asn, asn2) ((asn).asn_4lsb - (asn2).asn_4lsb)
+
 #define STD_ACK_LEN 3
 #define SYNC_IE_LEN 4
 
@@ -297,8 +313,8 @@ typedef struct {
   volatile uint16_t drift_counter; /* number of received drift corrections source neighbors */
   uint8_t cell_decison;
   cell_t *cell;
-  struct TSCH_packet *p;
-  struct neighbor_queue *n;
+  struct tsch_packet *p;
+  struct tsch_neighbor *n;
   void *payload;
   unsigned short payload_len;
   /* 1 byte for length if needed as dictated by the radio driver */

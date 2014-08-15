@@ -37,8 +37,8 @@
  *         Beshr Al Nahas <beshr@sics.se>
  */
 
-#ifndef __TSCH_PACKET_H__
-#define __TSCH_PACKET_H__
+#ifndef __tsch_packet_H__
+#define __tsch_packet_H__
 
 #include "contiki.h"
 #include "net/mac/tsch-private.h"
@@ -49,4 +49,4 @@ void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet
 /* Create an EB packet */
 int make_eb(uint8_t *buf, uint8_t buf_size);
 
-#endif /* __TSCH_PACKET_H__ */
+#endif /* __tsch_packet_H__ */
