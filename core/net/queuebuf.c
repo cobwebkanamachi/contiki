@@ -132,7 +132,8 @@ LIST(queuebuf_list);
 #define DEBUG 0
 #if DEBUG
 #include <stdio.h>
-#define PRINTF(...) printf(__VA_ARGS__)
+int dbg_printf(const char *fmt, ...);
+#define PRINTF(...) dbg_printf(__VA_ARGS__)
 #else
 #define PRINTF(...)
 #endif
@@ -356,6 +357,7 @@ queuebuf_new_from_packetbuf(void)
 #else
       if(buf->ram_ptr == NULL) {
         PRINTF("queuebuf_new_from_packetbuf: could not queuebuf data\n");
+        memb_free(&bufmem, buf);
         return NULL;
       }
       buframptr = buf->ram_ptr;
