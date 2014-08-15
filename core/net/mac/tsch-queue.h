@@ -43,7 +43,7 @@
 #include "contiki.h"
 #include "net/rime/rimeaddr.h"
 
-/* TSCH queue size: must be power of two to enable atomic put operation */
+/* Per-neighbor queue size: must be power of two to enable atomic put operation */
 #if ( TSCH_NBR_BUFFER_CONF_SIZE && !(TSCH_NBR_BUFFER_CONF_SIZE & (TSCH_NBR_BUFFER_CONF_SIZE-1)) )
 #define NBR_BUFFER_SIZE TSCH_NBR_BUFFER_CONF_SIZE
 #else
@@ -63,6 +63,7 @@ struct TSCH_packet
 /* TSCH neighbor information */
 struct neighbor_queue
 {
+	/* Neighbors are stored as a list: "next" must be the first field */
 	struct neighbor_queue *next;
 	/* TODO: have only one array for the whole system */
 	struct TSCH_packet buffer[NBR_BUFFER_SIZE]; /* circular buffer of packets.
