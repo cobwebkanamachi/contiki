@@ -34,6 +34,8 @@
 #ifndef __PROJECT_CONF_H__
 #define __PROJECT_CONF_H__
 
+#include "cooja-debug.h"
+
 /* Needed for TSCH */
 #undef DCOSYNCH_CONF_ENABLED
 #define DCOSYNCH_CONF_ENABLED 0
@@ -45,6 +47,10 @@
 /* The IEEE 802.15.4 channel in use */
 #undef RF_CHANNEL
 #define RF_CHANNEL              15
+
+/* No channel hopping for the moment */
+#undef TSCH_CONF_WITHOUT_CHANNEL_HOPPING
+#define TSCH_CONF_WITHOUT_CHANNEL_HOPPING 1
 
 /* The cc2420 transmission power (min:0, max: 31) */
 #define RF_POWER                31

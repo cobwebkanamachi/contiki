@@ -43,6 +43,21 @@
 
 #include "net/rime/rimeaddr.h"
 
+#if CONTIKI_TARGET_JN5168
+#define CONVERT_DRIFT_US_TO_RTIMER(D, DC) ((uint32_t)(D) * 16UL)/((uint32_t)(DC));
+#define RTIMER_TO_US(T)		((T)>>4UL)
+#define ENABLE_DELAYED_RF 1
+#include "dev/micromac-radio.h"
+#undef putchar
+void uart0_writeb(unsigned char c);
+#define putchar uart0_writeb
+#else /* Leave CC2420 as default */
+#define CONVERT_DRIFT_US_TO_RTIMER(D, DC) (((D) * 100UL)/(3051UL * (DC)));
+/* Do the math in 32bits to save precision */
+#define RTIMER_TO_US(T)		(((uint32_t)(T)* 3051UL)/(uint32_t)100UL)
+#include "dev/cc2420-tsch.h"
+#endif /* CONTIKI_TARGET */
+
 //struct received_frame_radio_s {
 //  uint8_t* buf;
 //  uint8_t len;
@@ -185,9 +200,6 @@ enum ieee154e_atomicdurations_enum {
 	wdAckDuration = 21,                  //  600us (measured 1000us me: 440us)
 };
 #endif
-enum ieee154e_states_enum {
-	TSCH_OFF = 0, TSCH_ASSOCIATED = 1, TSCH_SEARCHING = 2, TSCH_TIMEOUT,
-};
 
 enum slotframe_operations_enum {
 	ADD_SLOTFRAME = 0, DELETE_SLOTFRAME = 2, MODIFY_SLOTFRAME = 3,
@@ -254,5 +266,45 @@ typedef struct {
 #define MAC_MIN_BE 1
 #define MAC_MAC_FRAME_RETRIES 4
 #define MAC_MAC_BE 4
+
+/* IEEE 802.154e TSCH state */
+typedef struct {
+	volatile asn_t asn;                // current absolute slot number
+	volatile uint8_t state;              // state of the FSM
+	uint8_t dsn;                // data sequence number
+	uint16_t sync_timeout;        // how many slots left before loosing sync
+	uint8_t mac_ebsn;						//EB sequence number
+	uint8_t join_priority;			//inherit from RPL - for PAN coordinator: 0 -- lower is better
+	slotframe_t * current_slotframe;
+	volatile rtimer_clock_t start; //cell start time
+	uint8_t slot_template_id;
+	uint8_t hop_sequence_id;
+	volatile uint16_t timeslot;
+	volatile int16_t registered_drift;
+	volatile struct received_frame_radio_s *last_rf;
+	volatile struct rtimer t;
+	volatile struct pt mpt;
+	volatile uint8_t need_ack;
+	/* variable to protect queue structure */
+	volatile uint8_t working_on_queue;
+	uint8_t eb_buf[TSCH_MAX_PACKET_LEN+1]; /* a buffer for EB packets, last byte for length */
+
+	/* on resynchronization, the node has already joined a RPL network and it is mistaking it with root
+	 * this flag is used to prevent this */
+	volatile uint8_t first_associate;
+	volatile int32_t drift_correction;
+	volatile int32_t drift; //estimated drift to all time source neighbors
+	volatile uint16_t drift_counter; //number of received drift corrections source neighbors
+	uint8_t cell_decison;
+	cell_t * cell;
+	struct TSCH_packet* p;
+	struct neighbor_queue *n;
+	void * payload;
+	unsigned short payload_len;
+	//1 byte for length if needed as dictated by the radio driver
+	uint8_t ackbuf[STD_ACK_LEN + SYNC_IE_LEN +1];
+} ieee154e_vars_t;
+
+extern volatile ieee154e_vars_t ieee154e_vars;
 
 #endif /* __TSCH_PRIVATE_H__ */
