@@ -206,10 +206,9 @@ static uint8_t tsch_random_byte(uint8_t window) {
 /*---------------------------------------------------------------------------*/
 // Function send for TSCH-MAC, puts the packet in packetbuf in the MAC queue
 static int
-send_one_packet(mac_callback_t sent, void *ptr)
+send_packet(mac_callback_t sent, void *ptr)
 {
-	//send_one_packet(sent, ptr);
-	PRINTF("TSCH send_one_packet\n");
+	PRINTF("TSCH send_packet\n");
 	int ret = MAC_TX_DEFERRED;
 	uint16_t seqno;
 	struct neighbor_queue *n;
@@ -254,31 +253,11 @@ send_one_packet(mac_callback_t sent, void *ptr)
 }
 /*---------------------------------------------------------------------------*/
 static void
-send_packet(mac_callback_t sent, void *ptr)
-{
-	send_one_packet(sent, ptr);
-}
-/*---------------------------------------------------------------------------*/
-static void
 send_list(mac_callback_t sent, void *ptr, struct rdc_buf_list *buf_list)
 {
-	while (buf_list != NULL) {
-		/* We backup the next pointer, as it may be nullified by
-		 * mac_call_sent_callback() */
-		struct rdc_buf_list *next = buf_list->next;
-		int last_sent_ok;
-
-		queuebuf_to_packetbuf(buf_list->buf);
-		last_sent_ok = send_one_packet(sent, ptr);
-
-		/* If packet transmission was not successful, we should back off and let
-		 * upper layers retransmit, rather than potentially sending out-of-order
-		 * packet fragments. */
-		if (!last_sent_ok) {
-			return;
-		}
-		buf_list = next;
-	}
+	/* TSCH does not support send_list. Must be used with nullmac, not csma. */
+	mac_call_sent_callback(sent, ptr, MAC_TX_ERR_FATAL, 1);
+	return;
 }
 /*---------------------------------------------------------------------------*/
 
@@ -1473,12 +1452,18 @@ static void tsch_init_variables(void)
 	NETSTACK_RADIO_sfd_sync(1, 1);
 	NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
 }
+#include "net/mac/nullmac.h"
 /*---------------------------------------------------------------------------*/
 static void
 tsch_init(void)
 {
+	extern const struct mac_driver nullmac_driver;
+	if(&NETSTACK_CONF_MAC != &nullmac_driver) {
+		printf("TSCH: must be used with nullmac.\n");
+		return;
+	}
+
 	leds_blink();
-	COOJA_DEBUG_STR("tsch_init");
 	tsch_init_variables();
 	/* on resynchronization, the node has already joined a RPL network and it is mistaking it with root
 	 * this flag is used to prevent this */
