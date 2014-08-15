@@ -26,7 +26,7 @@
  * This file is part of the Contiki operating system.
  *
  */
-//#pragma GCC poison printf
+/* #pragma GCC poison printf */
 #undef WITH_COMPOWER
 #include "contiki.h"
 #include "lib/random.h"
@@ -37,7 +37,7 @@
 #ifdef WITH_COMPOWER
 #include "powertrace.h"
 #endif
-//#include <stdio.h>
+/* #include <stdio.h> */
 #include <string.h>
 #include "tsch.h"
 
@@ -67,10 +67,10 @@
 #define PERIOD 30
 #endif
 
-#define START_INTERVAL		(15 * CLOCK_SECOND)
-#define SEND_INTERVAL		(PERIOD * CLOCK_SECOND)
-#define SEND_TIME		(random_rand() % (SEND_INTERVAL))
-#define MAX_PAYLOAD_LEN		30
+#define START_INTERVAL    (15 * CLOCK_SECOND)
+#define SEND_INTERVAL   (PERIOD * CLOCK_SECOND)
+#define SEND_TIME   (random_rand() % (SEND_INTERVAL))
+#define MAX_PAYLOAD_LEN   30
 
 #define DISABLE_RPL 1
 
@@ -100,9 +100,9 @@ send_packet(void *ptr)
   char buf[MAX_PAYLOAD_LEN];
 
   seq_id++;
-  sprintf(buf, "%d::Hello %d", seq_id, rimeaddr_node_addr.u8[RIMEADDR_SIZE-1]);
+  sprintf(buf, "%d::Hello %d", seq_id, rimeaddr_node_addr.u8[RIMEADDR_SIZE - 1]);
   PRINTF("DATA send to %d '%s'\n",
-           server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1], buf);
+         server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1], buf);
   uip_udp_packet_sendto(client_conn, buf, strlen(buf),
                         &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
 }
@@ -121,8 +121,8 @@ print_local_addresses(void)
       PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
       PRINTF("\n");
       /* hack to make address "final" */
-      if (state == ADDR_TENTATIVE) {
-      	uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
+      if(state == ADDR_TENTATIVE) {
+        uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
       }
     }
   }
@@ -133,25 +133,25 @@ set_global_address(void)
 {
   uip_ipaddr_t ipaddr;
 
-	uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
-	uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-	uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
+  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
+  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
+  uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
 
-	tsch_is_coordinator = 0;
+  tsch_is_coordinator = 0;
 
 #if DISABLE_RPL
-	uip_ds6_defrt_t *
-	uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
-	uip_ds6_nbr_t *
-	uip_ds6_nbr_add(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr, uint8_t isrouter,
-			uint8_t state);
+  uip_ds6_defrt_t *
+  uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
+  uip_ds6_nbr_t *
+  uip_ds6_nbr_add(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr, uint8_t isrouter,
+                  uint8_t state);
 
-	uip_lladdr_t lladdr = {{ 0x0, 0x12, 0x74, 00, 0x11, 0x60, 0xfd, 0xbd  }};
+  uip_lladdr_t lladdr = { { 0x0, 0x12, 0x74, 00, 0x11, 0x60, 0xfd, 0xbd } };
 
-	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0, 0, 0, 0);
-	uip_ds6_set_addr_iid(&ipaddr, &lladdr);
-	uip_ds6_defrt_add(&ipaddr, 0);
-	uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
+  uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0, 0, 0, 0);
+  uip_ds6_set_addr_iid(&ipaddr, &lladdr);
+  uip_ds6_defrt_add(&ipaddr, 0);
+  uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
 
 #endif
 
@@ -168,14 +168,14 @@ set_global_address(void)
 
 #if 1
 /* Mode 1 - 64 bits inline */
-   uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
+  uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
 #elif 0
 /* Mode 2 - 16 bits inline */
   uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
 #else
 /* Mode 3 - derived from server link-local (MAC) address */
-//  uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
-    uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0x215, 0x8d00, 0x46, 0x5f85);
+/*  uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag */
+  uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0x215, 0x8d00, 0x46, 0x5f85);
 
 #endif
 }
@@ -209,7 +209,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
   PRINTF("Created a connection with the server ");
   PRINT6ADDR(&client_conn->ripaddr);
   PRINTF(" local/remote port %u/%u\n",
-	UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
+         UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
 
 #if WITH_COMPOWER
   powertrace_sniff(POWERTRACE_ON);
@@ -221,22 +221,20 @@ PROCESS_THREAD(udp_client_process, ev, data)
     if(ev == tcpip_event) {
       tcpip_handler();
     }
-
     if(etimer_expired(&periodic)) {
       etimer_reset(&periodic);
       ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);
-//      etimer_set(&periodic, SEND_INTERVAL+SEND_TIME);
-//      send_packet(NULL);
+/*      etimer_set(&periodic, SEND_INTERVAL+SEND_TIME); */
+/*      send_packet(NULL); */
 
-//#if WITH_COMPOWER
-//      if (print == 0) {
-//	powertrace_print("#P");
-//      }
-//      if (++print == 3) {
-//	print = 0;
-//      }
-//#endif
-
+/* #if WITH_COMPOWER */
+/*      if (print == 0) { */
+/*	powertrace_print("#P"); */
+/*      } */
+/*      if (++print == 3) { */
+/*	print = 0; */
+/*      } */
+/* #endif */
     }
   }
 

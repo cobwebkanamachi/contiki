@@ -25,7 +25,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
-  *
+ *
  */
 /**
  * \file
@@ -73,7 +73,9 @@ receiver(struct simple_udp_connection *c,
   RPL_LOG_FROM_APPDATAPTR((struct app_data *)data, "App: received");
 }
 /*---------------------------------------------------------------------------*/
-void app_send_broadcast() {
+void
+app_send_broadcast()
+{
 
   static unsigned int cnt;
   struct app_data data;
@@ -117,23 +119,22 @@ PROCESS_THREAD(broadcast_sender_process, ev, data)
 
   deployment_init(&global_ipaddr);
   simple_udp_register(&broadcast_connection, UDP_PORT,
-                        NULL, UDP_PORT,
-                        receiver);
+                      NULL, UDP_PORT,
+                      receiver);
 
   if(node_id == COORDINATOR_ID) {
-  	tsch_is_coordinator = 1;
+    tsch_is_coordinator = 1;
   }
+  etimer_set(&periodic_timer, SEND_INTERVAL);
+  while(1) {
+    etimer_set(&send_timer, random_rand() % (SEND_INTERVAL));
+    PROCESS_WAIT_UNTIL(etimer_expired(&send_timer));
 
-	etimer_set(&periodic_timer, SEND_INTERVAL);
-	while(1) {
-		etimer_set(&send_timer, random_rand() % (SEND_INTERVAL));
-		PROCESS_WAIT_UNTIL(etimer_expired(&send_timer));
+    app_send_broadcast();
 
-		app_send_broadcast();
-
-		PROCESS_WAIT_UNTIL(etimer_expired(&periodic_timer));
-		etimer_reset(&periodic_timer);
-	}
+    PROCESS_WAIT_UNTIL(etimer_expired(&periodic_timer));
+    etimer_reset(&periodic_timer);
+  }
 
   PROCESS_END();
 }

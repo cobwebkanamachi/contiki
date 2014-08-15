@@ -44,9 +44,9 @@
 #include "net/mac/tsch-private.h"
 
 /* This function adds the Sync IE from the beginning of the buffer and returns the reported drift in microseconds */
-int16_t add_sync_IE(uint8_t* buf, int32_t time_difference_32, uint8_t nack);
+int16_t add_sync_IE(uint8_t *buf, int32_t time_difference_32, uint8_t nack);
 void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack);
 /* Create an EB packet */
-int make_eb(uint8_t * buf, uint8_t buf_size);
+int make_eb(uint8_t *buf, uint8_t buf_size);
 
 #endif /* __TSCH_PACKET_H__ */

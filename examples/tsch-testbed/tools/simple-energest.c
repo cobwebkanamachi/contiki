@@ -25,7 +25,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
-  *
+ *
  */
 /**
  * \file
@@ -45,15 +45,18 @@ static uint32_t delta_tx, delta_rx, delta_time;
 static uint32_t curr_tx, curr_rx, curr_time;
 
 /*---------------------------------------------------------------------------*/
-void simple_energest_init() {
+void
+simple_energest_init()
+{
   energest_flush();
   last_tx = energest_type_time(ENERGEST_TYPE_TRANSMIT);
   last_rx = energest_type_time(ENERGEST_TYPE_LISTEN);
   last_time = energest_type_time(ENERGEST_TYPE_CPU) + energest_type_time(ENERGEST_TYPE_LPM);
 }
-
 /*---------------------------------------------------------------------------*/
-void simple_energest_step() {
+void
+simple_energest_step()
+{
   static uint16_t cnt;
   energest_flush();
 
@@ -69,11 +72,11 @@ void simple_energest_step() {
   last_rx = curr_rx;
   last_time = curr_time;
 
-  uint32_t fraction = (100ul*(delta_tx+delta_rx))/delta_time;
+  uint32_t fraction = (100ul * (delta_tx + delta_rx)) / delta_time;
   RPL_LOG_NULL("Duty Cycle: [%u %u] %8lu +%8lu /%8lu (%lu %%)",
-      node_id,
-      cnt++,
-      delta_tx, delta_rx, delta_time,
-      fraction
-  );
+               node_id,
+               cnt++,
+               delta_tx, delta_rx, delta_time,
+               fraction
+               );
 }

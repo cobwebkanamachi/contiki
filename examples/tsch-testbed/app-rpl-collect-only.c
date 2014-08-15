@@ -25,7 +25,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
-  *
+ *
  */
 /**
  * \file
@@ -66,7 +66,9 @@ receiver(struct simple_udp_connection *c,
   RPL_LOG_FROM_APPDATAPTR((struct app_data *)data, "App: received");
 }
 /*---------------------------------------------------------------------------*/
-void app_send_to(uint16_t id) {
+void
+app_send_to(uint16_t id)
+{
 
   static unsigned int cnt;
   struct app_data data;
@@ -127,7 +129,6 @@ PROCESS_THREAD(unicast_sender_process, ev, data)
       } else {
         printf("App: not in DODAG\n");
       }
-
       PROCESS_WAIT_UNTIL(etimer_expired(&periodic_timer));
       etimer_reset(&periodic_timer);
     }

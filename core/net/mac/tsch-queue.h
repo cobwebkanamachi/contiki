@@ -47,36 +47,34 @@
 #include "net/rime/rimeaddr.h"
 
 /* Per-neighbor queue size: must be power of two to enable atomic put operation */
-#if ( TSCH_NBR_BUFFER_CONF_SIZE && !(TSCH_NBR_BUFFER_CONF_SIZE & (TSCH_NBR_BUFFER_CONF_SIZE-1)) )
+#if (TSCH_NBR_BUFFER_CONF_SIZE && !(TSCH_NBR_BUFFER_CONF_SIZE & (TSCH_NBR_BUFFER_CONF_SIZE - 1)))
 #define NBR_BUFFER_SIZE TSCH_NBR_BUFFER_CONF_SIZE
 #else
 #define NBR_BUFFER_SIZE 4
 #endif
 
 /* TSCH packet information */
-struct TSCH_packet
-{
-	struct queuebuf * pkt; /* pointer to the packet to be sent */
-	mac_callback_t sent; /* callback for this packet */
-	void *ptr; /* MAC callback parameter */
-	uint8_t transmissions; /* #transmissions performed for this packet */
-	uint8_t ret; /* status -- MAC return code */
+struct TSCH_packet {
+  struct queuebuf *pkt;  /* pointer to the packet to be sent */
+  mac_callback_t sent; /* callback for this packet */
+  void *ptr; /* MAC callback parameter */
+  uint8_t transmissions; /* #transmissions performed for this packet */
+  uint8_t ret; /* status -- MAC return code */
 };
 
 /* TSCH neighbor information */
-struct neighbor_queue
-{
-	/* Neighbors are stored as a list: "next" must be the first field */
-	struct neighbor_queue *next;
-	/* TODO: have only one array for the whole system */
-	struct TSCH_packet buffer[NBR_BUFFER_SIZE]; /* circular buffer of packets.
-	Its size must be a power of two 	to allow for atomic put */
-	rimeaddr_t addr; /* link-layer address of the neighbor */
-	uint8_t is_time_source; /* is this neighbor a time source? */
-	uint8_t BE_value; /* current value of backoff exponent */
-	uint8_t BW_value; /* current value of backoff counter */
-	volatile uint8_t put_ptr,
-					get_ptr; /* pointers for circular buffer implementation */
+struct neighbor_queue {
+  /* Neighbors are stored as a list: "next" must be the first field */
+  struct neighbor_queue *next;
+  /* TODO: have only one array for the whole system */
+  struct TSCH_packet buffer[NBR_BUFFER_SIZE]; /* circular buffer of packets.
+                                                 Its size must be a power of two  to allow for atomic put */
+  rimeaddr_t addr; /* link-layer address of the neighbor */
+  uint8_t is_time_source; /* is this neighbor a time source? */
+  uint8_t BE_value; /* current value of backoff exponent */
+  uint8_t BW_value; /* current value of backoff counter */
+  volatile uint8_t put_ptr,
+                   get_ptr; /* pointers for circular buffer implementation */
 };
 
 /* Add a TSCH neighbor */

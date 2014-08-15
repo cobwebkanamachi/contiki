@@ -25,7 +25,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
-  *
+ *
  */
 /**
  * \author Simon Duquennoy <simonduq@sics.se>
@@ -56,7 +56,7 @@
 #define RF_POWER                31
 
 /* The cc2420 RSSI threshold (-32 is the reset value for -77 dBm) */
-#define RSSI_THR				(-32-14)
+#define RSSI_THR        (-32 - 14)
 
 /* The ContikiMAC wakeup interval */
 #define CONTIKIMAC_CONF_CYCLE_TIME (RTIMER_ARCH_SECOND / 8)

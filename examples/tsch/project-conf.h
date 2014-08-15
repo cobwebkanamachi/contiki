@@ -26,8 +26,8 @@
 
 #endif /* CONTIKI_TARGET */
 
-//#undef WITH_UIP6
-//#define WITH_UIP6 0
+/* #undef WITH_UIP6 */
+/* #define WITH_UIP6 0 */
 
 #undef UIP_CONF_LOGGING
 #define UIP_CONF_LOGGING 0
@@ -41,10 +41,10 @@
 #undef NETSTACK_CONF_RDC
 #define NETSTACK_CONF_RDC     tschrdc_driver
 
-//#if TMOTE_SKY
-//#undef NETSTACK_CONF_RADIO
-//#define NETSTACK_CONF_RADIO     tschrdc_driver
-//#endif
+/* #if TMOTE_SKY */
+/* #undef NETSTACK_CONF_RADIO */
+/* #define NETSTACK_CONF_RADIO     tschrdc_driver */
+/* #endif */
 
 #undef UIP_CONF_ND6_SEND_NA
 #define UIP_CONF_ND6_SEND_NA 0
@@ -53,7 +53,7 @@
 #define UIP_CONF_ND6_SEND_RA 0
 
 #undef NBR_TABLE_CONF_MAX_NEIGHBORS
-#define NBR_TABLE_CONF_MAX_NEIGHBORS	20
+#define NBR_TABLE_CONF_MAX_NEIGHBORS  20
 
 #define TSCH_NBR_BUFFER_CONF_SIZE 8
 

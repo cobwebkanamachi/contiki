@@ -25,7 +25,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
-  *
+ *
  */
 /**
  * \file
@@ -74,7 +74,6 @@ is_id_in_any_to_any(uint16_t id)
   }
   return 0;
 }
-
 /*---------------------------------------------------------------------------*/
 PROCESS(unicast_sender_process, "Any-to-any Application");
 AUTOSTART_PROCESSES(&unicast_sender_process);
@@ -90,13 +89,12 @@ receiver(struct simple_udp_connection *c,
          uint16_t datalen)
 {
   struct app_data data;
-  appdata_copy(&data, (struct app_data*)dataptr);
+  appdata_copy(&data, (struct app_data *)dataptr);
   if(data.ping) {
     RPL_LOG_FROM_APPDATAPTR((struct app_data *)dataptr, "App: received ping");
   } else {
     RPL_LOG_FROM_APPDATAPTR((struct app_data *)dataptr, "App: received pong");
-  }
-  if(data.ping) {
+  } if(data.ping) {
     app_send_to(data.src, 0, data.seqno | 0x8000l);
   }
 }
@@ -119,7 +117,6 @@ app_send_to(uint16_t id, int ping, uint32_t seqno)
   } else {
     RPL_LOG_FROM_APPDATAPTR(&data, "App: sending pong");
   }
-
   /* TODO */
   /* rpl_set_curr_seqno(data.seqno); */
   set_ipaddr_from_id(&dest_ipaddr, id);
@@ -166,8 +163,8 @@ PROCESS_THREAD(unicast_sender_process, ev, data)
       PROCESS_WAIT_UNTIL(etimer_expired(&send_timer));
 
       do {
-        target_id = get_node_id_from_index((random_rand()>>8)%get_n_nodes());
-      } while (target_id == node_id || !is_id_in_any_to_any(target_id));
+        target_id = get_node_id_from_index((random_rand() >> 8) % get_n_nodes());
+      } while(target_id == node_id || !is_id_in_any_to_any(target_id));
 
       if(target_id < node_id || target_id == ROOT_ID) {
         /* After finding an addressable node, send only if destination has lower ID

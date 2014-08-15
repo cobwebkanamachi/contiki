@@ -25,7 +25,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
-  *
+ *
  */
 /**
  * \file
@@ -47,35 +47,36 @@ static neighbor_set_size = 0;
 
 /* Print all neighbors (RPL "parents"), their link metric and rank */
 static void
-rpl_print_neighbor_list() {
-	  rpl_parent_t *p = nbr_table_head(rpl_parents);
-	  printf("RPL: neighbor list\n");
-	  while(p != NULL) {
-		  printf("RPL: nbr %d %u + %u = %u %c\n",
-				  node_id_from_rimeaddr(nbr_table_get_lladdr(rpl_parents, p)), p->rank, p->link_metric, p->rank + p->link_metric, p==default_instance->current_dag->preferred_parent?'*':' ');
-		  p = nbr_table_next(rpl_parents, p);
-	  }
-	  printf("RPL: end of neighbor list\n");
+rpl_print_neighbor_list()
+{
+  rpl_parent_t *p = nbr_table_head(rpl_parents);
+  printf("RPL: neighbor list\n");
+  while(p != NULL) {
+    printf("RPL: nbr %d %u + %u = %u %c\n",
+           node_id_from_rimeaddr(nbr_table_get_lladdr(rpl_parents, p)), p->rank, p->link_metric, p->rank + p->link_metric, p == default_instance->current_dag->preferred_parent ? '*' : ' ');
+    p = nbr_table_next(rpl_parents, p);
+  }
+  printf("RPL: end of neighbor list\n");
 }
-
 /* Copy an appdata to another with no assumption that the addresses are aligned */
 void
 appdata_copy(struct app_data *dst, struct app_data *src)
 {
   int i;
-  for(i=0; i<sizeof(struct app_data); i++) {
-    ((char*)dst)[i] = (((char*)src)[i]);
+  for(i = 0; i < sizeof(struct app_data); i++) {
+    ((char *)dst)[i] = (((char *)src)[i]);
   }
 }
-
 /* Get dataptr from the packet currently in uIP buffer */
 struct app_data *
 appdataptr_from_uip()
 {
   struct app_data *ptr;
   struct app_data data;
-  if(uip_len < sizeof(struct app_data)) return NULL;
-  ptr = (struct app_data *)((char*)uip_buf + ((uip_len - sizeof(struct app_data))));
+  if(uip_len < sizeof(struct app_data)) {
+    return NULL;
+  }
+  ptr = (struct app_data *)((char *)uip_buf + ((uip_len - sizeof(struct app_data))));
   appdata_copy(&data, ptr);
   if(data.magic == RPL_LOG_MAGIC) {
     return ptr;
@@ -83,15 +84,16 @@ appdataptr_from_uip()
     return NULL;
   }
 }
-
 /* Get dataptr from the current packetbuf */
 struct app_data *
 appdataptr_from_packetbuf()
 {
   struct app_data *ptr;
   struct app_data data;
-  if(packetbuf_datalen() < sizeof(struct app_data)) return NULL;
-  ptr = (struct app_data *)((char*)packetbuf_dataptr() + ((packetbuf_datalen() - sizeof(struct app_data))));
+  if(packetbuf_datalen() < sizeof(struct app_data)) {
+    return NULL;
+  }
+  ptr = (struct app_data *)((char *)packetbuf_dataptr() + ((packetbuf_datalen() - sizeof(struct app_data))));
   appdata_copy(&data, ptr);
   if(data.magic == RPL_LOG_MAGIC) {
     return ptr;
@@ -111,45 +113,41 @@ log_appdataptr(struct app_data *dataptr)
     appdata_copy(&data, dataptr);
 
     printf(" [%lx %u %u->%u]",
-        data.seqno,
-        data.hop,
-        data.src,
-        data.dest
-        );
+           data.seqno,
+           data.hop,
+           data.src,
+           data.dest
+           );
   }
 
   if(neighbor_set_size == 0) {
-  	neighbor_set_size = uip_ds6_nbr_num();
+    neighbor_set_size = uip_ds6_nbr_num();
   }
-
   printf(" {%u %u %u} \n",
-  		  neighbor_set_size,
-        curr_rank,
-        curr_dio_interval
-        );
+         neighbor_set_size,
+         curr_rank,
+         curr_dio_interval
+         );
 }
-
 /* Return node id from its rime address */
 uint16_t
 log_node_id_from_rimeaddr(const void *rimeaddr)
 {
   return node_id_from_rimeaddr((const rimeaddr_t *)rimeaddr);
 }
-
 /* Return node id from its IP address */
 uint16_t
 log_node_id_from_ipaddr(const void *ipaddr)
 {
   return node_id_from_ipaddr((const uip_ipaddr_t *)ipaddr);
 }
-
 PROCESS(rpl_log_process, "RPL Log");
 /* Starts logging process */
 void
-rpl_log_start() {
+rpl_log_start()
+{
   process_start(&rpl_log_process, NULL);
 }
-
 /* The logging process */
 PROCESS_THREAD(rpl_log_process, ev, data)
 {
@@ -159,15 +157,15 @@ PROCESS_THREAD(rpl_log_process, ev, data)
   simple_energest_init();
 
   while(1) {
-  	static int cnt = 0;
-  	neighbor_set_size = uip_ds6_nbr_num();
+    static int cnt = 0;
+    neighbor_set_size = uip_ds6_nbr_num();
 
     PROCESS_WAIT_UNTIL(etimer_expired(&periodic));
     etimer_reset(&periodic);
     simple_energest_step();
 
     if(cnt++ % 8 == 0) {
-    	rpl_print_neighbor_list();
+      rpl_print_neighbor_list();
     }
   }
 

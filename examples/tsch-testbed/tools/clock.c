@@ -57,7 +57,7 @@ ISR(TIMERA1, timera1)
 
     /* HW timer bug fix: Interrupt handler called before TR==CCR.
      * Occurs when timer state is toggled between STOP and CONT. */
-    while(TACTL & MC1 && TACCR1 - TAR == 1);
+    while(TACTL & MC1 && TACCR1 - TAR == 1) ;
 
     /* Make sure interrupt time is future */
     do {
@@ -65,15 +65,15 @@ ISR(TIMERA1, timera1)
       ++count;
 
       /* Make sure the CLOCK_CONF_SECOND is a power of two, to ensure
-	 that the modulo operation below becomes a logical and and not
-	 an expensive divide. Algorithm from Wikipedia:
-	 http://en.wikipedia.org/wiki/Power_of_two */
+         that the modulo operation below becomes a logical and and not
+         an expensive divide. Algorithm from Wikipedia:
+         http://en.wikipedia.org/wiki/Power_of_two */
 #if (CLOCK_CONF_SECOND & (CLOCK_CONF_SECOND - 1)) != 0
 #error CLOCK_CONF_SECOND must be a power of two (i.e., 1, 2, 4, 8, 16, 32, 64, ...).
 #error Change CLOCK_CONF_SECOND in contiki-conf.h.
 #endif
       if(count % CLOCK_CONF_SECOND == 0) {
-	++seconds;
+        ++seconds;
         energest_flush();
       }
     } while((TACCR1 - TAR) > INTERVAL);
@@ -85,11 +85,10 @@ ISR(TIMERA1, timera1)
       etimer_request_poll();
       LPM4_EXIT;
     }
-
   }
   /*  if(process_nevents() >= 0) {
-    LPM4_EXIT;
-    }*/
+     LPM4_EXIT;
+     }*/
 
   watchdog_stop();
 
@@ -128,7 +127,7 @@ clock_fine(void)
   /* Assign last_tar to local varible that can not be changed by interrupt */
   t = last_tar;
   /* perform calc based on t, TAR will not be changed during interrupt */
-  return (unsigned short) (TAR - t);
+  return (unsigned short)(TAR - t);
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -145,9 +144,9 @@ clock_init(void)
   /* Select ACLK 32768Hz clock */
   /* TACTL = TASSEL0 | TACLR; */
 
-#if INTERVAL==32768/CLOCK_SECOND
+#if INTERVAL == 32768 / CLOCK_SECOND
   TACTL = TASSEL0 | TACLR;
-#elif INTERVAL==16384/CLOCK_SECOND
+#elif INTERVAL == 16384 / CLOCK_SECOND
   TACTL = TASSEL0 | TACLR | ID_1;
 #else
 #error NEED TO UPDATE clock.c to match interval!
@@ -167,7 +166,6 @@ clock_init(void)
 
   /* Enable interrupts. */
   eint();
-
 }
 /*---------------------------------------------------------------------------*/
 /**
@@ -191,7 +189,7 @@ clock_wait(clock_time_t i)
   clock_time_t start;
 
   start = clock_time();
-  while(clock_time() - start < (clock_time_t)i);
+  while(clock_time() - start < (clock_time_t)i) ;
 }
 /*---------------------------------------------------------------------------*/
 void

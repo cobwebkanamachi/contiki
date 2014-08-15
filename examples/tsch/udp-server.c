@@ -26,7 +26,7 @@
  * This file is part of the Contiki operating system.
  *
  */
-//#pragma GCC poison printf
+/* #pragma GCC poison printf */
 
 #undef WITH_COMPOWER
 #include "contiki.h"
@@ -38,11 +38,11 @@
 #include "net/netstack.h"
 #include "tsch.h"
 
-//#include "dev/button-sensor.h"
-//#include <stdio.h>
-//#include <stdlib.h>
+/* #include "dev/button-sensor.h" */
+/* #include <stdio.h> */
+/* #include <stdlib.h> */
 #include <string.h>
-//#include <ctype.h>
+/* #include <ctype.h> */
 
 #define DEBUG DEBUG_PRINT
 #include "net/uip-debug.h"
@@ -63,12 +63,12 @@
 
 #define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
 
-#define UDP_CLIENT_PORT	4000
-#define UDP_SERVER_PORT	5678
+#define UDP_CLIENT_PORT 4000
+#define UDP_SERVER_PORT 5678
 
 #define UDP_EXAMPLE_ID  190
 #define SERVER_REPLY 1
-#define MAX_PAYLOAD_LEN		30
+#define MAX_PAYLOAD_LEN   30
 #define DISABLE_RPL 1
 
 #ifndef SERVER
@@ -91,10 +91,10 @@ tcpip_handler(void)
     appdata[uip_datalen()] = 0;
     PRINTF("DATA recv '%s' from %d\n", appdata, UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 1]);
 #if SERVER_REPLY
-    if(uip_datalen()>MAX_PAYLOAD_LEN/2) {
-    	appdata[MAX_PAYLOAD_LEN/2] = 0;
+    if(uip_datalen() > MAX_PAYLOAD_LEN / 2) {
+      appdata[MAX_PAYLOAD_LEN / 2] = 0;
     }
-    sprintf(buf, "%d::Reply::%s", rimeaddr_node_addr.u8[RIMEADDR_SIZE-1], appdata);
+    sprintf(buf, "%d::Reply::%s", rimeaddr_node_addr.u8[RIMEADDR_SIZE - 1], appdata);
     PRINTF("DATA sending '%s'\n", buf);
 
     uip_ipaddr_copy(&server_conn->ripaddr, &UIP_IP_BUF->srcipaddr);
@@ -117,8 +117,8 @@ print_local_addresses(void)
       PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
       PRINTF("\n");
       /* hack to make address "final" */
-      if (state == ADDR_TENTATIVE) {
-      	uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
+      if(state == ADDR_TENTATIVE) {
+        uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
       }
     }
   }
@@ -133,7 +133,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
 
   PROCESS_PAUSE();
 
-  //SENSORS_ACTIVATE(button_sensor);
+  /* SENSORS_ACTIVATE(button_sensor); */
 
   PRINTF("UDP server started\n");
 
@@ -146,56 +146,56 @@ PROCESS_THREAD(udp_server_process, ev, data)
    * Note Wireshark's IPCMV6 checksum verification depends on the correct uncompressed addresses.
    */
 
-  #if 1
+#if 1
   /* Mode 1 - 64 bits inline */
-     uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
-  #elif 0
+  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
+#elif 0
   /* Mode 2 - 16 bits inline */
-    uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
-  #else
+  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
+#else
   /* Mode 3 - derived from link local (MAC) address */
-    uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
-    uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-  #endif
+  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
+  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
+#endif
 
-	uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
+  uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
 
 #if !DISABLE_RPL && UIP_CONF_ROUTER
 
-	root_if = uip_ds6_addr_lookup(&ipaddr);
-	if(root_if != NULL) {
-		rpl_dag_t *dag;
-		dag = rpl_set_root(RPL_DEFAULT_INSTANCE,(uip_ip6addr_t *)&ipaddr);
-		uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
-		rpl_set_prefix(dag, &ipaddr, 64);
+  root_if = uip_ds6_addr_lookup(&ipaddr);
+  if(root_if != NULL) {
+    rpl_dag_t *dag;
+    dag = rpl_set_root(RPL_DEFAULT_INSTANCE, (uip_ip6addr_t *)&ipaddr);
+    uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
+    rpl_set_prefix(dag, &ipaddr, 64);
     PRINTF("created a new RPL dag\n");
   } else {
     PRINTF("failed to create a new RPL DAG\n");
   }
 #else
 
-	uip_ds6_defrt_t *
-	uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
-	uip_ds6_nbr_t *
-	uip_ds6_nbr_add(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr, uint8_t isrouter,
-			uint8_t state);
+  uip_ds6_defrt_t *
+  uip_ds6_defrt_add(uip_ipaddr_t *ipaddr, unsigned long interval);
+  uip_ds6_nbr_t *
+  uip_ds6_nbr_add(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr, uint8_t isrouter,
+                  uint8_t state);
 
-	uip_lladdr_t lladdr = {{ 0x0, 0x15, 0x8d, 0, 0, 0x46, 0x5f, 0x12 }};
+  uip_lladdr_t lladdr = { { 0x0, 0x15, 0x8d, 0, 0, 0x46, 0x5f, 0x12 } };
 
-	uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0, 0, 0, 0);
-	uip_ds6_set_addr_iid(&ipaddr, &lladdr);
-	uip_ds6_defrt_add(&ipaddr, 0);
-	uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
+  uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0, 0, 0, 0);
+  uip_ds6_set_addr_iid(&ipaddr, &lladdr);
+  uip_ds6_defrt_add(&ipaddr, 0);
+  uip_ds6_nbr_add(&ipaddr, &lladdr, 1, ADDR_MANUAL);
 
 #endif /* UIP_CONF_ROUTER */
 
-	tsch_is_coordinator = 1;
+  tsch_is_coordinator = 1;
 
   print_local_addresses();
 
   /* The data sink runs with a 100% duty cycle in order to ensure high
      packet reception rates. */
-  //NETSTACK_MAC.off(1);
+  /* NETSTACK_MAC.off(1); */
 
   server_conn = udp_new(NULL, UIP_HTONS(UDP_CLIENT_PORT), NULL);
   if(server_conn == NULL) {
@@ -213,10 +213,11 @@ PROCESS_THREAD(udp_server_process, ev, data)
     PROCESS_YIELD();
     if(ev == tcpip_event) {
       tcpip_handler();
-    } /*else if (ev == sensors_event && data == &button_sensor) {
-      PRINTF("Initiaing global repair\n");
-      rpl_repair_root(RPL_DEFAULT_INSTANCE);
-    }*/
+      /*else if (ev == sensors_event && data == &button_sensor) {
+         PRINTF("Initiaing global repair\n");
+         rpl_repair_root(RPL_DEFAULT_INSTANCE);
+         }*/
+    }
   }
 
   PROCESS_END();

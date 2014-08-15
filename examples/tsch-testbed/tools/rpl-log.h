@@ -25,7 +25,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
-  *
+ *
  */
 /**
  * \file
@@ -43,7 +43,7 @@
 /* Data structure copied at the end of all data packets, making it possible
  * to trace packets at every hop, from every layer. */
 struct app_data {
-	uint32_t magic;
+  uint32_t magic;
   uint32_t seqno;
   uint16_t src;
   uint16_t dest;
@@ -74,7 +74,7 @@ void rpl_log_start();
 #define RPL_LOG_IPADDR(addr) uip_debug_ipaddr_print(addr)
 #define RPL_LOG_LLADDR(addr) uip_debug_lladdr_print(addr)
 #define RPL_LOG_INC_HOPCOUNT_FROM_PACKETBUF() { struct app_data *dataptr = appdataptr_from_packetbuf(); \
-	if(dataptr != NULL) dataptr->hop++; }
+                                                if(dataptr != NULL) { dataptr->hop++; } }
 
 #define RPL_LOG_NODEID_FROM_RIMEADDR log_node_id_from_rimeaddr
 #define RPL_LOG_NODEID_FROM_IPADDR log_node_id_from_ipaddr
