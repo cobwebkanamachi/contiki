@@ -42,7 +42,6 @@
 #define __TSCH_PRIVATE_H__
 
 #include "contiki.h"
-#include "net/mac/tsch-schedule.h"
 
 #if CONTIKI_TARGET_JN5168
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) ((uint32_t)(D) * 16UL) / ((uint32_t)(DC));
@@ -283,6 +282,12 @@ struct slotframe {
   uint16_t on_size;
   struct tsch_link **links;
 };
+
+/* Link options */
+#define LINK_OPTION_TX              1
+#define LINK_OPTION_RX              2
+#define LINK_OPTION_SHARED          4
+#define LINK_OPTION_TIME_KEEPING    8
 
 enum cell_decision_enum {
   CELL_OFF = 0,
