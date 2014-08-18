@@ -509,7 +509,7 @@ powercycle(struct rtimer *t, void *ptr)
       PT_YIELD(&ieee154e_vars.mpt);
       leds_off(LEDS_RED);
     }
-    ieee154e_vars.timeslot = ieee154e_vars.asn.asn_4lsb % ieee154e_vars.current_slotframe->length;
+    ieee154e_vars.timeslot = ieee154e_vars.asn.asn_4lsb % ieee154e_vars.current_slotframe->size;
     if(ieee154e_vars.join_priority == 0) {
       ieee154e_vars.start = RTIMER_NOW();
       /* while MAC-RDC is not disabled, and while its synchronized */
@@ -971,7 +971,7 @@ powercycle(struct rtimer *t, void *ptr)
 
       dt =
         next_timeslot ? next_timeslot - ieee154e_vars.timeslot :
-        ieee154e_vars.current_slotframe->length - ieee154e_vars.timeslot;
+        ieee154e_vars.current_slotframe->size - ieee154e_vars.timeslot;
       duration = dt * TsSlotDuration;
 
       /*			COOJA_DEBUG_PRINTF("ASN %lu TS %u NTS %u duration %lu", ieee154e_vars.asn.asn_4lsb, ieee154e_vars.timeslot, next_timeslot, duration); */
@@ -1024,7 +1024,7 @@ powercycle(struct rtimer *t, void *ptr)
           next_timeslot = get_next_active_timeslot(ieee154e_vars.timeslot);
           dt =
             next_timeslot ? next_timeslot - ieee154e_vars.timeslot :
-            ieee154e_vars.current_slotframe->length - ieee154e_vars.timeslot;
+            ieee154e_vars.current_slotframe->size - ieee154e_vars.timeslot;
           ieee154e_vars.timeslot = next_timeslot;
           duration = dt * TsSlotDuration;
           /* increase asn */
@@ -1384,7 +1384,7 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 			uint16_t next_timeslot = get_next_active_timeslot(current_timeslot);
 			/* Calculate number of slots between current and next */
 			uint16_t timeslot_diff = next_timeslot > current_timeslot ? next_timeslot - current_timeslot:
-					current_slotframe->length - (current_timeslot - next_timeslot);
+					current_slotframe->size - (current_timeslot - next_timeslot);
 			/* Update ASN */
 			ASN_INC(current_asn, timeslot_diff);
 

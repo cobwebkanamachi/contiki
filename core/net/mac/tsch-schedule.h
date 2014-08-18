@@ -83,7 +83,7 @@ struct tsch_link {
 struct slotframe {
   /* Unique identifier */
   uint16_t slotframe_handle;
-  uint16_t length;
+  uint16_t size;
   uint16_t on_size;
   struct tsch_link **links;
 };

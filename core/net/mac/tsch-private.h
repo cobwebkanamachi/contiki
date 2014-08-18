@@ -69,9 +69,9 @@ void uart0_writeb(unsigned char c);
 #define NACK_FLAG (0x8000)
 
 /* number of slots to wait before initiating resynchronization */
-#define DESYNC_THRESHOLD (ieee154e_vars.current_slotframe->length * 30)
+#define DESYNC_THRESHOLD (ieee154e_vars.current_slotframe->size * 30)
 /* number of slots to wait before activating keep-alive mechanism */
-#define KEEPALIVE_TIMEOUT (ieee154e_vars.current_slotframe->length * 3)
+#define KEEPALIVE_TIMEOUT (ieee154e_vars.current_slotframe->size * 3)
 /* number of slots to wait before applying drift correction */
 #define DRIFT_CORRECTION_TIMEOUT  (3)
 /* Period of EB */
