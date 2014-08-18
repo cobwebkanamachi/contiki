@@ -1324,27 +1324,269 @@ static asn_t current_asn;
 static rtimer_clock_t current_cell_start;
 static uint16_t current_timeslot;
 struct slotframe *current_slotframe;
+static struct tsch_link *current_cell;
 static struct tsch_packet *current_packet;
+static struct tsch_neighbor *current_neighbor;
+
+/* last estimated drift */
+static int32_t drift = 0;
 
 static uint8_t eb_buf[TSCH_MAX_PACKET_LEN] = { 0 };
 
 static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
 
+/* Reads ACK and process sync IE header for drift correction */
+static uint8_t tsch_read_and_process_ack(struct tsch_neighbor *n, uint8_t seqno) {
+	uint8_t ackbuf[STD_ACK_LEN + SYNC_IE_LEN];
+	uint8_t ack_len, /* ack_len*/
+					success,
+					ack_status;
+	int16_t d;
+
+	ack_len = NETSTACK_RADIO_read_ack((void *)ackbuf, STD_ACK_LEN + SYNC_IE_LEN);
+  if(2 == ackbuf[0] && ack_len >= STD_ACK_LEN && seqno == ackbuf[2]) {
+    success = 1;
+    ack_status = 0;
+    /* IE-list present? */
+    if(ackbuf[1] & 2) {
+      if(ack_len >= STD_ACK_LEN + SYNC_IE_LEN) {
+      	/* sync-IE present? */
+        if(ackbuf[3] == 0x02 && ackbuf[4] == 0x1e) {
+          ack_status = ackbuf[5];
+          ack_status |= ackbuf[6] << 8;
+          /* If the originator was a time source neighbor, the receiver adjusts its own clock by incorporating the
+           *  difference into an average of the drift to all its time source neighbors. The averaging method is
+           *  implementation dependent. If the receiver is not a clock source, the time correction is ignored.
+           */
+          if(n != NULL) {
+            if(n->is_time_source) {
+              /* extract time correction */
+              d = 0;
+              /*is it a negative correction?*/
+              if(ack_status & 0x0800) {
+                d = -(ack_status & 0x0fff & ~0x0800);
+              } else {
+                d = ack_status & 0x0fff;
+              }
+              drift += d;
+              PUTCHAR('+');
+            }
+          }
+          if(ack_status & NACK_FLAG) {
+            /* TODO return NACK status to upper layer */
+            PUTCHAR('/');
+            COOJA_DEBUG_STR("ACK NACK_FLAG\n");
+          }
+        }
+      }
+    }
+    PUTCHAR('*');
+    COOJA_DEBUG_STR("ACK ok\n");
+  } else {
+    success = 0;
+    PUTCHAR('@');
+    COOJA_DEBUG_STR("ACK not ok!\n");
+  }
+  return success;
+}
+
+static void
+update_csma(struct tsch_packet * p, struct tsch_neighbor * n, struct tsch_link * cell, uint8_t mac_tx_status, uint8_t is_broadcast) {
+	uint8_t window = 0;
+	t0post_tx = RTIMER_NOW();
+	/* post TX: Update CSMA control variables */
+	/* if it was EB or broadcast there is no need to update anything */
+	if(!is_broadcast) {
+		if(mac_tx_status == MAC_TX_NOACK) {
+			p->transmissions++;
+			if(p->transmissions >= MAC_MAC_FRAME_RETRIES) {
+				tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
+				n->BE_value = MAC_MIN_BE;
+				n->BW_value = 0;
+			} else if((cell->link_options & LINK_OPTION_SHARED)) {
+				window = 1 << n->BE_value;
+				n->BW_value = tsch_random_byte(window - 1);
+				n->BE_value++;
+				if(n->BE_value > MAC_MAC_BE) {
+					n->BE_value = MAC_MAC_BE;
+				}
+			}
+		} else if(mac_tx_status == MAC_TX_OK) {
+			tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
+			if(!tsch_queue_get_packet_from_dest_addr(cell->node_address)) {
+				/* if no more packets in the queue */
+				n->BW_value = 0;
+				n->BE_value = MAC_MIN_BE;
+			} else {
+				/* if queue is not empty */
+				n->BW_value = 0;
+			}
+		} else if(mac_tx_status == MAC_TX_COLLISION) {
+			p->transmissions++;
+			if(p->transmissions >= MAC_MAC_FRAME_RETRIES) {
+				tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
+				n->BE_value = MAC_MIN_BE;
+				n->BW_value = 0;
+			} else if((cell->link_options & LINK_OPTION_SHARED)) {
+				window = 1 << n->BE_value;
+				n->BW_value = tsch_random_byte(window - 1);
+				n->BE_value++;
+				if(n->BE_value > MAC_MAC_BE) {
+					n->BE_value = MAC_MAC_BE;
+				}
+			}
+		} else if(mac_tx_status == MAC_TX_ERR) {
+			p->transmissions++;
+			if(p->transmissions >= MAC_MAC_FRAME_RETRIES) {
+				tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
+				n->BE_value = MAC_MIN_BE;
+				n->BW_value = 0;
+			} else if((cell->link_options & LINK_OPTION_SHARED)) {
+				window = 1 << n->BE_value;
+				n->BW_value = tsch_random_byte(window - 1);
+				n->BE_value++;
+				if(n->BE_value > MAC_MAC_BE) {
+					n->BE_value = MAC_MAC_BE;
+				}
+			}
+		} else {
+			/* successful transmission */
+			tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
+			if(!tsch_queue_get_packet_from_dest_addr(cell->node_address)) {
+				/* if no more packets in the queue */
+				n->BW_value = 0;
+				n->BE_value = MAC_MIN_BE;
+			} else {
+				/* if queue is not empty */
+				n->BW_value = 0;
+			}
+		}
+	}
+	t0post_tx = RTIMER_NOW() - t0post_tx;
+}
+
 static
 PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
 {
+  /**
+   * TX cell:
+   * 1. Copy packet to radio buffer
+   * 2. Perform CCA if enabled
+   * 3. Sleep until it is time to transmit
+   * 4. Wait for ACK if it is a unicast packet
+   * 5. Extract drift if we received an E-ACK from a time source neighbor
+   * 6. Update CSMA parameters according to TX status
+   * 7. Schedule mac_call_sent_callback
+   **/
+	COOJA_DEBUG_STR("CELL_TX");
   PT_BEGIN(pt);
+  /* packet payload */
   static void *payload = NULL;
+  /* packet payload length */
   static uint8_t payload_len = 0;
+  /* packet seqno */
+  static uint8_t seqno = 0;
+  /* tx status */
+  static uint8_t mac_tx_status = 0;
+  /* is this a broadcast packet? (wait for ack?) */
+  static uint8_t is_broadcast = 0,
+  		is_eb = 0;
+  /* is channel clear? */
+  static uint8_t cca_status = 0;
+  /* tx duration */
+  static rtimer_clock_t tx_time;
+
+  /* TODO There are small timing variations visible in cooja, which needs tuning */
+
+  t0prepare = RTIMER_NOW();
 
 	if(current_packet != NULL && current_packet->pkt != NULL) {
 		payload = queuebuf_dataptr(current_packet->pkt);
 		payload_len = queuebuf_datalen(current_packet->pkt);
 	}
-  rtimer_set(t, current_cell_start + TRIVIAL_DELAY,
-              0, (rtimer_callback_t)tsch_cell_operation, NULL);
-  PT_YIELD(pt);
 
+  /* is this a broadcast packet? (wait for ack?) */
+  is_eb = rimeaddr_cmp(tsch_queue_get_nbr_address(current_neighbor), &eb_cell_address);
+  is_broadcast = is_eb || rimeaddr_cmp(queuebuf_addr(current_packet->pkt, PACKETBUF_ADDR_RECEIVER), &rimeaddr_null);
+  /* read seqno from payload! */
+  seqno = ((uint8_t *)(payload))[2];
+  /* prepare packet to send: copy to radio buffer */
+  mac_tx_status = !NETSTACK_RADIO.prepare(payload, payload_len);
+  t0prepare = RTIMER_NOW() - t0prepare;
+
+  cca_status = 1;
+#if CCA_ENABLED
+  /* delay before CCA */
+  schedule_fixed(t, current_cell_start, TsCCAOffset);
+  PT_YIELD(pt);
+  on();
+  /* CCA */
+  BUSYWAIT_UNTIL_ABS(!(cca_status |= NETSTACK_RADIO.channel_clear()),
+  		current_cell_start, TsCCAOffset + TsCCA);
+  /* there is not enough time to turn radio off */
+//  off();
+#endif /* CCA_ENABLED */
+  if(cca_status == 0 || !mac_tx_status) {
+    mac_tx_status = (!mac_tx_status) ? MAC_TX_ERR : MAC_TX_COLLISION;
+  } else {
+    /* delay before TX */
+    schedule_fixed(t, current_cell_start, TsTxOffset - delayTx);
+    PT_YIELD(pt);
+    t0tx = RTIMER_NOW();
+    tx_time = RTIMER_NOW();
+    /* send packet already in radio tx buffer */
+    mac_tx_status = NETSTACK_RADIO.transmit(payload_len);
+    /* Calculate TX duration based on sent packet len */
+    tx_time = PACKET_DURATION(payload_len);
+    /* limit tx_time in case of something wrong */
+    tx_time = MIN(tx_time, wdDataDuration);
+    off();
+
+    t0tx = RTIMER_NOW() - t0tx;
+    t0txack = RTIMER_NOW();
+    if(mac_tx_status == RADIO_TX_OK) {
+      if(!is_broadcast) {
+        /* wait for ack: after tx */
+        COOJA_DEBUG_STR("wait for ACK\n");
+        schedule_fixed(t, current_cell_start,
+                       TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayRx);
+        PT_YIELD(pt);
+        cca_status = 0;
+        /* Disabling address decoding so the radio accepts the enhanced ACK */
+        NETSTACK_RADIO_address_decode(0);
+        on();
+        /* Wait for ACK to come */
+        BUSYWAIT_UNTIL_ABS(NETSTACK_RADIO.receiving_packet(),
+                           current_cell_start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT - delayRx);
+        /* Wait for ACK to finish */
+        BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
+                           current_cell_start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT + wdAckDuration);
+        /* Enabling address decoding again so the radio filter data packets */
+        NETSTACK_RADIO_address_decode(1);
+
+        /* read ack and exctract drift correction */
+        mac_tx_status = tsch_read_and_process_ack(current_neighbor, seqno) ? MAC_TX_OK : MAC_TX_NOACK;
+      } else {
+      	mac_tx_status = MAC_TX_OK;
+      }
+      off();
+      COOJA_DEBUG_STR("end tx slot\n");
+    } else {
+    	mac_tx_status = MAC_TX_ERR;
+    }
+  }
+  t0txack = RTIMER_NOW() - t0txack;
+
+  /* post TX: Update CSMA control variables */
+  update_csma(current_packet, current_neighbor, current_cell, mac_tx_status, is_broadcast);
+
+  /* Store TX status */
+  current_packet->ret = mac_tx_status;
+
+	/* poll MAC TX callback */
+	while(PROCESS_ERR_OK != process_post(&tsch_tx_callback_process, PROCESS_EVENT_POLL, current_packet)) {
+		PRINTF("PROCESS_ERR_OK != process_post(&tsch_tx_callback_process\n");
+	}
   PT_END(pt);
 }
 
@@ -1370,8 +1612,6 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 
   /* Loop over all active cells */
   while(associated) {
-		static struct tsch_neighbor *current_neighbor;
-		static struct tsch_link *current_cell;
 
 		current_cell = get_cell(current_timeslot);
 
@@ -1387,12 +1627,13 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 	  /* Decide whether it is a TX/RX/IDLE or OFF link */
 		/* Actual slot operation */
 		if(current_packet != NULL) {
-			/* We have something to transmit */
+			/* We have something to transmit, do the following:
+			 * 1. send
+			 * 2. update_backoff_state(current_neighbor)
+			 * 3. post tx callback
+			 **/
 			static struct pt cell_tx_pt;
 			PT_SPAWN(&cell_operation_pt, &cell_tx_pt, tsch_tx_cell(&cell_tx_pt, t));
-			/* TODO
-								update_backoff_state(current_neighbor)
-								post tx callback */
 		} else if(current_cell->link_options & LINK_OPTION_RX) {
 			/* Listen */
 			static struct pt cell_rx_pt;

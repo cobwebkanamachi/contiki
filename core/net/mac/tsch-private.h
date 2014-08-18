@@ -59,6 +59,9 @@ void uart0_writeb(unsigned char c);
 #include "dev/cc2420-tsch.h"
 #endif /* CONTIKI_TARGET */
 
+/* Calculate packet tx/rc duration based on sent packet len assuming 802.15.4 250kbps data rate */
+#define PACKET_DURATION(payload_len) (RADIO_TO_RTIMER(((payload_len) + 1) * 2))
+
 /* struct received_frame_radio_s { */
 /*  uint8_t* buf; */
 /*  uint8_t len; */

@@ -85,6 +85,8 @@ struct tsch_neighbor *tsch_queue_get_nbr(const rimeaddr_t *addr);
 void tsch_queue_remove_nbr(struct tsch_neighbor *n);
 /* Lock a TSCH neighbor, to prevent removal by table replacement policy */
 int tsch_queue_lock_nbr(struct tsch_neighbor *n);
+/* Get the address of a neighbor */
+rimeaddr_t * tsch_queue_get_nbr_address(struct tsch_neighbor *n);
 /* Add packet to neighbor queue. Use same lockfree implementation as ringbuf.c (put is atomic) */
 int tsch_queue_add_packet(const rimeaddr_t *addr, mac_callback_t sent, void *ptr);
 /* Remove first packet from a neighbor queue */

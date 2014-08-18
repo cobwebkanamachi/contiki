@@ -81,6 +81,13 @@ tsch_queue_lock_nbr(struct tsch_neighbor *n)
   return 0;
 }
 
+/* Get the address of a neighbor */
+rimeaddr_t *
+tsch_queue_get_nbr_address(struct tsch_neighbor *n)
+{
+	return nbr_table_get_lladdr(neighbor_queues, n);
+}
+
 /* Add a TSCH neighbor */
 struct tsch_neighbor *
 tsch_queue_add_nbr(const rimeaddr_t *addr)
