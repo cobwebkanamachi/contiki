@@ -40,6 +40,7 @@
 
 #include "contiki.h"
 #include "dev/leds.h"
+#include "lib/memb.h"
 #include "net/nbr-table.h"
 #include "net/packetbuf.h"
 #include "net/queuebuf.h"
@@ -58,49 +59,32 @@
 #define DEBUG DEBUG_NONE
 #include "net/uip-debug.h"
 
-/* Schedule: addresses */
-static rimeaddr_t broadcast_cell_address = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static rimeaddr_t eb_cell_address = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
-static rimeaddr_t cell_address1 = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } };
-static rimeaddr_t cell_address2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
-static rimeaddr_t cell_address3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
+/* Max number of TSCH slotframes */
+#ifdef TSCH_CONF_MAX_SLOTFRAMES
+#define TSCH_MAX_SLOTFRAMES TSCH_CONF_MAX_SLOTFRAMES
+#else
+#define TSCH_MAX_SLOTFRAMES 4
+#endif
 
-/* Schedule: links */
-static const struct tsch_link_ generic_shared_cell = { 0xffff, 0,
-                                            LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
-                                            LINK_TYPE_NORMAL, &broadcast_cell_address };
-static const struct tsch_link_ generic_eb_cell = { 0, 0,
-                                        LINK_OPTION_TX,
-                                        LINK_TYPE_ADVERTISING, &eb_cell_address };
-static const struct tsch_link_ cell_to_1 = { 1, 0,
-                                  LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING,
-                                  LINK_TYPE_NORMAL, &cell_address1 };
-static const struct tsch_link_ cell_to_2 = { 2, 0,
-                                  LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
-                                  LINK_TYPE_NORMAL, &cell_address2 };
-static const struct tsch_link_ cell_to_3 = { 3, 0,
-                                  LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
-                                  LINK_TYPE_NORMAL, &cell_address3 };
-static const struct tsch_link_ cell_3_to_2 = { 4, 0,
-                                    LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
-                                    LINK_TYPE_NORMAL, &cell_address2 };
+/* Max number of links */
+#ifdef TSCH_CONF_MAX_LINKS
+#define TSCH_MAX_LINKS TSCH_CONF_MAX_LINKS
+#else
+#define TSCH_MAX_LINKS 32
+#endif
 
-/* Static schedule definition */
-static const struct tsch_link_ *minimum_links[6] = {
-  &generic_eb_cell, &generic_shared_cell, &generic_shared_cell,
-  &generic_shared_cell, &generic_shared_cell, &generic_shared_cell
-};
-static const struct tsch_link_ *links_list[] = { &generic_eb_cell, &generic_shared_cell,
-                                      &cell_to_1, &cell_to_2, &cell_to_3, &cell_3_to_2 };
-static struct tsch_slotframe_ minimum_slotframe = { 0, 101, 6, (struct tsch_link_ **)minimum_links };
-#define TOTAL_LINKS (sizeof(links_list) / sizeof(struct tsch_link_ *))
+/* Pre-allocated space for links */
+MEMB(link_memb, struct tsch_link_, TSCH_MAX_LINKS);
+/* Pre-allocated space for slotframes */
+MEMB(slotframe_memb, struct tsch_slotframe_, TSCH_MAX_SLOTFRAMES);
+/* List of slotframes (each slotframe holds its own list of links) */
+LIST(slotframe_list);
 
 /* Return the cell for a given timeslot */
 static struct tsch_link_ *
 get_cell(uint16_t timeslot)
 {
-  return (timeslot >= ieee154e_vars.current_slotframe->on_size) ?
-         NULL : ieee154e_vars.current_slotframe->links[timeslot];
+  return NULL;
 }
 /* Return the first active (not OFF) timeslot */
 static uint16_t
@@ -112,7 +96,7 @@ get_first_active_timeslot()
 static uint16_t
 get_next_active_timeslot(uint16_t timeslot)
 {
-  return (timeslot >= ieee154e_vars.current_slotframe->on_size - 1) ? 0 : timeslot + 1;
+  return 0;
 }
 
 /* Initialization */
