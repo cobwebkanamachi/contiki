@@ -64,7 +64,7 @@ enum cell_decision_enum {
   CELL_RX = 4,
 };
 
-struct tsch_link {
+struct tsch_link_ {
   /* Unique identifier (local to specified slotframe) for the link */
   uint16_t link_handle;
   /* Relative number of slot in slotframe */
@@ -80,7 +80,7 @@ struct tsch_link {
   rimeaddr_t *node_address;
 };
 
-struct slotframe {
+struct tsch_slotframe_ {
   /* Unique identifier */
   uint16_t slotframe_handle;
   uint16_t size;

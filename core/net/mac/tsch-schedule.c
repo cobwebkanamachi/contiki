@@ -66,37 +66,37 @@ static rimeaddr_t cell_address2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
 static rimeaddr_t cell_address3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
 
 /* Schedule: links */
-static const struct tsch_link generic_shared_cell = { 0xffff, 0,
+static const struct tsch_link_ generic_shared_cell = { 0xffff, 0,
                                             LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
                                             LINK_TYPE_NORMAL, &broadcast_cell_address };
-static const struct tsch_link generic_eb_cell = { 0, 0,
+static const struct tsch_link_ generic_eb_cell = { 0, 0,
                                         LINK_OPTION_TX,
                                         LINK_TYPE_ADVERTISING, &eb_cell_address };
-static const struct tsch_link cell_to_1 = { 1, 0,
+static const struct tsch_link_ cell_to_1 = { 1, 0,
                                   LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING,
                                   LINK_TYPE_NORMAL, &cell_address1 };
-static const struct tsch_link cell_to_2 = { 2, 0,
+static const struct tsch_link_ cell_to_2 = { 2, 0,
                                   LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
                                   LINK_TYPE_NORMAL, &cell_address2 };
-static const struct tsch_link cell_to_3 = { 3, 0,
+static const struct tsch_link_ cell_to_3 = { 3, 0,
                                   LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
                                   LINK_TYPE_NORMAL, &cell_address3 };
-static const struct tsch_link cell_3_to_2 = { 4, 0,
+static const struct tsch_link_ cell_3_to_2 = { 4, 0,
                                     LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
                                     LINK_TYPE_NORMAL, &cell_address2 };
 
 /* Static schedule definition */
-static const struct tsch_link *minimum_links[6] = {
+static const struct tsch_link_ *minimum_links[6] = {
   &generic_eb_cell, &generic_shared_cell, &generic_shared_cell,
   &generic_shared_cell, &generic_shared_cell, &generic_shared_cell
 };
-static const struct tsch_link *links_list[] = { &generic_eb_cell, &generic_shared_cell,
+static const struct tsch_link_ *links_list[] = { &generic_eb_cell, &generic_shared_cell,
                                       &cell_to_1, &cell_to_2, &cell_to_3, &cell_3_to_2 };
-static struct slotframe minimum_slotframe = { 0, 101, 6, (struct tsch_link **)minimum_links };
-#define TOTAL_LINKS (sizeof(links_list) / sizeof(struct tsch_link *))
+static struct tsch_slotframe_ minimum_slotframe = { 0, 101, 6, (struct tsch_link_ **)minimum_links };
+#define TOTAL_LINKS (sizeof(links_list) / sizeof(struct tsch_link_ *))
 
 /* Return the cell for a given timeslot */
-static struct tsch_link *
+static struct tsch_link_ *
 get_cell(uint16_t timeslot)
 {
   return (timeslot >= ieee154e_vars.current_slotframe->on_size) ?
