@@ -38,6 +38,7 @@
  *				 *Other operations are allowed outside of interrupt only.*
  * \author
  *         Beshr Al Nahas <beshr@sics.se>
+ *         Simon Duquennoy <simonduq@sics.se>
  */
 
 #ifndef __TSCH_QUEUE_H__

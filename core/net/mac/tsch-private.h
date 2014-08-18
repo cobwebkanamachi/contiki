@@ -36,6 +36,7 @@
  *         (meant for use by TSCH implementation files only)
  * \author
  *         Beshr Al Nahas <beshr@sics.se>
+ *         Simon Duquennoy <simonduq@sics.se>
  */
 
 #ifndef __TSCH_PRIVATE_H__

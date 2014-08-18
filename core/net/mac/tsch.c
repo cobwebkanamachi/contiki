@@ -35,6 +35,8 @@
  *         IEEE 802.15.4 TSCH MAC implementation. Must be used with nullmac as NETSTACK_CONF_MAC
  * \author
  *         Beshr Al Nahas <beshr@sics.se>
+ *         Simon Duquennoy <simonduq@sics.se>
+ *
  */
 
 #include "contiki.h"

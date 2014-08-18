@@ -35,6 +35,7 @@
  *         TSCH packet format management
  * \author
  *         Beshr Al Nahas <beshr@sics.se>
+ *         Simon Duquennoy <simonduq@sics.se>
  */
 
 #ifndef __tsch_packet_H__
