@@ -1491,6 +1491,8 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
 
   /* is this a broadcast packet? (wait for ack?) */
   is_eb = rimeaddr_cmp(tsch_queue_get_nbr_address(current_neighbor), &eb_cell_address);
+  // TODO: get broadcast status from nbr or from packet? I think it is the same
+  //  is_broadcast = is_eb || rimeaddr_cmp(tsch_queue_get_nbr_address(current_neighbor), &broadcast_cell_address);
   is_broadcast = is_eb || rimeaddr_cmp(queuebuf_addr(current_packet->pkt, PACKETBUF_ADDR_RECEIVER), &rimeaddr_null);
   /* read seqno from payload! */
   seqno = ((uint8_t *)(payload))[2];
@@ -1530,7 +1532,7 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
     t0txack = RTIMER_NOW();
     if(mac_tx_status == RADIO_TX_OK) {
       if(!is_broadcast) {
-        /* wait for ack: after tx */
+        /* wait for ack after tx: sleep until ack time */
         COOJA_DEBUG_STR("wait for ACK\n");
         schedule_fixed(t, current_cell_start,
                        TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayRx);
@@ -1550,10 +1552,10 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
 
         /* read ack and exctract drift correction */
         mac_tx_status = tsch_read_and_process_ack(current_neighbor, seqno) ? MAC_TX_OK : MAC_TX_NOACK;
+        off();
       } else {
       	mac_tx_status = MAC_TX_OK;
       }
-      off();
       COOJA_DEBUG_STR("end tx slot\n");
     } else {
     	mac_tx_status = MAC_TX_ERR;
@@ -1579,9 +1581,86 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 {
   PT_BEGIN(pt);
 
-  rtimer_set(t, current_cell_start + TRIVIAL_DELAY,
-              0, (rtimer_callback_t)tsch_cell_operation, NULL);
-  PT_YIELD(pt);
+	/**
+	 * RX cell:
+	 * 1. Check if it is used for TIME_KEEPING
+	 * 2. Sleep and wake up just before expected RX time (with a guard time: TsLongGT)
+	 * 3. Check for radio activity for the guard time: TsLongGT
+	 * 4. Prepare and send ACK if needed
+	 * 5. Drift calculated in the ACK callback registered with the radio driver. Use it if receiving from a time source neighbor.
+	 **/
+
+	/* this cell is RX current_cell. Check if it is used for keep alive as well*/
+	if((current_cell->link_options & LINK_OPTION_TIME_KEEPING)) {
+		/* TODO LINK_OPTION_TIME_KEEPING ??? */
+	}
+
+	t0rx = RTIMER_NOW();
+	uint8_t cca_status = 0,
+			is_broadcast = 0,
+			is_eb = 0,
+			ret = 0;
+	uint32_t irq_status = 0;
+	struct tsch_neighbor *n;
+
+	/* wait before RX */
+	schedule_fixed(t, current_cell_start, TsTxOffset - TsLongGT - delayRx);
+	COOJA_DEBUG_STR("schedule RX on guard time - TsLongGT");
+	/* save start and end sfd */
+	NETSTACK_RADIO_sfd_sync(1, 1);
+	PT_YIELD(pt);
+	/* Start radio for at least guard time */
+	on();
+	/* Check if receiving within guard time */
+	BUSYWAIT_UNTIL_ABS(NETSTACK_RADIO.receiving_packet(),
+										 current_cell_start, TsTxOffset + TsLongGT);
+	irq_status = NETSTACK_RADIO_pending_irq();
+	if(!NETSTACK_RADIO.receiving_packet() && !irq_status) {
+		off();
+		t0rx = RTIMER_NOW() - t0rx;
+		/* no packets on air */
+		ret = 0;
+	} else {
+#if CONTIKI_TARGET_JN5168
+		if(!irq_status) {
+			/* Check if receiving within guard time */
+			BUSYWAIT_UNTIL_ABS((irq_status = NETSTACK_RADIO_pending_irq()),
+												 current_cell_start, TsTxOffset + TsLongGT + wdDataDuration + delayRx);
+		}
+#endif
+		NETSTACK_RADIO_process_packet(irq_status);
+
+		off();
+		t0rx = RTIMER_NOW() - t0rx;
+		t0rxack = RTIMER_NOW();
+		if(ieee154e_vars.last_rf != NULL) {
+			/* wait until ack time */
+			if(ieee154e_vars.need_ack) {
+				schedule_fixed(t, NETSTACK_RADIO_get_rx_end_time(), TsTxAckDelay - delayTx);
+				/*									schedule_fixed(t, ieee154e_vars.last_rf->sfd_timestamp, rx_duration + TsTxAckDelay - delayTx); */
+				PT_YIELD(pt);
+				NETSTACK_RADIO_send_ack();
+			}
+			/* If the originator was a time source neighbor, the receiver adjusts its own clock by incorporating the
+			 *  difference into an average of the drift to all its time source neighbors. The averaging method is
+			 *  implementation dependent. If the receiver is not a clock source, the time correction is ignored.
+			 */
+			/* drift calculated in radio_interrupt */
+			if(ieee154e_vars.registered_drift) {
+				COOJA_DEBUG_PRINTF("ieee154e_vars.drift seen %d\n", ieee154e_vars.registered_drift);
+				/* check the source address for potential time-source match */
+				n = tsch_queue_get_nbr(&ieee154e_vars.last_rf->source_address);
+				if(n != NULL && n->is_time_source) {
+					/* should be the average of drifts to all time sources */
+					drift -= ieee154e_vars.registered_drift;
+					COOJA_DEBUG_STR("ieee154e_vars.drift recorded");
+				}
+			}
+			/* TODO return length instead? or status? or something? */
+			ret = 1;
+		}
+	}
+	t0rxack = RTIMER_NOW() - t0rxack;
 
   PT_END(pt);
 }
@@ -1604,6 +1683,8 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 			current_packet = get_packet_and_neighbor_for_cell(current_cell, &current_neighbor);
 		}
 
+		/* Since this is a shared link,
+		 * we need to decrease the backoff value for all neighbors waiting to send */
 		if(current_cell->link_options & LINK_OPTION_SHARED) {
 			tsch_decrement_backoff_counter_for_all_nbrs();
 		}
