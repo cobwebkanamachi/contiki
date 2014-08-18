@@ -48,6 +48,7 @@
 #include "net/mac/tsch-queue.h"
 #include "net/mac/tsch-private.h"
 #include "net/mac/tsch-packet.h"
+#include "net/mac/tsch-schedule.h"
 #include "net/mac/frame802154.h"
 #include "sys/process.h"
 #include "sys/rtimer.h"
@@ -80,23 +81,27 @@ MEMB(slotframe_memb, struct tsch_slotframe_, TSCH_MAX_SLOTFRAMES);
 /* List of slotframes (each slotframe holds its own list of links) */
 LIST(slotframe_list);
 
-/* Return the cell for a given timeslot */
-static struct tsch_link_ *
-get_cell(uint16_t timeslot)
+/* Adds and returns a slotframe (NULL if failure) */
+struct tsch_slotframe_ *
+tsch_schedule_add_slotframe(uint16_t size)
 {
   return NULL;
 }
-/* Return the first active (not OFF) timeslot */
-static uint16_t
-get_first_active_timeslot()
+
+/* Adds a link to a slotframe, return a pointer to it (NULL if failure) */
+struct tsch_link_ *
+tsch_schedule_add_link(struct tsch_slotframe_ *slotframe,
+    uint8_t link_options, enum link_type link_type, const rimeaddr_t *node_address,
+    uint16_t timeslot, uint16_t channel_offset)
 {
-  return 0;
+
 }
+
 /* Return the next active (not OFF) timeslot after a given timeslot */
-static uint16_t
-get_next_active_timeslot(uint16_t timeslot)
+struct tsch_link_ *
+tsch_schedule_get_link_from_asn(asn_t asn)
 {
-  return 0;
+
 }
 
 /* Initialization */
