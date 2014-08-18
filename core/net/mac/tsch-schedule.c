@@ -83,29 +83,184 @@ LIST(slotframe_list);
 
 /* Adds and returns a slotframe (NULL if failure) */
 struct tsch_slotframe_ *
-tsch_schedule_add_slotframe(uint16_t size)
+tsch_schedule_add_slotframe(uint16_t handle, uint16_t size)
 {
+  if(tsch_schedule_get_slotframe_from_handle(handle)) {
+    /* A slotframe with this handle already exists */
+    return NULL;
+  } else {
+    struct tsch_slotframe_ *sf = memb_alloc(&slotframe_memb);
+    if(sf != NULL) {
+      /* Initialize the slotframe */
+      sf->handle = handle;
+      sf->size = size;
+      LIST_STRUCT_INIT(sf, links_list);
+      /* Add the slotframe to the global list */
+      list_add(slotframe_list, sf);
+    }
+    return sf;
+  }
+}
+
+/* Looks for a slotframe from a handle */
+struct tsch_slotframe_ *
+tsch_schedule_get_slotframe_from_handle(uint16_t handle)
+{
+  struct tsch_slotframe_ *sf = list_head(slotframe_list);
+  while(sf != NULL) {
+    if(sf->handle == handle) {
+      return sf;
+    }
+    sf = list_item_next(sf);
+  }
   return NULL;
 }
 
 /* Adds a link to a slotframe, return a pointer to it (NULL if failure) */
 struct tsch_link_ *
 tsch_schedule_add_link(struct tsch_slotframe_ *slotframe,
-    uint8_t link_options, enum link_type link_type, const rimeaddr_t *node_address,
+    uint8_t link_options, enum link_type link_type, const rimeaddr_t *address,
     uint16_t timeslot, uint16_t channel_offset)
 {
+  /* First check whether the timeslot is already occupied */
+  if(slotframe != NULL && !tsch_schedule_get_link_from_timeslot(slotframe, timeslot)) {
+    struct tsch_link_ *l = memb_alloc(&link_memb);
+    if(l != NULL) {
+      /* Initialize link */
+      l->link_options = link_options;
+      l->link_type = link_type;
+      l->slotframe_handle = slotframe->handle;
+      rimeaddr_copy(&l->address, address);
+      l->timeslot = timeslot;
+      l->channel_offset = channel_offset;
+      /* Add the link to the slotframe */
+      list_add(slotframe->links_list, l);
+    }
+  }
+  return NULL;
+}
 
+/* Looks within a slotframe for a link with a given timeslot */
+struct tsch_link_ *
+tsch_schedule_get_link_from_timeslot(struct tsch_slotframe_ *slotframe, uint16_t timeslot)
+{
+  if(slotframe != NULL) {
+    struct tsch_link_ *l = list_head(slotframe->links_list);
+    /* Loop over all items. Assume there is max one link per timeslot */
+    while(l != NULL) {
+      if(l->timeslot == timeslot) {
+        return l;
+      }
+      l = list_item_next(l);
+    }
+    return l;
+  } else {
+    return NULL;
+  }
 }
 
 /* Return the next active (not OFF) timeslot after a given timeslot */
 struct tsch_link_ *
 tsch_schedule_get_link_from_asn(asn_t asn)
 {
+  struct tsch_link_ *curr_best = NULL;
+  struct tsch_slotframe_ *sf = list_head(slotframe_list);
+  /* For each slotframe, looks for a link matching the asn.
+   * Tx links have priority, then lower handle have priority. */
+  while(sf != NULL) {
+    /* Get timeslot from ASN, given the slotframe length */
+    uint16_t timeslot = asn % sf->size;
+    struct tsch_link_ *l = tsch_schedule_get_link_from_timeslot(sf, timeslot);
+    /* We have a match */
+    if(l != NULL) {
+      if(curr_best == NULL) {
+        curr_best = l;
+      } else {
+        /* We already have a current best,
+         * we must check Tx flag and handle to find the highest priority link */
+        if(!(curr_best->link_options & LINK_OPTION_TX) && (l->link_options & LINK_OPTION_TX)) {
+          /* We have Tx link, the current best didn't */
+          curr_best = l;
+        } else if(curr_best->slotframe_handle > sf->handle) {
+          /* We have a lower handle */
+          curr_best = l;
+        }
+      }
+    }
+    sf = list_item_next(sf);
+  }
+  return curr_best;
+}
 
+void tsch_schedule_print()
+{
+  struct tsch_slotframe_ *sf = list_head(slotframe_list);
+
+  printf("Schedule: slotframe list\n");
+
+  while(sf != NULL) {
+    struct tsch_link_ *l = list_head(sf->links_list);
+
+    printf("[Slotframe] Handle %u, size %u\n", sf->handle, sf->size);
+    printf("List of links:\n");
+
+    while(l != NULL) {
+      printf("[Link] Options %02x, type %u, timeslot %u, channel offset %u, address %u\n",
+          l->link_options, l->link_type, l->timeslot, l->channel_offset, l->address.u8[7]);
+      l = list_item_next(l);
+    }
+
+    sf = list_item_next(sf);
+  }
+
+  printf("Schedule: end of slotframe list\n");
+}
+
+void tsch_schedule_test()
+{
+  static rimeaddr_t link_broadcast_address = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
+  static rimeaddr_t address1 = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } };
+  static rimeaddr_t address2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
+
+  struct tsch_slotframe_ *sf1 = tsch_schedule_add_slotframe(20, 5);
+  struct tsch_slotframe_ *sf2 = tsch_schedule_add_slotframe(21, 3);
+
+  tsch_schedule_add_link(sf1,
+      LINK_OPTION_RX | LINK_OPTION_TX | LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING,
+      LINK_TYPE_ADVERTISING, &link_broadcast_address,
+      0, 1);
+
+  tsch_schedule_add_link(sf1,
+      LINK_OPTION_RX,
+      LINK_TYPE_NORMAL, &address1,
+      1, 1);
+
+  tsch_schedule_add_link(sf1,
+      LINK_OPTION_RX,
+      LINK_TYPE_NORMAL, &address1,
+      4, 10);
+
+  tsch_schedule_add_link(sf2,
+      LINK_OPTION_TX,
+      LINK_TYPE_NORMAL, &address2,
+      0, 2);
+
+  tsch_schedule_print();
+
+  int asn;
+  for(asn=0; asn<20; asn++) {
+    struct tsch_link_ *l = tsch_schedule_get_link_from_asn((asn_t) asn);
+    if(l != NULL) {
+      printf("asn %u: timeslot %u, channel offset %u (schedule handle %u)\n",
+          (unsigned)asn, l->timeslot, l->channel_offset, l->slotframe_handle);
+    } else {
+      printf("asn %u: no link\n", (unsigned)asn);
+    }
+  }
 }
 
 /* Initialization */
 void tsch_schedule_init()
 {
-  printf("schedule: hi!\n");
+  tsch_schedule_test();
 }
