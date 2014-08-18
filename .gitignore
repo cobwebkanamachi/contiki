@@ -1,0 +1,39 @@
+# Directories
+*/obj_sky
+*/obj_jn5168
+*/build
+*/dist
+/jn
+
+
+
+#eclipse
+.cproject
+.project
+.settings/
+
+#log
+*.log
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+contiki-*.a
+*.map
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.bin
+*.jn5168
+*.sky
+*.hex
+
+#Symbols files
+symbols.c
+symbols.h
