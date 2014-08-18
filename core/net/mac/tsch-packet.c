@@ -179,8 +179,8 @@ make_eb(uint8_t *buf, uint8_t buf_size)
     buf[i++] = 1; /* number of slotframes described in EB */
     /* TSCH slotframe descriptor*/
     buf[i++] = ieee154e_vars.current_slotframe->slotframe_handle;
-    buf[i++] = ieee154e_vars.current_slotframe->length;
-    buf[i++] = ieee154e_vars.current_slotframe->length >> 8;
+    buf[i++] = ieee154e_vars.current_slotframe->size;
+    buf[i++] = ieee154e_vars.current_slotframe->size >> 8;
     /* buf[i++] = ieee154e_vars.current_slotframe->on_size & 0xff; / * number of included links * / */
     k = i++; /* index of the element containing the number of included links */
     for(j = 0; j < (ieee154e_vars.current_slotframe->on_size & 0xff); j++) {

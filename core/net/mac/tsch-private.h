@@ -69,9 +69,9 @@ void uart0_writeb(unsigned char c);
 #define NACK_FLAG (0x8000)
 
 /* number of slots to wait before initiating resynchronization */
-#define DESYNC_THRESHOLD (ieee154e_vars.current_slotframe->length * 30)
+#define DESYNC_THRESHOLD (ieee154e_vars.current_slotframe->size * 30)
 /* number of slots to wait before activating keep-alive mechanism */
-#define KEEPALIVE_TIMEOUT (ieee154e_vars.current_slotframe->length * 3)
+#define KEEPALIVE_TIMEOUT (ieee154e_vars.current_slotframe->size * 3)
 /* number of slots to wait before applying drift correction */
 #define DRIFT_CORRECTION_TIMEOUT  (3)
 /* Period of EB */
@@ -275,5 +275,37 @@ typedef struct {
 } ieee154e_vars_t;
 
 extern volatile ieee154e_vars_t ieee154e_vars;
+
+struct tsch_link {
+  /* Unique identifier (local to specified slotframe) for the link */
+  uint16_t link_handle;
+  /* Relative number of slot in slotframe */
+  /* uint16_t timeslot; */
+  /* maybe 0 to 15 */
+  uint8_t channel_offset;
+  /*b0 = Transmit, b1 = Receive, b2 = Shared, b3= Timekeeping, b4–b7 reserved.*/
+  uint8_t link_options;
+  /* Type of link. NORMAL = 0. ADVERTISING = 1, and indicates
+     the link may be used to send an Enhanced beacon. */
+  uint8_t link_type;
+  /* short address of neighbor */
+  rimeaddr_t *node_address;
+};
+
+struct slotframe {
+  /* Unique identifier */
+  uint16_t slotframe_handle;
+  uint16_t size;
+  uint16_t on_size;
+  struct tsch_link **links;
+};
+
+enum cell_decision_enum {
+  CELL_OFF = 0,
+  CELL_TX = 1,
+  CELL_TX_IDLE = 2, /* No packet to transmit */
+  CELL_TX_BACKOFF = 3, /* csma backoff */
+  CELL_RX = 4,
+};
 
 #endif /* __TSCH_PRIVATE_H__ */
