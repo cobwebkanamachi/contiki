@@ -181,20 +181,20 @@ make_eb(uint8_t *buf, uint8_t buf_size)
     buf[i++] = ieee154e_vars.current_slotframe->slotframe_handle;
     buf[i++] = ieee154e_vars.current_slotframe->length;
     buf[i++] = ieee154e_vars.current_slotframe->length >> 8;
-    /* buf[i++] = ieee154e_vars.current_slotframe->on_size & 0xff; / * number of included cells * / */
-    k = i++; /* index of the element containing the number of included cells */
+    /* buf[i++] = ieee154e_vars.current_slotframe->on_size & 0xff; / * number of included links * / */
+    k = i++; /* index of the element containing the number of included links */
     for(j = 0; j < (ieee154e_vars.current_slotframe->on_size & 0xff); j++) {
       /* Include cells I am listening on only */
-      if(ieee154e_vars.current_slotframe->cells[j]->link_options & LINK_OPTION_RX) {
+      if(ieee154e_vars.current_slotframe->links[j]->link_options & LINK_OPTION_RX) {
         /* increase the number of included cells */
         buf[k]++;
         /* XXX slotnumber may not be its index in the general case */
         buf[i++] = j;
         buf[i++] = j >> 8;
         /* XXX slotnumber end of comment */
-        buf[i++] = ieee154e_vars.current_slotframe->cells[j]->channel_offset;
-        buf[i++] = ieee154e_vars.current_slotframe->cells[j]->channel_offset >> 8;
-        buf[i++] = ieee154e_vars.current_slotframe->cells[j]->link_options;
+        buf[i++] = ieee154e_vars.current_slotframe->links[j]->channel_offset;
+        buf[i++] = ieee154e_vars.current_slotframe->links[j]->channel_offset >> 8;
+        buf[i++] = ieee154e_vars.current_slotframe->links[j]->link_options;
       }
       buf[len] = 4 + 5 * buf[k];
     }

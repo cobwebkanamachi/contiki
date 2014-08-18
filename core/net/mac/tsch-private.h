@@ -241,7 +241,7 @@ typedef struct {
   uint16_t sync_timeout;        /* how many slots left before loosing sync */
   uint8_t mac_ebsn;           /* EB sequence number */
   uint8_t join_priority;      /* inherit from RPL - for PAN coordinator: 0 -- lower is better */
-  slotframe_t *current_slotframe;
+  struct slotframe *current_slotframe;
   volatile rtimer_clock_t start; /* cell start time */
   uint8_t slot_template_id;
   uint8_t hop_sequence_id;
@@ -262,7 +262,7 @@ typedef struct {
   volatile int32_t drift; /* estimated drift to all time source neighbors */
   volatile uint16_t drift_counter; /* number of received drift corrections source neighbors */
   uint8_t cell_decison;
-  cell_t *cell;
+  struct tsch_link *cell;
   struct tsch_packet *p;
   struct tsch_neighbor *n;
   void *payload;

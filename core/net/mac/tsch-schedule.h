@@ -64,7 +64,7 @@ enum cell_decision_enum {
   CELL_RX = 4,
 };
 
-typedef struct {
+struct tsch_link {
   /* Unique identifier (local to specified slotframe) for the link */
   uint16_t link_handle;
   /* Relative number of slot in slotframe */
@@ -78,15 +78,15 @@ typedef struct {
   uint8_t link_type;
   /* short address of neighbor */
   rimeaddr_t *node_address;
-} cell_t;
+};
 
-typedef struct {
+struct slotframe {
   /* Unique identifier */
   uint16_t slotframe_handle;
   uint16_t length;
   uint16_t on_size;
-  cell_t **cells;
-} slotframe_t;
+  struct tsch_link **links;
+};
 
 /* Initialization */
 void tsch_schedule_init();

@@ -105,35 +105,35 @@ static rimeaddr_t cell_address1 = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } };
 static rimeaddr_t cell_address2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
 static rimeaddr_t cell_address3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
 
-/* Schedule: cells */
-static const cell_t generic_shared_cell = { 0xffff, 0,
+/* Schedule: links */
+static const struct tsch_link generic_shared_cell = { 0xffff, 0,
                                             LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
                                             LINK_TYPE_NORMAL, &broadcast_cell_address };
-static const cell_t generic_eb_cell = { 0, 0,
+static const struct tsch_link generic_eb_cell = { 0, 0,
                                         LINK_OPTION_TX,
                                         LINK_TYPE_ADVERTISING, &eb_cell_address };
-static const cell_t cell_to_1 = { 1, 0,
+static const struct tsch_link cell_to_1 = { 1, 0,
                                   LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING,
                                   LINK_TYPE_NORMAL, &cell_address1 };
-static const cell_t cell_to_2 = { 2, 0,
+static const struct tsch_link cell_to_2 = { 2, 0,
                                   LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
                                   LINK_TYPE_NORMAL, &cell_address2 };
-static const cell_t cell_to_3 = { 3, 0,
+static const struct tsch_link cell_to_3 = { 3, 0,
                                   LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
                                   LINK_TYPE_NORMAL, &cell_address3 };
-static const cell_t cell_3_to_2 = { 4, 0,
+static const struct tsch_link cell_3_to_2 = { 4, 0,
                                     LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
                                     LINK_TYPE_NORMAL, &cell_address2 };
 
 /* Static schedule definition */
-static const cell_t *minimum_cells[6] = {
+static const struct tsch_link *minimum_links[6] = {
   &generic_eb_cell, &generic_shared_cell, &generic_shared_cell,
   &generic_shared_cell, &generic_shared_cell, &generic_shared_cell
 };
-static const cell_t *links_list[] = { &generic_eb_cell, &generic_shared_cell,
+static const struct tsch_link *links_list[] = { &generic_eb_cell, &generic_shared_cell,
                                       &cell_to_1, &cell_to_2, &cell_to_3, &cell_3_to_2 };
-static slotframe_t minimum_slotframe = { 0, 101, 6, (cell_t **)minimum_cells };
-#define TOTAL_LINKS (sizeof(links_list) / sizeof(cell_t *))
+static struct slotframe minimum_slotframe = { 0, 101, 6, (struct tsch_link **)minimum_links };
+#define TOTAL_LINKS (sizeof(links_list) / sizeof(struct tsch_link *))
 
 /* Other function prototypes */
 static int powercycle(struct rtimer *t, void *ptr);
@@ -277,11 +277,11 @@ hop_channel(uint8_t offset)
  */
 
 /* Return the cell for a given timeslot */
-static cell_t *
+static struct tsch_link *
 get_cell(uint16_t timeslot)
 {
   return (timeslot >= ieee154e_vars.current_slotframe->on_size) ?
-         NULL : ieee154e_vars.current_slotframe->cells[timeslot];
+         NULL : ieee154e_vars.current_slotframe->links[timeslot];
 }
 /* Return the first active (not OFF) timeslot */
 static uint16_t
@@ -1290,7 +1290,7 @@ PROCESS_THREAD(tsch_tx_callback_process, ev, data)
  * TODO: Update EB fields.
  *  */
 static struct tsch_packet *
-get_packet_and_neighbor_for_cell(cell_t *cell, struct tsch_neighbor **target_neighbor)
+get_packet_and_neighbor_for_cell(struct tsch_link *cell, struct tsch_neighbor **target_neighbor)
 {
 /* TODO */
   *target_neighbor = NULL;
@@ -1303,7 +1303,7 @@ static struct pt cell_operation_pt;
 static asn_t current_asn;
 static rtimer_clock_t current_cell_start;
 static uint16_t current_timeslot;
-slotframe_t *current_slotframe;
+struct slotframe *current_slotframe;
 
 static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
 
@@ -1347,7 +1347,7 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
   while(associated) {
       static struct tsch_packet *current_packet;
       static struct tsch_neighbor *current_neighbor;
-      static cell_t *current_cell;
+      static struct tsch_link *current_cell;
 
       current_cell = get_cell(current_timeslot);
 
