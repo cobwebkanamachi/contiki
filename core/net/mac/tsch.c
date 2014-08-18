@@ -264,7 +264,7 @@ calculate_channel(uint8_t offset)
   return RF_CHANNEL;
 #else
   /* TODO: compute this with 5-byte ASN */
-  return 11 + (offset + ieee154e_vars.asn.asn_4lsb) % 16;
+  return 11 + (offset + ieee154e_vars.asn) % 16;
 #endif /* TSCH_WITHOUT_CHANNEL_HOPPING */
 }
 /* Select the current channel from ASN and channel offset, hop to it */
@@ -509,7 +509,7 @@ powercycle(struct rtimer *t, void *ptr)
       PT_YIELD(&ieee154e_vars.mpt);
       leds_off(LEDS_RED);
     }
-    ieee154e_vars.timeslot = ieee154e_vars.asn.asn_4lsb % ieee154e_vars.current_slotframe->size;
+    ieee154e_vars.timeslot = ieee154e_vars.asn % ieee154e_vars.current_slotframe->size;
     if(ieee154e_vars.join_priority == 0) {
       ieee154e_vars.start = RTIMER_NOW();
       /* while MAC-RDC is not disabled, and while its synchronized */
@@ -974,15 +974,12 @@ powercycle(struct rtimer *t, void *ptr)
         ieee154e_vars.current_slotframe->size - ieee154e_vars.timeslot;
       duration = dt * TsSlotDuration;
 
-      /*			COOJA_DEBUG_PRINTF("ASN %lu TS %u NTS %u duration %lu", ieee154e_vars.asn.asn_4lsb, ieee154e_vars.timeslot, next_timeslot, duration); */
+      /*			COOJA_DEBUG_PRINTF("ASN %lu TS %u NTS %u duration %lu", ieee154e_vars.asn, ieee154e_vars.timeslot, next_timeslot, duration); */
       /* increase the timeout counter because we will reset it in case of successful TX or RX */
       ieee154e_vars.sync_timeout += dt;
       ieee154e_vars.timeslot = next_timeslot;
       /* increase asn */
-      ieee154e_vars.asn.asn_4lsb += dt;
-      if(!ieee154e_vars.asn.asn_4lsb) {
-        ieee154e_vars.asn.asn_msb++;
-      }
+      ieee154e_vars.asn += dt;
       leds_off(LEDS_RED);
 
       /* apply drift correction */
@@ -1028,11 +1025,7 @@ powercycle(struct rtimer *t, void *ptr)
           ieee154e_vars.timeslot = next_timeslot;
           duration = dt * TsSlotDuration;
           /* increase asn */
-          ieee154e_vars.asn.asn_4lsb += dt;
-          if(!ieee154e_vars.asn.asn_4lsb) {
-            ieee154e_vars.asn.asn_msb++;
-            /*					PUTCHAR('!'); */
-          }
+          ieee154e_vars.asn += dt;
         }
         /*				PUTCHAR('N'); */
         ieee154e_vars.start += duration;
@@ -1065,11 +1058,12 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s *last_rf_ir
     if(ieee154e_vars.last_rf->len >= 23 && (FRAME802154_BEACONFRAME == ((ieee154e_vars.last_rf)->buf[0] & 7))
        && (((ieee154e_vars.last_rf)->buf[1] & (2 | 32 | 128 | 64)) == (2 | 32 | 128 | 64))) {
       if(((ieee154e_vars.last_rf)->buf[16] & 0xfe) == 0x34) {  /* sync IE? (0x1a << 1) ==0 0x34 */
-        ieee154e_vars.asn.asn_4lsb = (uint32_t)(ieee154e_vars.last_rf)->buf[17];
-        ieee154e_vars.asn.asn_4lsb += ((uint32_t)(ieee154e_vars.last_rf)->buf[18] << (uint32_t)8);
-        ieee154e_vars.asn.asn_4lsb += ((uint32_t)(ieee154e_vars.last_rf)->buf[19] << (uint32_t)16);
-        ieee154e_vars.asn.asn_4lsb += ((uint32_t)(ieee154e_vars.last_rf)->buf[20] << (uint32_t)24);
-        ieee154e_vars.asn.asn_msb = (ieee154e_vars.last_rf)->buf[21];
+        /* TODO: check this */
+        ieee154e_vars.asn = (asn_t)(ieee154e_vars.last_rf)->buf[17];
+        ieee154e_vars.asn |= (asn_t)(ieee154e_vars.last_rf)->buf[18] << 8;
+        ieee154e_vars.asn |= (asn_t)(ieee154e_vars.last_rf)->buf[19] << 16;
+        ieee154e_vars.asn |= (asn_t)(ieee154e_vars.last_rf)->buf[20] << 24;
+        ieee154e_vars.asn |= (asn_t)(ieee154e_vars.last_rf)->buf[21] << 32;
         ieee154e_vars.join_priority = (ieee154e_vars.last_rf)->buf[22] + 1;
         /* XXX to disable reading the packet */
         (ieee154e_vars.last_rf)->len = 0;
@@ -1090,10 +1084,7 @@ tsch_wait_for_eb(uint8_t need_ack_irq, struct received_frame_radio_s *last_rf_ir
           ieee154e_vars.start += duration;
           duration = dt * TsSlotDuration;
           /* increase asn */
-          ieee154e_vars.asn.asn_4lsb += dt;
-          if(!ieee154e_vars.asn.asn_4lsb) {
-            ieee154e_vars.asn.asn_msb++;
-          }
+          ieee154e_vars.asn += dt;
           dt = 15 + tsch_random_byte(16 - 1);
           PRINTF("Debutg timing: %u %u %u\n", ieee154e_vars.start, duration, RTIMER_NOW());
         } while(schedule_strict(&ieee154e_vars.t, ieee154e_vars.start, duration));
@@ -1231,7 +1222,7 @@ PROCESS_THREAD(tsch_associate, ev, data)
         /*				ieee154e_vars.start += 2*TRIVIAL_DELAY; */
         PRINTF("associate done\n");
         /* XXX for debugging */
-        ieee154e_vars.asn.asn_4lsb = 0;
+        ieee154e_vars.asn = 0;
       } else {
 #if CONTIKI_TARGET_JN5168
         NETSTACK_RADIO_radio_raw_rx_on();
@@ -1376,7 +1367,7 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 		}
 
 		/* End of slot operation, schedule next slot */
-		if(!tsch_is_coordinator && ASN_DIFF(current_asn, last_sync_asn) > DESYNC_THRESHOLD) {
+		if(!tsch_is_coordinator && current_asn - last_sync_asn > (asn_t)DESYNC_THRESHOLD) {
 			associated = 0;
 			process_post(&tsch_process, PROCESS_EVENT_POLL, NULL);
 		} else {
@@ -1386,7 +1377,7 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 			uint16_t timeslot_diff = next_timeslot > current_timeslot ? next_timeslot - current_timeslot:
 					current_slotframe->size - (current_timeslot - next_timeslot);
 			/* Update ASN */
-			ASN_INC(current_asn, timeslot_diff);
+			current_asn += (asn_t)timeslot_diff;
 
 			/* Update timeslot and cell start, schedule next wakeup */
 			current_timeslot = next_timeslot;
@@ -1414,7 +1405,7 @@ PT_THREAD(tsch_associate_dummy(struct pt *pt))
     associated = 1;
     current_slotframe = &minimum_slotframe;
     current_timeslot = get_first_active_timeslot();
-    ASN_SET(current_asn, current_timeslot);
+    current_asn = (asn_t)current_timeslot;
     current_cell_start = RTIMER_NOW() + TRIVIAL_DELAY;
     printf("TSCH: associate [done as coordinator]\n");
   } else {
@@ -1511,8 +1502,7 @@ tsch_init_variables(void)
   ieee154e_vars.current_slotframe = &minimum_slotframe;
   ieee154e_vars.slot_template_id = 1;
   ieee154e_vars.hop_sequence_id = 1;
-  ieee154e_vars.asn.asn_4lsb = 0;
-  ieee154e_vars.asn.asn_msb = 0;
+  ieee154e_vars.asn = 0;
   /* start with a random sequence number */
   ieee154e_vars.dsn = tsch_random_byte(127);
   tsch_state = TSCH_SEARCHING;

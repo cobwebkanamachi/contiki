@@ -207,26 +207,7 @@ enum ieee154e_atomicdurations_enum {
 
 #define TSCH_MAX_PACKET_LEN 127
 
-typedef struct {
-  uint8_t asn_msb;
-  uint32_t asn_4lsb;
-} asn_t;
-
-#define ASN_SET(asn, val) do { \
-    (asn).asn_msb = 0; \
-    (asn).asn_4lsb = (uint32_t)(val); \
-  } while(0);
-
-#define ASN_INC(asn, val) do { \
-    uint32_t old_4lsb = (asn).asn_4lsb; \
-    (asn).asn_4lsb += (uint32_t)(val); \
-    if((asn).asn_4lsb < old_4lsb) { \
-      (asn).asn_msb++; \
-    } \
-  } while(0);
-
-/* TODO: do it over 5 bytes */
-#define ASN_DIFF(asn, asn2) ((asn).asn_4lsb - (asn2).asn_4lsb)
+typedef uint64_t asn_t;
 
 #define STD_ACK_LEN 3
 #define SYNC_IE_LEN 4

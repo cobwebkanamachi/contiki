@@ -128,11 +128,11 @@ make_eb(uint8_t *buf, uint8_t buf_size)
   type = 0; /* short type */
   buf[i++] = len;
   buf[i++] = (sub_id << 1) | (type & 0x01);
-  buf[i++] = ieee154e_vars.asn.asn_4lsb & 0xff;
-  buf[i++] = ieee154e_vars.asn.asn_4lsb >> 8;
-  buf[i++] = ieee154e_vars.asn.asn_4lsb >> (uint16_t)16;
-  buf[i++] = ieee154e_vars.asn.asn_4lsb >> (uint32_t)24;
-  buf[i++] = ieee154e_vars.asn.asn_msb;
+  buf[i++] = ieee154e_vars.asn;
+  buf[i++] = ieee154e_vars.asn >> 8;
+  buf[i++] = ieee154e_vars.asn >> 16;
+  buf[i++] = ieee154e_vars.asn >> 24;
+  buf[i++] = ieee154e_vars.asn >> 32;
   /* update join_priority */
   rpl_instance_t *rpl = rpl_get_instance(RPL_DEFAULT_INSTANCE);
   static rpl_dag_t *my_rpl_dag = NULL;
