@@ -41,7 +41,8 @@
 #ifndef __TSCH_PRIVATE_H__
 #define __TSCH_PRIVATE_H__
 
-#include "net/rime/rimeaddr.h"
+#include "contiki.h"
+#include "net/mac/tsch-schedule.h"
 
 #if CONTIKI_TARGET_JN5168
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) ((uint32_t)(D) * 16UL) / ((uint32_t)(DC));
@@ -201,57 +202,6 @@ enum ieee154e_atomicdurations_enum {
 };
 #endif
 
-enum slotframe_operations_enum {
-  ADD_SLOTFRAME = 0, DELETE_SLOTFRAME = 2, MODIFY_SLOTFRAME = 3,
-};
-
-enum link_operations_enum {
-  ADD_LINK = 0, DELETE_LINK = 1, MODIFY_LINK = 2,
-};
-
-enum link_options_enum {
-  LINK_OPTION_TX = 1,
-  LINK_OPTION_RX = 2,
-  LINK_OPTION_SHARED = 4,
-  LINK_OPTION_TIME_KEEPING = 8,
-};
-
-enum link_type_enum {
-  LINK_TYPE_NORMAL = 0,
-  LINK_TYPE_ADVERTISING = 1,
-};
-
-enum cell_decision_enum {
-  CELL_OFF = 0,
-  CELL_TX = 1,
-  CELL_TX_IDLE = 2, /* No packet to transmit */
-  CELL_TX_BACKOFF = 3, /* csma backoff */
-  CELL_RX = 4,
-};
-
-typedef struct {
-  /* Unique identifier (local to specified slotframe) for the link */
-  uint16_t link_handle;
-  /* Relative number of slot in slotframe */
-  /* uint16_t timeslot; */
-  /* maybe 0 to 15 */
-  uint8_t channel_offset;
-  /*b0 = Transmit, b1 = Receive, b2 = Shared, b3= Timekeeping, b4–b7 reserved.*/
-  uint8_t link_options;
-  /* Type of link. NORMAL = 0. ADVERTISING = 1, and indicates
-     the link may be used to send an Enhanced beacon. */
-  uint8_t link_type;
-  /* short address of neighbor */
-  rimeaddr_t *node_address;
-} cell_t;
-
-typedef struct {
-  /* Unique identifier */
-  uint16_t slotframe_handle;
-  uint16_t length;
-  uint16_t on_size;
-  cell_t **cells;
-} slotframe_t;
 #define TSCH_MAX_PACKET_LEN 127
 
 typedef struct {

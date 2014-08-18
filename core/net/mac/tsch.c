@@ -46,6 +46,7 @@
 #include "net/mac/tsch-queue.h"
 #include "net/mac/tsch-private.h"
 #include "net/mac/tsch-packet.h"
+#include "net/mac/tsch-schedule.h"
 #include "net/mac/frame802154.h"
 #include "sys/process.h"
 #include "sys/rtimer.h"
@@ -1500,6 +1501,7 @@ tsch_init(void)
    * this flag is used to prevent this */
   ieee154e_vars.first_associate = 0;
   tsch_queue_init();
+  tsch_schedule_init();
 //  process_start(&tsch_tx_callback_process, NULL);
   /* try to associate to a network or start one if setup as RPL root */
 //  process_start(&tsch_associate, NULL);
