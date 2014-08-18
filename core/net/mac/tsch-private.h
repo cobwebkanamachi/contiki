@@ -300,4 +300,12 @@ struct slotframe {
   struct tsch_link **links;
 };
 
+enum cell_decision_enum {
+  CELL_OFF = 0,
+  CELL_TX = 1,
+  CELL_TX_IDLE = 2, /* No packet to transmit */
+  CELL_TX_BACKOFF = 3, /* csma backoff */
+  CELL_RX = 4,
+};
+
 #endif /* __TSCH_PRIVATE_H__ */

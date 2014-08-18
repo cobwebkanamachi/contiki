@@ -42,50 +42,41 @@
 #define __TSCH_SCHEDULE_H__
 
 #include "contiki.h"
+#include "lib/list.h"
 #include "net/rime/rimeaddr.h"
 
-enum link_options_enum {
-  LINK_OPTION_TX = 1,
-  LINK_OPTION_RX = 2,
-  LINK_OPTION_SHARED = 4,
-  LINK_OPTION_TIME_KEEPING = 8,
-};
-
-enum link_type_enum {
-  LINK_TYPE_NORMAL = 0,
-  LINK_TYPE_ADVERTISING = 1,
-};
-
-enum cell_decision_enum {
-  CELL_OFF = 0,
-  CELL_TX = 1,
-  CELL_TX_IDLE = 2, /* No packet to transmit */
-  CELL_TX_BACKOFF = 3, /* csma backoff */
-  CELL_RX = 4,
-};
+/* Link options */
+#define LINK_OPTION_TX              1
+#define LINK_OPTION_RX              2
+#define LINK_OPTION_SHARED          4
+#define LINK_OPTION_TIME_KEEPING    8
 
 struct tsch_link_ {
   /* Unique identifier (local to specified slotframe) for the link */
   uint16_t link_handle;
-  /* Relative number of slot in slotframe */
-  /* uint16_t timeslot; */
-  /* maybe 0 to 15 */
-  uint8_t channel_offset;
-  /*b0 = Transmit, b1 = Receive, b2 = Shared, b3= Timekeeping, b4–b7 reserved.*/
+  /* b0 = Transmit, b1 = Receive, b2 = Shared, b3 = Timekeeping, b4 = reserved */
   uint8_t link_options;
   /* Type of link. NORMAL = 0. ADVERTISING = 1, and indicates
      the link may be used to send an Enhanced beacon. */
-  uint8_t link_type;
-  /* short address of neighbor */
-  rimeaddr_t *node_address;
+  enum { LINK_TYPE_NORMAL, LINK_TYPE_ADVERTISING }  link_type;
+  /* Identifier of Slotframe to which this link belongs
+   * Unused. */
+  /* uint8_t slotframe_handle; */
+  /* MAC address of neighbor */
+  rimeaddr_t node_address;
+  /* Timeslot for this link */
+  uint16_t timeslot;
+  /* Channel offset for this link */
+  uint8_t channel_offset;
 };
 
 struct tsch_slotframe_ {
   /* Unique identifier */
   uint16_t slotframe_handle;
+  /* Number of timeslots in the slotframe */
   uint16_t size;
-  uint16_t on_size;
-  struct tsch_link **links;
+  /* List of links belonging to this slotframe */
+  LIST_STRUCT(links_list);
 };
 
 /* Initialization */
