@@ -198,7 +198,7 @@ tsch_queue_get_packet_from_dest_addr(const rimeaddr_t *addr)
   }
   return NULL;
 }
-/* Returns the head packet of any neighbor queue.
+/* Returns the head packet of any neighbor queue with zero backoff counter.
  * Writes pointer to the neighbor in *n */
 struct tsch_packet *
 tsch_queue_get_any_packet(struct tsch_neighbor **n)
@@ -210,7 +210,7 @@ tsch_queue_get_any_packet(struct tsch_neighbor **n)
 
     while(curr_nbr != NULL) {
       p = tsch_queue_get_packet_from_neighbor(curr_nbr);
-      if(p != NULL) {
+      if(p != NULL && curr_nbr->BW_value == 0) {
         *n = curr_nbr;
         return p;
       }
@@ -219,6 +219,25 @@ tsch_queue_get_any_packet(struct tsch_neighbor **n)
   }
   return NULL;
 }
+
+/* Decrements the CSMA backoff counter for all neighbors
+ * To be used in shared slots */
+void
+tsch_decrement_backoff_counter_for_all_nbrs(void)
+{
+//  if(!locked) {
+	struct tsch_neighbor *curr_nbr = nbr_table_head(neighbor_queues);
+
+	while (curr_nbr != NULL) {
+		if (curr_nbr->BW_value > 0) {
+			curr_nbr->BW_value--;
+		}
+		curr_nbr = nbr_table_next(neighbor_queues, curr_nbr);
+	}
+//  }
+	return NULL;
+}
+
 /* Initialize TSCH queue module */
 void
 tsch_queue_init(void)

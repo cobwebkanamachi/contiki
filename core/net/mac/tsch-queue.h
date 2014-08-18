@@ -93,9 +93,12 @@ int tsch_queue_remove_packet_from_dest_addr(const rimeaddr_t *addr);
 struct tsch_packet *tsch_queue_get_packet_from_neighbor(const struct tsch_neighbor *n);
 /* Returns the head packet from a neighbor queue (from neighbor address) */
 struct tsch_packet *tsch_queue_get_packet_from_dest_addr(const rimeaddr_t *addr);
-/* Returns the head packet of any neighbor queue.
+/* Returns the head packet of any neighbor queue with zero backoff counter.
  * Writes pointer to the neighbor in *n */
 struct tsch_packet *tsch_queue_get_any_packet(struct tsch_neighbor **n);
+/* Decrements the CSMA backoff counter for all neighbors
+ * To be used in shared slots */
+void tsch_decrement_backoff_counter_for_all_nbrs(void);
 /* Initialize TSCH queue module */
 void tsch_queue_init(void);
 

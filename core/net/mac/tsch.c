@@ -1282,11 +1282,39 @@ PROCESS_THREAD(tsch_tx_callback_process, ev, data)
  * TODO: Update EB fields.
  *  */
 static struct tsch_packet *
-get_packet_and_neighbor_for_cell(struct tsch_link *cell, struct tsch_neighbor **target_neighbor)
+get_packet_and_neighbor_for_cell(struct tsch_link *link, struct tsch_neighbor **target_neighbor)
 {
-/* TODO */
-  *target_neighbor = NULL;
-  return NULL;
+	struct tsch_packet * p = NULL;
+	struct tsch_neighbor * n = NULL;
+
+  /* is there a packet to send? if not check if this slot is RX too */
+  if(link->link_options & LINK_OPTION_TX) {
+    /* is it for ADV/EB? */
+    if(link->link_type == LINK_TYPE_ADVERTISING) {
+      /* fetch adv/EB packets */
+      n = tsch_queue_get_nbr(&eb_cell_address);
+      p = tsch_queue_get_packet_from_dest_addr(&eb_cell_address);
+    }
+    /* NORMAL link or no EB to send, pick a data packet */
+    if(p == NULL) {
+      /* pick a packet from the neighbors queue who is associated with this cell */
+      n = tsch_queue_get_nbr(link->node_address);
+      if(n != NULL) {
+        p = tsch_queue_get_packet_from_dest_addr(link->node_address);
+      }
+      /* if there it is a shared broadcast slot and there were no broadcast packets, pick any unicast packet */
+      if(p == NULL
+         && rimeaddr_cmp(link->node_address, &broadcast_cell_address)
+         && (link->link_options & LINK_OPTION_SHARED)) {
+        p = tsch_queue_get_any_packet(&n);
+      }
+    }
+  }
+  /* return nbr */
+  if(target_neighbor != NULL) {
+  	*target_neighbor = n;
+  }
+  return p;
 }
 
 static int associated = 0;
@@ -1296,6 +1324,8 @@ static asn_t current_asn;
 static rtimer_clock_t current_cell_start;
 static uint16_t current_timeslot;
 struct slotframe *current_slotframe;
+static struct tsch_packet *current_packet;
+
 static uint8_t eb_buf[TSCH_MAX_PACKET_LEN] = { 0 };
 
 static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
@@ -1304,12 +1334,16 @@ static
 PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
 {
   PT_BEGIN(pt);
+  static void *payload = NULL;
+  static uint8_t payload_len = 0;
 
+	if(current_packet != NULL && current_packet->pkt != NULL) {
+		payload = queuebuf_dataptr(current_packet->pkt);
+		payload_len = queuebuf_datalen(current_packet->pkt);
+	}
   rtimer_set(t, current_cell_start + TRIVIAL_DELAY,
               0, (rtimer_callback_t)tsch_cell_operation, NULL);
-  //printf("TSCH: before yield\n");
   PT_YIELD(pt);
-  //printf("TSCH: after yield\n");
 
   PT_END(pt);
 }
@@ -1321,9 +1355,7 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 
   rtimer_set(t, current_cell_start + TRIVIAL_DELAY,
               0, (rtimer_callback_t)tsch_cell_operation, NULL);
-  //printf("TSCH: before yield\n");
   PT_YIELD(pt);
-  //printf("TSCH: after yield\n");
 
   PT_END(pt);
 }
@@ -1338,20 +1370,21 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 
   /* Loop over all active cells */
   while(associated) {
-      static struct tsch_packet *current_packet;
-      static struct tsch_neighbor *current_neighbor;
-      static struct tsch_link *current_cell;
+		static struct tsch_neighbor *current_neighbor;
+		static struct tsch_link *current_cell;
 
 		current_cell = get_cell(current_timeslot);
 
-		if(current_cell->link_options & LINK_OPTION_SHARED) {
-/* TODO       update_backoff(all); */
-		}
-
 		if(current_cell->link_options & LINK_OPTION_TX) {
+			/* Get a packet ready to be sent */
 			current_packet = get_packet_and_neighbor_for_cell(current_cell, &current_neighbor);
 		}
 
+		if(current_cell->link_options & LINK_OPTION_SHARED) {
+			tsch_decrement_backoff_counter_for_all_nbrs();
+		}
+
+	  /* Decide whether it is a TX/RX/IDLE or OFF link */
 		/* Actual slot operation */
 		if(current_packet != NULL) {
 			/* We have something to transmit */
