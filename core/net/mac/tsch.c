@@ -1247,25 +1247,7 @@ PROCESS_THREAD(tsch_associate, ev, data)
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
-/* a polled-process to invoke the MAC tx callback asynchronously */
-PROCESS_THREAD(tsch_tx_callback_process, ev, data)
-{
-  PROCESS_BEGIN();
-  PRINTF("tsch_tx_callback_process: started\n");
-  COOJA_DEBUG_STR("tsch_tx_callback_process: started\n");
 
-  while(1) {
-    PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
-    /*		PRINTF("tsch_tx_callback_process: calling mac tx callback\n"); */
-    COOJA_DEBUG_STR("tsch_tx_callback_process: calling mac tx callback\n");
-    if(data != NULL) {
-      struct tsch_packet *p = (struct tsch_packet *)data;
-      /* XXX callback -- do we need to restore the packet to packetbuf? */
-      mac_call_sent_callback(p->sent, p->ptr, p->ret, p->transmissions);
-    }
-  }
-  PROCESS_END();
-}
 
 
 
@@ -1725,6 +1707,25 @@ PROCESS_THREAD(tsch_process, ev, data)
 
 
 
+/* a polled-process to invoke the MAC tx callback asynchronously */
+PROCESS_THREAD(tsch_tx_callback_process, ev, data)
+{
+  PROCESS_BEGIN();
+  PRINTF("tsch_tx_callback_process: started\n");
+  COOJA_DEBUG_STR("tsch_tx_callback_process: started\n");
+
+  while(1) {
+    PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
+    /*		PRINTF("tsch_tx_callback_process: calling mac tx callback\n"); */
+    COOJA_DEBUG_STR("tsch_tx_callback_process: calling mac tx callback\n");
+    if(data != NULL) {
+      struct tsch_packet *p = (struct tsch_packet *)data;
+      /* XXX callback -- do we need to restore the packet to packetbuf? */
+      mac_call_sent_callback(p->sent, p->ptr, p->ret, p->transmissions);
+    }
+  }
+  PROCESS_END();
+}
 
 /* a periodic process to send EBs */
 PROCESS_THREAD(tsch_send_eb_process, ev, data)
