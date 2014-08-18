@@ -65,14 +65,17 @@ void uart0_writeb(unsigned char c);
 /*  rtimer_clock_t sfd_timestamp; */
 /* }; */
 
-#define NACK_FLAG 0x8000
+#define NACK_FLAG (0x8000)
 
 /* number of slots to wait before initiating resynchronization */
-#define DESYNC_THRESHOLD ieee154e_vars.current_slotframe->length * 30
+#define DESYNC_THRESHOLD (ieee154e_vars.current_slotframe->length * 30)
 /* number of slots to wait before activating keep-alive mechanism */
-#define KEEPALIVE_TIMEOUT ieee154e_vars.current_slotframe->length * 3
+#define KEEPALIVE_TIMEOUT (ieee154e_vars.current_slotframe->length * 3)
 /* number of slots to wait before applying drift correction */
-#define DRIFT_CORRECTION_TIMEOUT  3
+#define DRIFT_CORRECTION_TIMEOUT  (3)
+/* Period of EB */
+#define EB_PERIOD (4*CLOCK_SECOND)
+
 
 #if CONTIKI_TARGET_JN5168
 #pragma __TSCH_PARAMETERS_H__ CONTIKI_TARGET_JN5168

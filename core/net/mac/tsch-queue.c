@@ -70,6 +70,17 @@ tsch_queue_is_locked()
 /* Per-neighbor queue */
 NBR_TABLE(struct tsch_neighbor, neighbor_queues);
 
+/* Lock a TSCH neighbor, to prevent removal */
+int
+tsch_queue_lock_nbr(struct tsch_neighbor *n)
+{
+	if(n != NULL) {
+		/* Lock neighbor entry */
+		return nbr_table_lock(neighbor_queues, n);
+	}
+  return 0;
+}
+
 /* Add a TSCH neighbor */
 struct tsch_neighbor *
 tsch_queue_add_nbr(const rimeaddr_t *addr)

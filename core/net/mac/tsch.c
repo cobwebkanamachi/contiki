@@ -158,6 +158,7 @@ static rtimer_clock_t t0prepare = 0, t0tx = 0, t0txack = 0, t0post_tx = 0, t0rx 
 
 /* Contiki processes */
 PROCESS(tsch_tx_callback_process, "tsch_tx_callback_process");
+PROCESS(tsch_send_eb_process, "tsch_send_eb_process");
 PROCESS(tsch_associate, "tsch_associate");
 PROCESS(tsch_process, "TSCH process");
 
@@ -1303,6 +1304,7 @@ static asn_t current_asn;
 static rtimer_clock_t current_cell_start;
 static uint16_t current_timeslot;
 slotframe_t *current_slotframe;
+static uint8_t eb_buf[TSCH_MAX_PACKET_LEN] = { 0 };
 
 static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
 
@@ -1344,56 +1346,56 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 
   /* Loop over all active cells */
   while(associated) {
-      static struct tsch_packet *current_packet;
-      static struct tsch_neighbor *current_neighbor;
-      static cell_t *current_cell;
+		static struct tsch_packet *current_packet;
+		static struct tsch_neighbor *current_neighbor;
+		static cell_t *current_cell;
 
-      current_cell = get_cell(current_timeslot);
+		current_cell = get_cell(current_timeslot);
 
-      if(current_cell->link_options & LINK_OPTION_SHARED) {
+		if(current_cell->link_options & LINK_OPTION_SHARED) {
 /* TODO       update_backoff(all); */
-      }
+		}
 
-      if(current_cell->link_options & LINK_OPTION_TX) {
-        current_packet = get_packet_and_neighbor_for_cell(current_cell, &current_neighbor);
-      }
+		if(current_cell->link_options & LINK_OPTION_TX) {
+			current_packet = get_packet_and_neighbor_for_cell(current_cell, &current_neighbor);
+		}
 
-      /* Actual slot operation */
-      if(current_packet != NULL) {
-        /* We have something to transmit */
-        static struct pt cell_tx_pt;
-        PT_SPAWN(&cell_operation_pt, &cell_tx_pt, tsch_tx_cell(&cell_tx_pt, t));
-        /* TODO
-                  update_backoff_state(current_neighbor)
-                  post tx callback */
-      } else if(current_cell->link_options & LINK_OPTION_RX) {
-        /* Listen */
-        static struct pt cell_rx_pt;
-        PT_SPAWN(&cell_operation_pt, &cell_rx_pt, tsch_rx_cell(&cell_rx_pt, t));
-      }
+		/* Actual slot operation */
+		if(current_packet != NULL) {
+			/* We have something to transmit */
+			static struct pt cell_tx_pt;
+			PT_SPAWN(&cell_operation_pt, &cell_tx_pt, tsch_tx_cell(&cell_tx_pt, t));
+			/* TODO
+								update_backoff_state(current_neighbor)
+								post tx callback */
+		} else if(current_cell->link_options & LINK_OPTION_RX) {
+			/* Listen */
+			static struct pt cell_rx_pt;
+			PT_SPAWN(&cell_operation_pt, &cell_rx_pt, tsch_rx_cell(&cell_rx_pt, t));
+		}
 
-      /* End of slot operation, schedule next slot */
-      if(!tsch_is_coordinator && ASN_DIFF(current_asn, last_sync_asn) > DESYNC_THRESHOLD) {
-        associated = 0;
-        process_post(&tsch_process, PROCESS_EVENT_POLL, NULL);
-      } else {
-        /* Get next active timeslot */
-        uint16_t next_timeslot = get_next_active_timeslot(current_timeslot);
-        /* Calculate number of slots between current and next */
-        uint16_t timeslot_diff = next_timeslot > current_timeslot ? next_timeslot - current_timeslot:
-            current_slotframe->length - (current_timeslot - next_timeslot);
-        /* Update ASN */
-        ASN_INC(current_asn, timeslot_diff);
+		/* End of slot operation, schedule next slot */
+		if(!tsch_is_coordinator && ASN_DIFF(current_asn, last_sync_asn) > DESYNC_THRESHOLD) {
+			associated = 0;
+			process_post(&tsch_process, PROCESS_EVENT_POLL, NULL);
+		} else {
+			/* Get next active timeslot */
+			uint16_t next_timeslot = get_next_active_timeslot(current_timeslot);
+			/* Calculate number of slots between current and next */
+			uint16_t timeslot_diff = next_timeslot > current_timeslot ? next_timeslot - current_timeslot:
+					current_slotframe->length - (current_timeslot - next_timeslot);
+			/* Update ASN */
+			ASN_INC(current_asn, timeslot_diff);
 
-        /* Update timeslot and cell start, schedule next wakeup */
-        current_timeslot = next_timeslot;
-        current_cell_start +=  timeslot_diff * TsSlotDuration + drift_correction;
-        rtimer_set(t, current_cell_start,
-            0, (rtimer_callback_t)tsch_cell_operation, NULL);
-        printf("TSCH: end of cell %u\n", timeslot_diff);
-      }
+			/* Update timeslot and cell start, schedule next wakeup */
+			current_timeslot = next_timeslot;
+			current_cell_start +=  timeslot_diff * TsSlotDuration + drift_correction;
+			rtimer_set(t, current_cell_start,
+					0, (rtimer_callback_t)tsch_cell_operation, NULL);
+			printf("TSCH: end of cell %u\n", timeslot_diff);
+		}
 
-      PT_YIELD(&cell_operation_pt);
+		PT_YIELD(&cell_operation_pt);
   }
 
   PT_END(&cell_operation_pt);
@@ -1456,7 +1458,47 @@ PROCESS_THREAD(tsch_process, ev, data)
 
 
 
+/* a periodic process to send EBs */
+PROCESS_THREAD(tsch_send_eb_process, ev, data)
+{
+  static struct etimer eb_timer;
+  PROCESS_BEGIN();
+	static struct tsch_neighbor *n;
+  uint8_t eb_len = 0;
 
+	/* yield the process until a neighbor for EBs is added */
+  etimer_set(&eb_timer, CLOCK_SECOND/10);
+  do {
+		n = tsch_queue_add_nbr(&eb_cell_address);
+		if(n == NULL) {
+			PROCESS_WAIT_EVENT();
+		}
+		etimer_reset(&eb_timer);
+	}	while(n == NULL);
+
+	/* Lock the EB nbr so it does not get deleted later on */
+	tsch_queue_lock_nbr(n);
+
+	PRINTF("tsch_send_eb_process: started\n");
+  COOJA_DEBUG_STR("tsch_send_eb_process: started\n");
+  etimer_set(&eb_timer, EB_PERIOD/2 + tsch_random_byte(0xff)*(EB_PERIOD/(2UL*0xff)));
+  while(1) {
+    PROCESS_WAIT_EVENT();
+    if(ev == PROCESS_EVENT_TIMER) {
+			if(data == &eb_timer) {
+				etimer_reset(&eb_timer);
+				/* Prepare the EB packet and schedule it to be sent */
+				eb_len = make_eb(eb_buf, TSCH_MAX_PACKET_LEN);
+				packetbuf_reference((void *)eb_buf, eb_len);
+		    /* enqueue eb packet */
+		    if(n != NULL && !tsch_queue_add_packet(&eb_cell_address, NULL, NULL)) {
+		      PRINTF("tsch: can't send EB packet\n");
+		    }
+			}
+    }
+  }
+  PROCESS_END();
+}
 /*---------------------------------------------------------------------------*/
 static void
 tsch_init_variables(void)
@@ -1500,7 +1542,7 @@ tsch_init(void)
    * this flag is used to prevent this */
   ieee154e_vars.first_associate = 0;
   tsch_queue_init();
-//  process_start(&tsch_tx_callback_process, NULL);
+//
   /* try to associate to a network or start one if setup as RPL root */
 //  process_start(&tsch_associate, NULL);
   /* XXX for debugging */
@@ -1508,7 +1550,8 @@ tsch_init(void)
   /*	NETSTACK_RADIO.on(); */
 //  powercycle(&ieee154e_vars.t, NULL);
   /* schedule_fixed(&ieee154e_vars.t, RTIMER_NOW(), 0); */
-
+  process_start(&tsch_tx_callback_process, NULL);
+  process_start(&tsch_send_eb_process, NULL);
   process_start(&tsch_process, NULL);
 }
 /*---------------------------------------------------------------------------*/
