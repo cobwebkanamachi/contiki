@@ -1377,11 +1377,18 @@ static uint8_t tsch_read_and_process_ack(struct tsch_neighbor *n, uint8_t seqno)
   return success;
 }
 
+/* post TX: Update CSMA control variables */
 static void
 update_csma(struct tsch_packet * p, struct tsch_neighbor * n, struct tsch_link * cell, uint8_t mac_tx_status, uint8_t is_broadcast) {
 	uint8_t window = 0;
 	t0post_tx = RTIMER_NOW();
-	/* post TX: Update CSMA control variables */
+
+	/* If this is a shared link,
+	 * we need to decrease the backoff value for all neighbors waiting to send */
+	if(cell->link_options & LINK_OPTION_SHARED) {
+		tsch_decrement_backoff_counter_for_all_nbrs();
+	}
+
 	/* if it was EB or broadcast there is no need to update anything */
 	if(!is_broadcast) {
 		if(mac_tx_status == MAC_TX_NOACK) {
@@ -1449,6 +1456,7 @@ update_csma(struct tsch_packet * p, struct tsch_neighbor * n, struct tsch_link *
 			}
 		}
 	}
+
 	t0post_tx = RTIMER_NOW() - t0post_tx;
 }
 
@@ -1684,12 +1692,6 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 		if(current_cell->link_options & LINK_OPTION_TX) {
 			/* Get a packet ready to be sent */
 			current_packet = get_packet_and_neighbor_for_cell(current_cell, &current_neighbor);
-		}
-
-		/* Since this is a shared link,
-		 * we need to decrease the backoff value for all neighbors waiting to send */
-		if(current_cell->link_options & LINK_OPTION_SHARED) {
-			tsch_decrement_backoff_counter_for_all_nbrs();
 		}
 
 	  /* Decide whether it is a TX/RX/IDLE or OFF link */
