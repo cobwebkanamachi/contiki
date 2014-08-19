@@ -298,4 +298,7 @@ enum cell_decision_enum {
   CELL_RX = 4,
 };
 
+/* 802.15.4 broadcast MAC address */
+const rimeaddr_t tsch_broadcast_address;
+
 #endif /* __TSCH_PRIVATE_H__ */
