@@ -65,6 +65,10 @@
 #define CC2420_CONF_AUTOACK 0
 #endif /* CC2420_CONF_AUTOACK */
 
+#ifndef CC2420_CONF_ADR_DECODE
+#define CC2420_CONF_ADR_DECODE 1
+#endif /* CC2420_CONF_ADR_DECODE */
+
 #if CC2420_CONF_CHECKSUM
 #include "lib/crc16.h"
 #define CHECKSUM_LEN 2
@@ -74,6 +78,28 @@
 
 #define AUX_LEN (CHECKSUM_LEN + FOOTER_LEN)
 
+#define WITH_SEND_CCA 0
+
+#define FIFOP_THRESHOLD (ACK_LEN)
+
+#undef CC2420_CONF_AUTOACK
+#define CC2420_CONF_AUTOACK 0
+
+#ifndef RF_CHANNEL
+#define RF_CHANNEL 20
+#endif /* RF_CHANNEL */
+
+#ifndef CC2420_CONF_TX_POWER
+#define CC2420_CONF_TX_POWER 15
+#endif /* CC2420_CONF_TX_POWER */
+
+#ifndef RSSI_THR
+#define RSSI_THR				(-32-14)
+#endif /* RSSI_THR */
+
+#ifndef CC2420_CONF_CCA_THRESH
+#define CC2420_CONF_CCA_THRESH RSSI_THR
+#endif /* CC2420_CONF_CCA_THRESH */
 
 #define FOOTER1_CRC_OK      0x80
 #define FOOTER1_CORRELATION 0x7f
@@ -162,7 +188,10 @@ static uint8_t receive_on;
 
 static int channel;
 
-/*---------------------------------------------------------------------------*/
+/* A flag to enable or disable FIFOP interrupt */
+static uint8_t volatile interrupt_enabled = 1;
+
+static uint8_t volatile address_decoding_enabled = CC2420_CONF_ADR_DECODE;
 
 static void
 getrxdata(void *buf, int len)
@@ -203,7 +232,10 @@ static uint8_t locked, lock_on, lock_off;
 static void
 on(void)
 {
-  CC2420_ENABLE_FIFOP_INT();
+  if(interrupt_enabled) {
+  	CC2420_ENABLE_FIFOP_INT();
+  }
+
   strobe(CC2420_SRXON);
 
   BUSYWAIT_UNTIL(status() & (BV(CC2420_XOSC16M_STABLE)), RTIMER_SECOND / 100);
@@ -222,7 +254,10 @@ off(void)
 
   ENERGEST_OFF(ENERGEST_TYPE_LISTEN);
   strobe(CC2420_SRFOFF);
-  CC2420_DISABLE_FIFOP_INT();
+
+  if(interrupt_enabled) {
+  	CC2420_DISABLE_FIFOP_INT();
+  }
 
   if(!CC2420_FIFOP_IS_1) {
     flushrx();
@@ -284,6 +319,9 @@ cc2420_init(void)
     cc2420_arch_init();		/* Initalize ports and SPI. */
     CC2420_DISABLE_FIFOP_INT();
     CC2420_FIFOP_INT_INIT();
+    if(!interrupt_enabled) {
+    	CC2420_DISABLE_FIFOP_INT();
+    }
     splx(s);
   }
 
@@ -295,7 +333,6 @@ cc2420_init(void)
   SET_RESET_INACTIVE();
   clock_delay(125);
 
-
   /* Turn on the crystal oscillator. */
   strobe(CC2420_SXOSCON);
 
@@ -303,10 +340,17 @@ cc2420_init(void)
   reg = getreg(CC2420_MDMCTRL0);
 
 #if CC2420_CONF_AUTOACK
-  reg |= AUTOACK | ADR_DECODE;
+  reg |= AUTOACK;
 #else
-  reg &= ~(AUTOACK | ADR_DECODE);
+  reg &= ~(AUTOACK);
 #endif /* CC2420_CONF_AUTOACK */
+
+	if(address_decoding_enabled) {
+		reg |= ADR_DECODE;
+	} else {
+		reg &= ~(ADR_DECODE);
+	}
+
   setreg(CC2420_MDMCTRL0, reg);
 
   /* Set transmission turnaround time to the lower setting (8 symbols
@@ -324,7 +368,7 @@ cc2420_init(void)
   setreg(CC2420_RXCTRL1, reg);
 
   /* Set the FIFOP threshold to maximum. */
-  setreg(CC2420_IOCFG0, FIFOP_THR(127));
+  setreg(CC2420_IOCFG0, FIFOP_THR(FIFOP_THRESHOLD));
 
   /* Turn off "Security enable" (page 32). */
   reg = getreg(CC2420_SECCTRL0);
@@ -333,8 +377,13 @@ cc2420_init(void)
 
   cc2420_set_pan_addr(0xffff, 0x0000, NULL);
   cc2420_set_channel(RF_CHANNEL);
+  cc2420_set_cca_threshold(CC2420_CONF_CCA_THRESH);
+  cc2420_set_txpower(CC2420_CONF_TX_POWER);
 
   flushrx();
+  if(interrupt_enabled) {
+  	CC2420_CLEAR_FIFOP_INT();
+  }
 
   process_start(&cc2420_process, NULL);
   return 1;
@@ -884,4 +933,92 @@ cc2420_set_cca_threshold(int value)
   setreg(CC2420_RSSI, shifted);
   RELEASE_LOCK();
 }
-/*---------------------------------------------------------------------------*/
+
+/* Configures timer B to capture SFD edge (start, end, both),
+ * and sets the cell start time for calculating synchronization in ACK */
+void
+cc2420_sfd_sync(uint8_t capture_start_sfd, uint8_t capture_end_sfd)
+{
+	if(capture_start_sfd && capture_end_sfd) {
+		/* Capture mode: 3 - both edges */
+		TBCCTL1 = CM_3 | CAP | SCS;
+	} else if(capture_end_sfd){
+		/* Capture mode: 2 - neg. edge */
+		TBCCTL1 = CM_2 | CAP | SCS;
+	} else if(capture_start_sfd) {
+		/* Capture mode: 1 - pos. edge */
+		TBCCTL1 = CM_1 | CAP | SCS;
+	} else {
+		/* Capture mode: 0 - disabled */
+		TBCCTL1 = CM_0 | CAP | SCS;
+	}
+
+  /* Start Timer_B in continuous mode. */
+  //  TBCTL |= MC1; //it is already started?
+
+	/* Sync with RTIMER */
+  TBR = RTIMER_NOW();
+}
+
+/* Read the timer value when the last SFD edge was captured,
+ * this depends on SFD timer configuration */
+uint16_t
+cc2420_read_sfd_timer(void)
+{
+	uint16_t t = TBCCR1;
+	return t;
+}
+
+/* Turn on/off address decoding.
+ * Disabling address decoding would enable reception of
+ * frames not compliant with the 802.15.4-2003 standard */
+void
+cc2420_address_decode(uint8_t enable)
+{
+	GET_LOCK();
+
+	address_decoding_enabled = enable;
+
+	/* Turn on/off address decoding. */
+	uint16_t reg = getreg(CC2420_MDMCTRL0);
+	if(enable) {
+	  reg |= ADR_DECODE;
+	} else {
+		reg &= ~(ADR_DECODE);
+	}
+  BUSYWAIT_UNTIL((status() & (BV(CC2420_XOSC16M_STABLE))), RTIMER_SECOND / 100);
+	setreg(CC2420_MDMCTRL0, reg);
+	RELEASE_LOCK();
+}
+
+/* Enable or disable radio interrupts (both FIFOP and SFD timer capture) */
+void
+cc2420_set_interrupt_enable(uint8_t e)
+{
+	GET_LOCK();
+
+	interrupt_enabled = e;
+
+	if(e) {
+		/* Initialize and enable FIFOP interrupt */
+		CC2420_FIFOP_INT_INIT();
+		CC2420_ENABLE_FIFOP_INT();
+		CC2420_CLEAR_FIFOP_INT();
+		/* Enable SFD timer capture interrupt */
+		TBCCTL1 |= CCIE;
+	} else {
+		/* Disable FIFOP interrupt */
+		CC2420_CLEAR_FIFOP_INT();
+		CC2420_DISABLE_FIFOP_INT();
+		/* Disable SFD timer capture interrupt */
+		TBCCTL1 &= ~CCIE;
+	}
+	RELEASE_LOCK();
+}
+
+/* Get radio interrupt enable status */
+uint8_t
+cc2420_get_interrupt_enable(void)
+{
+	return interrupt_enabled;
+}

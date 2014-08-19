@@ -50,6 +50,8 @@ int cc2420_init(void);
 
 #define CC2420_MAX_PACKET_LEN      127
 
+#define ACK_LEN 3
+
 int cc2420_set_channel(int channel);
 int cc2420_get_channel(void);
 
@@ -88,6 +90,24 @@ int cc2420_off(void);
 
 void cc2420_set_cca_threshold(int value);
 
+/* Configures timer B to capture SFD edge (start, end, both),
+ * and sets the cell start time for calculating synchronization in ACK */
+void cc2420_sfd_sync(uint8_t capture_start_sfd, uint8_t capture_end_sfd);
+
+/* Read the timer value when the last SFD edge was captured,
+ * this depends on SFD timer configuration */
+uint16_t cc2420_read_sfd_timer(void);
+
+/* Turn on/off address decoding.
+ * Disabling address decoding would enable reception of
+ * frames not compliant with the 802.15.4-2003 standard */
+void cc2420_address_decode(uint8_t enable);
+
+/* Enable or disable radio interrupts (both FIFOP and SFD timer capture) */
+void cc2420_set_interrupt_enable(uint8_t e);
+
+/* Get radio interrupt enable status */
+uint8_t cc2420_get_interrupt_enable(void);
 /************************************************************************/
 /* Additional SPI Macros for the CC2420 */
 /************************************************************************/
