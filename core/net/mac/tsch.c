@@ -99,6 +99,9 @@ struct seqno {
 static struct seqno received_seqnos[MAX_SEQNOS];
 #endif /* TSCH_802154_DUPLICATE_DETECTION */
 
+/* 802.15.4 broadcast MAC address */
+const rimeaddr_t tsch_broadcast_address = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
+
 /* TODO: const? */
 /* Schedule: addresses */
 static rimeaddr_t broadcast_cell_address = { { 0, 0, 0, 0, 0, 0, 0, 0 } };

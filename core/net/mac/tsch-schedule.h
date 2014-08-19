@@ -99,7 +99,9 @@ struct tsch_link_ *tsch_schedule_add_link(struct tsch_slotframe_ *slotframe,
     uint16_t timeslot, uint16_t channel_offset);
 /* Looks within a slotframe for a link with a given timeslot */
 struct tsch_link_ *tsch_schedule_get_link_from_timeslot(struct tsch_slotframe_ *slotframe, uint16_t timeslot);
-/* Return the next active (not OFF) timeslot after a given timeslot */
+/* Returns the next active (not OFF) timeslot after a given timeslot */
 struct tsch_link_ *tsch_schedule_get_link_from_asn(asn_t asn);
+/* Returns the number of slots until the first active link after a given ASN */
+uint16_t tsch_schedule_time_to_next_active_link(asn_t asn);
 
 #endif /* __TSCH_SCHEDULE_H__ */

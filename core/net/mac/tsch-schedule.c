@@ -192,6 +192,32 @@ tsch_schedule_get_link_from_asn(asn_t asn)
   return curr_best;
 }
 
+/* Returns the number of slots until the first active link after a given ASN */
+uint16_t
+tsch_schedule_time_to_next_active_link(asn_t asn)
+{
+  uint16_t curr_earliest = 0;
+  struct tsch_slotframe_ *sf = list_head(slotframe_list);
+  /* For each slotframe, look for the earliest occurring link */
+  while(sf != NULL) {
+    /* Get timeslot from ASN, given the slotframe length */
+    uint16_t timeslot = asn % sf->size;
+    struct tsch_link_ *l = list_head(sf->links_list);
+    while(l != NULL) {
+      uint16_t time_to_timeslot =
+          l->timeslot > timeslot ?
+              l->timeslot - timeslot :
+              sf->size + l->timeslot - timeslot;
+      if(curr_earliest == 0 || time_to_timeslot < curr_earliest) {
+        curr_earliest = time_to_timeslot;
+      }
+      l = list_item_next(l);
+    }
+    sf = list_item_next(sf);
+  }
+  return curr_earliest;
+}
+
 void tsch_schedule_print()
 {
   struct tsch_slotframe_ *sf = list_head(slotframe_list);
@@ -256,11 +282,29 @@ void tsch_schedule_test()
     } else {
       printf("asn %u: no link\n", (unsigned)asn);
     }
+    printf("time to next %u\n", tsch_schedule_time_to_next_active_link((asn_t) asn));
   }
 }
 
 /* Initialization */
 void tsch_schedule_init()
 {
-  tsch_schedule_test();
+  /* Build 6TiSCH minimal schedule.
+   * We pick a slotframe length of 101. */
+  struct tsch_slotframe_ *sf = tsch_schedule_add_slotframe(0, 101);
+  /* Add a single Tx|Rx|Shared slot using broadcast address (i.e. usable for unicast and broadcast).
+   * We set the link type to advertising, which is not compliant with 6TiSCH minimal schedule
+   * but is required according to 802.15.4e if also used for EB transmission.
+   * Timeslot: 0, channel offset: 0. */
+  tsch_schedule_add_link(sf,
+        LINK_OPTION_RX | LINK_OPTION_TX | LINK_OPTION_SHARED,
+        LINK_TYPE_ADVERTISING, &tsch_broadcast_address,
+        0, 0);
+
+  /* Example of a dedicated Tx unicast link. Timeslot: 1, channel offset: 0. */
+  /* static rimeaddr_t dest_addr = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } }; */
+  /* tsch_schedule_add_link(sf,
+        LINK_OPTION_RX,
+        LINK_TYPE_NORMAL, &dest_addr,
+        1, 0); */
 }
