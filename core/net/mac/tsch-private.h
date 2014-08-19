@@ -43,7 +43,7 @@
 #define __TSCH_PRIVATE_H__
 
 #include "contiki.h"
-
+#include "rimeaddr.h"
 #if CONTIKI_TARGET_JN5168
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) ((uint32_t)(D) * 16UL) / ((uint32_t)(DC));
 #define RTIMER_TO_US(T)   ((T) >> 4UL)
@@ -56,7 +56,8 @@ void uart0_writeb(unsigned char c);
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) (((D) * 100UL) / (3051UL * (DC)));
 /* Do the math in 32bits to save precision */
 #define RTIMER_TO_US(T)   (((uint32_t)(T) * 3051UL) / (uint32_t)100UL)
-#include "dev/cc2420-tsch.h"
+#define RADIO_TO_RTIMER(X) 	((rtimer_clock_t)( (uint32_t)((uint32_t)(X)*524)/(uint32_t)1000 ))
+#include "dev/cc2420.h"
 #endif /* CONTIKI_TARGET */
 
 /* Calculate packet tx/rc duration based on sent packet len assuming 802.15.4 250kbps data rate */

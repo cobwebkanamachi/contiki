@@ -49,8 +49,8 @@
 
 /*---------------------------------------------------------------------------*/
 /* This function adds the Sync IE from the beginning of the buffer and returns the reported drift in microseconds */
-int16_t
-add_sync_IE(uint8_t *buf, int32_t time_difference_32, uint8_t nack)
+static int16_t
+tsch_packet_add_sync_IE(uint8_t *buf, int32_t time_difference_32, uint8_t nack)
 {
   int16_t time_difference;
   uint16_t ack_status = 0;
@@ -69,30 +69,27 @@ add_sync_IE(uint8_t *buf, int32_t time_difference_32, uint8_t nack)
   buf[3] = (ack_status >> 8) & 0xff;
   return time_difference;
 }
-/*---------------------------------------------------------------------------*/
-void
-tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack)
+
+/* Construct enhanced ACK packet and return ACK length */
+uint8_t
+tsch_packet_make_sync_ack(int32_t sync_time, uint8_t *ackbuf, uint8_t seqno, uint8_t nack)
 {
-  int32_t time_difference_32;
-  COOJA_DEBUG_STR("tsch_make_sync_ack");
-  *buf = ieee154e_vars.ackbuf;
+  COOJA_DEBUG_STR("tsch_packet_make_sync_ack");
   /* calculating sync in rtimer ticks */
-  time_difference_32 = (int32_t)ieee154e_vars.start + TsTxOffset - last_packet_timestamp;
-  ieee154e_vars.registered_drift = time_difference_32;
   /* ackbuf[1+ACK_LEN + EXTRA_ACK_LEN] = {ACK_LEN + EXTRA_ACK_LEN + AUX_LEN, 0x02, 0x00, seqno, 0x02, 0x1e, ack_status_LSB, ack_status_MSB}; */
-  ieee154e_vars.ackbuf[1] = 0x02; /* ACK frame */
-  ieee154e_vars.ackbuf[3] = seqno;
-  ieee154e_vars.ackbuf[2] = 0x00; /* b9:IE-list-present=1 - b12-b13:frame version=2 */
-  ieee154e_vars.ackbuf[0] = 3; /*length*/
+  ackbuf[0] = 0x02; /* ACK frame */
+  ackbuf[2] = seqno;
+  ackbuf[1] = 0x22; /* b9:IE-list-present=1 - b12-b13:frame version=2 */
+
   /* Append IE timesync */
-  add_sync_IE(&(ieee154e_vars.ackbuf[4]), time_difference_32, nack);
-  ieee154e_vars.ackbuf[0] = 7; /* Len: FCF 2B + SEQNO 1B + sync IE 4B*/
-  ieee154e_vars.ackbuf[2] = 0x22; /* b9:IE-list-present=1 - b12-b13:frame version=2 */
+  tsch_packet_add_sync_IE(&(ackbuf[3]), sync_time, nack);
+
+  return 7; /* Len: FCF 2B + SEQNO 1B + sync IE 4B*/
 }
 /*---------------------------------------------------------------------------*/
 /* Create an EB packet */
 int
-make_eb(uint8_t *buf, uint8_t buf_size)
+tsch_packet_make_eb(uint8_t *buf, uint8_t buf_size)
 {
   /* XXX make sure this function does not overflow buf */
   uint16_t j = 0;
@@ -204,7 +201,7 @@ make_eb(uint8_t *buf, uint8_t buf_size)
   /* Append time correction IE */
   /* Put IEs: sync, slotframe and link, timeslot and channel hopping sequence */
   /*	if (reported_drift != 0) { */
-  /*		add_sync_IE(buf+i+3, reported_drift, nack); */
+  /*		tsch_packet_add_sync_IE(buf+i+3, reported_drift, nack); */
   /*		i+=4; */
   /*	} */
 
@@ -213,4 +210,96 @@ make_eb(uint8_t *buf, uint8_t buf_size)
   buf[13] = i;
   buf[14] = ((i >> 8) & 0x7) | (((1 << 1) | 1) << 3); /* b0-2:: left for length MSB, b3-6: GroupID, b7: Type */
   return i;
+}
+
+#define DO_ACK 2
+#define IS_DATA 4
+#define IS_ACK 8
+
+static uint8_t
+tsch_packet_parse_frame_type(uint8_t *data, uint8_t len)
+{
+	if(len < ACK_LEN) {
+		return 0;
+	}
+	/* decode the FCF */
+	uint8_t do_ack = ((data[0] >> 5) & 1) == 1 ? DO_ACK : 0;
+	uint8_t is_data = (data[0] & 7) == FRAME802154_DATAFRAME ? IS_DATA : 0;
+	uint8_t is_ack = (data[0] & 7) == FRAME802154_ACKFRAME ? IS_ACK : 0;
+	return do_ack | is_data | is_ack;
+}
+
+uint8_t
+tsch_packet_is_ack_needed(uint8_t *data, uint8_t len)
+{
+	uint8_t do_ack = 0;
+	if(len > ACK_LEN) {
+		/* decode the FCF */
+		do_ack = ((data[0] >> 5) & 1) == 1 ? DO_ACK : 0;
+	}
+	return do_ack;
+}
+
+static rimeaddr_t source_address = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
+/* Extract sender address from raw packet */
+rimeaddr_t *
+tsch_packet_extract_sender_address(uint8_t *buf, uint8_t len)
+{
+	frame802154_fcf_t fcf;
+
+	int c;
+
+	if(len > ACK_LEN) {
+		uint8_t * p = buf;
+
+		/* decode the FCF */
+		fcf.frame_type = p[0] & 7;
+		fcf.security_enabled = (p[0] >> 3) & 1;
+		fcf.frame_pending = (p[0] >> 4) & 1;
+		fcf.ack_required = (p[0] >> 5) & 1;
+		fcf.panid_compression = (p[0] >> 6) & 1;
+
+		fcf.dest_addr_mode = (p[1] >> 2) & 3;
+		fcf.frame_version = (p[1] >> 4) & 3;
+		fcf.src_addr_mode = (p[1] >> 6) & 3;
+
+		/* copy fcf and seqNum */
+		p += 3;  /* Skip first three bytes */
+
+		/* Destination address, if any */
+		if(fcf.dest_addr_mode) {
+			/* Destination PAN */
+			p += 2;
+			if(fcf.dest_addr_mode == FRAME802154_SHORTADDRMODE) {
+				p += 2;
+			} else if(fcf.dest_addr_mode == FRAME802154_LONGADDRMODE) {
+				p += 8;
+			}
+		}
+
+		/* Source address, if any */
+		if(fcf.src_addr_mode) {
+			/* Source PAN */
+			if(!fcf.panid_compression) {
+				p += 2;
+			} else {
+			}
+			/* Source address */
+			if(fcf.src_addr_mode == FRAME802154_SHORTADDRMODE) {
+				source_address.u8[0] = p[1];
+				source_address.u8[1] = p[0];
+				p += 2;
+			} else if(fcf.src_addr_mode == FRAME802154_LONGADDRMODE) {
+				for(c = 0; c < 8; c++) {
+					source_address.u8[c] = p[7-c];
+				}
+				p += 8;
+			}
+		} else {
+			rimeaddr_copy(&source_address, &rimeaddr_null);
+		}
+	} else {
+		return NULL;
+	}
+	return &source_address;
 }

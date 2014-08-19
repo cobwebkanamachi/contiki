@@ -5,6 +5,7 @@
 
 #define ENABLE_COOJA_DEBUG 0
 
+#undef RF_CHANNEL
 #define RF_CHANNEL 15
 #define RF_CONF_CHANNEL RF_CHANNEL
 

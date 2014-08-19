@@ -108,6 +108,17 @@ void cc2420_set_interrupt_enable(uint8_t e);
 
 /* Get radio interrupt enable status */
 uint8_t cc2420_get_interrupt_enable(void);
+
+/************************************************************************/
+/* Generic names for special functions */
+/************************************************************************/
+
+#define NETSTACK_RADIO_address_decode(E) 				cc2420_address_decode((E))
+#define NETSTACK_RADIO_set_interrupt_enable(E) 	cc2420_set_interrupt_enable((E))
+#define NETSTACK_RADIO_sfd_sync(S,E) 						cc2420_sfd_sync((S),(E))
+#define NETSTACK_RADIO_read_sfd_timer() 				cc2420_read_sfd_timer()
+#define NETSTACK_RADIO_set_channel(C)						cc2420_set_channel((C))
+
 /************************************************************************/
 /* Additional SPI Macros for the CC2420 */
 /************************************************************************/

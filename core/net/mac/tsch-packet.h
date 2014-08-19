@@ -44,10 +44,14 @@
 #include "contiki.h"
 #include "net/mac/tsch-private.h"
 
-/* This function adds the Sync IE from the beginning of the buffer and returns the reported drift in microseconds */
-int16_t add_sync_IE(uint8_t *buf, int32_t time_difference_32, uint8_t nack);
-void tsch_make_sync_ack(uint8_t **buf, uint8_t seqno, rtimer_clock_t last_packet_timestamp, uint8_t nack);
-/* Create an EB packet */
-int make_eb(uint8_t *buf, uint8_t buf_size);
+/* Construct enhanced ACK packet and return ACK length */
+uint8_t tsch_packet_make_sync_ack(int32_t sync_time, uint8_t *ackbuf, uint8_t seqno, uint8_t nack);
 
+/* Create an EB packet */
+int tsch_packet_make_eb(uint8_t *buf, uint8_t buf_size);
+
+/* Extract sender address from raw packet */
+rimeaddr_t * tsch_packet_extract_sender_address(uint8_t *buf, uint8_t len);
+
+uint8_t tsch_packet_is_ack_needed(uint8_t *data, uint8_t len);
 #endif /* __tsch_packet_H__ */

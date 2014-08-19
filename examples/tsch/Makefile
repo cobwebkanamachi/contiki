@@ -3,7 +3,7 @@ TARGET ?= sky
 #APPS=servreg-hack
  
 ifeq ($(TARGET), sky) 
-CONTIKI_SOURCEFILES += cc2420-tsch.c
+CONTIKI_SOURCEFILES += cc2420.c
 endif
 CONTIKI_SOURCEFILES += tsch.c
 

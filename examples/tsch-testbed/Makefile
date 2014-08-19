@@ -19,7 +19,7 @@ PROJECTDIRS += tools
 PROJECT_SOURCEFILES += deployment.c simple-energest.c rpl-log.c
 
 ifeq ($(CONFIG),$(CONFIG_TSCH))
-PROJECT_SOURCEFILES += cc2420-tsch.c
+PROJECT_SOURCEFILES += cc2420.c
 else
 PROJECT_SOURCEFILES += cc2420.c
 endif
