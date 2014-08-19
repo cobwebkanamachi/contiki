@@ -34,6 +34,8 @@
 #ifndef __PROJECT_CONF_H__
 #define __PROJECT_CONF_H__
 
+#define ENABLE_COOJA_DEBUG 0
+
 #include "cooja-debug.h"
 
 /* Needed for TSCH */
