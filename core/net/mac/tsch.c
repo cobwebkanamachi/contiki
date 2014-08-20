@@ -714,15 +714,7 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 		t0rx = RTIMER_NOW() - t0rx;
 		/* no packets on air */
 	} else {
-#if CONTIKI_TARGET_JN5168
-		if(!irq_status) {
-			/* Check if receiving within guard time */
-			BUSYWAIT_UNTIL_ABS((irq_status = NETSTACK_RADIO_pending_irq()),
-												 current_link_start, TsTxOffset + TsLongGT + wdDataDuration + delayRx);
-		}
-#endif
-
-		/* Wait until packet is received */
+	  /* Wait until packet is received */
 		BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
 											 current_link_start, TsTxOffset + TsLongGT + wdDataDuration);
 		off();
