@@ -664,6 +664,9 @@ static int associated = 0;
 static struct pt cell_operation_pt;
 
 static asn_t current_asn;
+/* Last time we received Sync-IE (ACK or data packet from a time source) */
+static asn_t last_sync_asn;
+
 static rtimer_clock_t current_cell_start;
 static uint16_t current_timeslot;
 struct slotframe *current_slotframe;
@@ -675,7 +678,7 @@ static struct tsch_neighbor *current_neighbor;
 static uint8_t tsch_rx_buffer[TSCH_MAX_PACKET_LEN] = {0};
 
 /* last estimated drift */
-static int32_t drift = 0;
+static int32_t drift_correction = 0;
 
 static uint8_t eb_buf[TSCH_MAX_PACKET_LEN] = { 0 };
 
@@ -705,19 +708,19 @@ tsch_read_and_process_ack(struct tsch_neighbor *n, uint8_t seqno) {
            *  difference into an average of the drift to all its time source neighbors. The averaging method is
            *  implementation dependent. If the receiver is not a clock source, the time correction is ignored.
            */
-          if(n != NULL) {
-            if(n->is_time_source) {
-              /* extract time correction */
-              d = 0;
-              /*is it a negative correction?*/
-              if(ack_status & 0x0800) {
-                d = -(ack_status & 0x0fff & ~0x0800);
-              } else {
-                d = ack_status & 0x0fff;
-              }
-              drift += d;
-              PUTCHAR('+');
-            }
+          if(n != NULL && n->is_time_source) {
+          	/* Keep track of sync time */
+						last_sync_asn = current_asn;
+						/* extract time correction */
+						d = 0;
+						/*is it a negative correction?*/
+						if(ack_status & 0x0800) {
+							d = -(ack_status & 0x0fff & ~0x0800);
+						} else {
+							d = ack_status & 0x0fff;
+						}
+						drift_correction += d;
+						PUTCHAR('+');
           }
           if(ack_status & NACK_FLAG) {
             /* TODO return NACK status to upper layer */
@@ -1060,8 +1063,10 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 				/* check the source address for potential time-source match */
 				n = tsch_queue_get_nbr(&source_address);
 				if(n != NULL && n->is_time_source) {
+        	/* Keep track of sync time */
+					last_sync_asn = current_asn;
 					/* should be the average of drifts to all time sources */
-					drift -= estimated_drift;
+					drift_correction -= estimated_drift;
 					COOJA_DEBUG_STR("drift recorded");
 				}
 			}
@@ -1083,9 +1088,6 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 static
 PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 {
-  static asn_t last_sync_asn;
-  static int32_t drift_correction;
-
   PT_BEGIN(&cell_operation_pt);
 
   /* Loop over all active cells */
@@ -1298,7 +1300,7 @@ tsch_init_variables(void)
   current_packet = NULL;
   current_neighbor = NULL;
   /* last estimated drift */
-  drift = 0;
+  drift_correction = 0;
   tsch_state = TSCH_SEARCHING;
   /* start with a random sequence number */
   ieee154e_vars.dsn = tsch_random_byte(127);
