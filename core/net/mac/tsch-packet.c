@@ -317,3 +317,28 @@ tsch_packet_extract_sender_address(uint8_t *buf, uint8_t len)
 	}
 	return &source_address;
 }
+
+uint8_t
+tsch_parse_eb(uint8_t* buf, uint8_t buf_len, asn_t *asn, uint8_t *join_priority)
+{
+	uint8_t sync = 0;
+	if (buf_len >= 23 /* is long enough to contain Sync-IE? */
+	/* is beacon? */
+	&& (FRAME802154_BEACONFRAME == (buf[0] & 7))
+	/* IE available? */
+	&& ((buf[1] & (2 | 32 | 128 | 64)) == (2 | 32 | 128 | 64))
+	/* sync IE? (0x1a << 1) ==0 0x34 */
+	&& ((buf[16] & 0xfe) == 0x34)) {
+		/* TODO: check this */
+		*asn = (asn_t) buf[17];
+		*asn |= (asn_t) buf[18] << 8;
+		*asn |= (asn_t) buf[19] << 16;
+		*asn |= (asn_t) buf[20] << 24;
+		*asn |= (asn_t) buf[21] << 32;
+		*join_priority = buf[22] + 1;
+
+		/* we are in sync */
+		sync = 1;
+	}
+  return sync;
+}

@@ -104,6 +104,13 @@ static void tsch_init(void);
 static void tsch_resynchronize(struct rtimer *, void *);
 static void tsch_init_variables(void);
 static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
+static PT_THREAD(tsch_associate(struct pt *pt));
+
+/* Contiki processes */
+PROCESS(tsch_tx_callback_process, "tsch_tx");
+PROCESS(tsch_rx_callback_process, "tsch_rx");
+PROCESS(tsch_send_eb_process, "tsch_send_eb");
+PROCESS(tsch_process, "TSCH process");
 
 /* A global variable telling whether we are coordinator of the TSCH network
  * TODO: have a function to set this */
@@ -119,15 +126,6 @@ enum tsch_state_e tsch_state;
 
 /* Debug timing */
 static rtimer_clock_t t0prepare = 0, t0tx = 0, t0txack = 0, t0post_tx = 0, t0rx = 0, t0rxack = 0, tq = 0, tn = 0;
-
-/* Contiki processes */
-PROCESS(tsch_tx_callback_process, "tsch_tx");
-PROCESS(tsch_rx_callback_process, "tsch_rx");
-PROCESS(tsch_send_eb_process, "tsch_send_eb");
-PROCESS(tsch_associate, "tsch_associate");
-PROCESS(tsch_process, "TSCH process");
-
-
 
 /**
  *  A pseudo-random generator with better properties than msp430-libc's default
@@ -369,192 +367,6 @@ tsch_schedule_cell_operation(struct rtimer *tm, rtimer_clock_t ref_time, rtimer_
 	return status;
 }
 
-
-/* Schedule a wakeup from a reference time for a specific duration.
- * Provides basic protection against missed deadlines and timer overflows
- * A non-zero return value signals to powercycle a missed deadline */
-static uint8_t
-schedule_fixed(struct rtimer *tm, rtimer_clock_t ref_time,
-               rtimer_clock_t duration)
-{
-  int r, status = 0;
-  rtimer_clock_t now = RTIMER_NOW();
-
-  /*	RTIMER_CLOCK_LT(ref_time - now > duration+5) */
-  /*	!RTIMER_CLOCK_LT(now,ref_time) */
-  if(check_timer_miss(ref_time, duration, now)) {
-    COOJA_DEBUG_STR("schedule_fixed: missed deadline");
-    /*		PRINTF("schedule_fixed: missed deadline: %u, %u, %u, %u\n", ref_time, now, now - ref_time, duration ); */
-    ref_time = now + TRIVIAL_DELAY;
-  } else {
-    ref_time += duration;
-  }
-//  r = rtimer_set(tm, ref_time, 1, (void
-//                                     (*)(struct rtimer *, void *))powercycle, NULL /*(void*)&status*/);
-  if(r != RTIMER_OK) {
-    COOJA_DEBUG_STR("schedule_fixed: could not set rtimer\n");
-    status = 2;
-  }
-  return status;
-}
-
-/* Schedule only if deadline not passed.
- * A non-zero return value signals to powercycle a missed deadline */
-static uint8_t
-schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
-                rtimer_clock_t duration)
-{
-  int r, status = 0;
-  rtimer_clock_t now = RTIMER_NOW();
-
-  if(check_timer_miss(ref_time, duration, now)) {
-    COOJA_DEBUG_STR("schedule_strict: missed deadline");
-    PRINTF("schedule_strict: missed deadline: %u, %u, %u (%u)\n", ref_time, duration, now, start_of_powercycle);
-    PRINTF("tq: %u, t0prepare %u, t0tx %u, t0txack %u, t0post_tx %u, t0rx %u, t0rxack %u, tn %u\n", tq, t0prepare, t0tx, t0txack, t0post_tx, t0rx, t0rxack, tn);
-    PUTCHAR('!');
-    status = 1;
-  } else {
-//    r = rtimer_set(tm, ref_time + duration, 1, (void
-//                                                (*)(struct rtimer *, void *))powercycle, NULL /*(void*)&status*/);
-    if(r != RTIMER_OK) {
-      COOJA_DEBUG_STR("schedule_strict: could not set rtimer\n");
-      status = 2;
-    }
-    PRINTF("schedule_strict: scheduled: %u, %u, %u (%u)\n", ref_time, duration, now, ref_time + duration);
-  }
-
-  /* COOJA_DEBUG_PRINTF("tq: %u, t0prepare %u, t0tx %u, t0txack %u, t0post_tx %u, t0rx %u, t0rxack %u, tn %u\n", tq, t0prepare, t0tx, t0txack, t0post_tx, t0rx, t0rxack, tn ); */
-  tn = RTIMER_NOW();
-  return status;
-}
-/*---------------------------------------------------------------------------*/
-void
-tsch_resume_powercycle(uint8_t need_ack_irq, struct received_frame_radio_s *last_rf_irq)
-{
-  ieee154e_vars.need_ack = need_ack_irq;
-  ieee154e_vars.last_rf = last_rf_irq;
-  leds_off(LEDS_RED);
-}
-rtimer_clock_t start_of_powercycle;
-/*---------------------------------------------------------------------------*/
-/*---------------------------------------------------------------------------*/
-static void
-tsch_resynchronize(struct rtimer *tm, void *ptr)
-{
-  off();
-  COOJA_DEBUG_STR("tsch_resynchronize\n");
-  tsch_init_variables();
-//  NETSTACK_RADIO_softack_subscribe(NULL, NULL);
-  /* try to associate to a network or start one if setup as RPL root */
-  while(PROCESS_ERR_OK != process_post(&tsch_associate, PROCESS_EVENT_POLL, NULL)) {
-    PRINTF("PROCESS_ERR_OK != process_post(&tsch_associate\n");
-  }
-}
-/* Synchronize
- * If we are a master, start right away
- * otherwise, wait for EBs to associate with a master
- */
-PROCESS_THREAD(tsch_associate, ev, data)
-{
-  PROCESS_BEGIN();
-
-  /* Trying to get the RPL DAG, and polling until it becomes available  */
-  static rpl_dag_t *my_rpl_dag = NULL;
-  static struct etimer periodic;
-#if CONTIKI_TARGET_JN5168
-  uint32_t irq_status = 0;
-  rtimer_clock_t t0;
-#endif
-
-  while(tsch_state != TSCH_OFF) {
-    COOJA_DEBUG_STR("tsch_associate\n");
-
-    my_rpl_dag = NULL;
-    /* setup radio functions for intercepting EB */
-//    NETSTACK_RADIO_softack_subscribe(NULL, NULL);
-    etimer_set(&periodic, CLOCK_SECOND / 10);
-
-    while(tsch_state == TSCH_SEARCHING) {
-
-      PROCESS_YIELD();
-      etimer_set(&periodic, CLOCK_SECOND / 100);
-      NETSTACK_RADIO_sfd_sync(1, 1);
-      /*If I am root (rank==1), then exit association process*/
-      rpl_instance_t *rpl = rpl_get_instance(RPL_DEFAULT_INSTANCE);
-      if(rpl != NULL) {
-        my_rpl_dag = rpl->current_dag;
-        if(my_rpl_dag != NULL) {
-          COOJA_DEBUG_PRINTF("rank %d", my_rpl_dag->rank);
-
-          ieee154e_vars.join_priority = (my_rpl_dag->rank) / RPL_DAG_MC_ETX_DIVISOR;
-          /* to make sure that this is a root and not just a low ranked node */
-          if(!tsch_is_coordinator) {
-            /* TODO choose something else? */
-            if(ieee154e_vars.first_associate /* || my_rpl_dag->rank == 256 ??*/) {
-              ieee154e_vars.join_priority = 0xf0;
-            }
-          }
-        }
-      }
-
-      if(tsch_is_coordinator) {
-        ieee154e_vars.join_priority = 0;
-      }
-      /* XXX there should be a better way of handling rpl, and erasing rank, dag etc. on resync */
-      ieee154e_vars.first_associate = 1;
-
-      /* if this is root start now */
-      if(tsch_is_coordinator) {
-        PRINTF("rpl root\n");
-        /* something other than 0 for now */
-        tsch_state = TSCH_ASSOCIATED;
-        /* make queues and data structures */
-//        tsch_wait_for_eb(0, NULL);
-//        NETSTACK_RADIO_softack_subscribe(NULL/*tsch_packet_make_sync_ack*/, tsch_resume_powercycle);
-        ieee154e_vars.start = RTIMER_NOW();
-
-        schedule_fixed(&ieee154e_vars.t, ieee154e_vars.start, 2 * TRIVIAL_DELAY);
-        /*				ieee154e_vars.start += 2*TRIVIAL_DELAY; */
-        PRINTF("associate done\n");
-        /* XXX for debugging */
-        ieee154e_vars.asn = 0;
-      } else {
-#if CONTIKI_TARGET_JN5168
-        NETSTACK_RADIO_radio_raw_rx_on();
-        t0 = RTIMER_NOW();
-        BUSYWAIT_UNTIL_ABS(irq_status = NETSTACK_RADIO_pending_irq(), t0, RTIMER_SECOND / 10);
-        NETSTACK_RADIO_process_packet(irq_status);
-#else
-        on();
-#endif /* CONTIKI_TARGET_JN5168 */
-        /* TODO hop channel after timeout */
-        /* ... set_channel... */
-      }
-    }
-    PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
-    PRINTF("tsch_associate polled\n");
-//    NETSTACK_RADIO_softack_subscribe(NULL, tsch_wait_for_eb);
-  }
-  COOJA_DEBUG_STR("tsch_associate exit");
-
-  PROCESS_END();
-}
-/*---------------------------------------------------------------------------*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* Get EB, broadcast or unicast packet to be sent, and target neighbor.
  * TODO: Update EB fields.
  *  */
@@ -604,6 +416,10 @@ static rtimer_clock_t current_link_start;
 static struct tsch_link *current_link;
 static struct tsch_packet *current_packet;
 static struct tsch_neighbor *current_neighbor;
+/* Device rank or join priority:
+ * For PAN coordinator: 0 -- lower is better
+ * To be inherited from RPL */
+static uint8_t tsch_join_priority;
 
 /* Buffer to store received packet temporarily */
 static uint8_t tsch_rx_buffer[TSCH_MAX_PACKET_LEN] = {0};
@@ -841,7 +657,16 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
 static
 PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 {
-  PT_BEGIN(pt);
+	/**
+	 * RX cell:
+	 * 1. Check if it is used for TIME_KEEPING
+	 * 2. Sleep and wake up just before expected RX time (with a guard time: TsLongGT)
+	 * 3. Check for radio activity for the guard time: TsLongGT
+	 * 4. Prepare and send ACK if needed
+	 * 5. Drift calculated in the ACK callback registered with the radio driver. Use it if receiving from a time source neighbor.
+	 **/
+
+	PT_BEGIN(pt);
 
   /* packet payload length */
   static uint8_t payload_len = 0;
@@ -868,14 +693,6 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 	rimeaddr_t *source_address;
 
   t0rx = RTIMER_NOW();
-	/**
-	 * RX cell:
-	 * 1. Check if it is used for TIME_KEEPING
-	 * 2. Sleep and wake up just before expected RX time (with a guard time: TsLongGT)
-	 * 3. Check for radio activity for the guard time: TsLongGT
-	 * 4. Prepare and send ACK if needed
-	 * 5. Drift calculated in the ACK callback registered with the radio driver. Use it if receiving from a time source neighbor.
-	 **/
 
 	/* this cell is RX current_link. Check if it is used for keep alive as well*/
 	if((current_link->link_options & LINK_OPTION_TIME_KEEPING)) {
@@ -1032,23 +849,73 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
   PT_END(&cell_operation_pt);
 }
 
+/* Synchronize
+ * If we are a master, start right away
+ * otherwise, wait for EBs to associate with a master
+ */
 static
-PT_THREAD(tsch_associate_dummy(struct pt *pt))
+PT_THREAD(tsch_associate(struct pt *pt))
 {
   static struct etimer a_timer;
 
   PT_BEGIN(pt);
+  static uint8_t is_packet_pending = 0;
+  rtimer_clock_t t0;
+  uint8_t eb_packet[TSCH_MAX_PACKET_LEN];
+  uint8_t eb_packet_len;
 
   printf("TSCH: associate\n");
   if(tsch_is_coordinator) {
     associated = 1;
+
+    tsch_join_priority = 0;
     current_asn = (asn_t)0;
     current_link_start = RTIMER_NOW() + TRIVIAL_DELAY;
+
     printf("TSCH: associate [done as coordinator]\n");
   } else {
-    /* TODO */
-    etimer_set(&a_timer, CLOCK_SECOND);
-    PT_WAIT_UNTIL(pt, etimer_expired(&a_timer));
+    /* wait for EB */
+  	on();
+  	/* TODO for jennic?    NETSTACK_RADIO_radio_raw_rx_on(); */
+    t0 = RTIMER_NOW();
+    BUSYWAIT_UNTIL_ABS(is_packet_pending = NETSTACK_RADIO.pending_packet(), t0, RTIMER_SECOND / 10);
+    /* wait until reception is finished */
+    BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(), t0, wdDataDuration);
+    /* register packet timestamp*/
+    t0 = NETSTACK_RADIO_read_sfd_timer() & 0xffffUL;
+    /* in case of 16bit SFD timer and 32bit RTimer*/
+    t0 |= (uint32_t)RTIMER_NOW() & 0xffff0000UL;
+    if(NETSTACK_RADIO.pending_packet()) {
+  		/* Read packet */
+    	eb_packet_len = NETSTACK_RADIO.read((void *)eb_packet, TSCH_MAX_PACKET_LEN);
+
+    	/* Parse EB and extract ASN and join priority */
+    	associated = tsch_parse_eb(eb_packet, eb_packet_len, &current_asn, &tsch_join_priority);
+
+  		/* register packet timestamp */
+  		current_link_start = t0 - TsTxOffset;
+
+      /* XXX HACK this should be set in sent schedule
+         * --Set parent as timesource */
+      if(associated) {
+      	rimeaddr_t * tsch_parent_address = tsch_packet_extract_sender_address(eb_packet, eb_packet_len);
+        struct tsch_neighbor *n = tsch_queue_get_nbr(tsch_parent_address);
+        if(n == NULL && !tsch_queue_is_locked()) {
+          /* add new neighbor to list of neighbors */
+          n = tsch_queue_add_nbr(tsch_parent_address);
+        }
+        if(n != NULL) {
+          n->is_time_source = 1;
+          PRINTF("Setting parent as time source : %x.%x\n", ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE - 2], ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE - 1]);
+        }
+        /* TODO: Verify if tsch_nbrs are created and timesources are set
+         * this is an example code for setting a timesource
+         *         n->is_time_source = (links_list[i]->link_options & LINK_OPTION_TIME_KEEPING) ? 1 : n->is_time_source; */
+
+      }
+    }
+    etimer_set(&a_timer, CLOCK_SECOND / 100);
+    PT_YIELD_UNTIL(pt, etimer_expired(&a_timer));
   }
 
   PT_END(pt);
@@ -1066,14 +933,25 @@ PROCESS_THREAD(tsch_process, ev, data)
 
     /* Associate */
     while(!associated) {
-      PROCESS_PT_SPAWN(&associate_pt, tsch_associate_dummy(&associate_pt));
+      PROCESS_PT_SPAWN(&associate_pt, tsch_associate(&associate_pt));
     }
+
+  	/* Turn the radio off until next active cell */
+  	off();
+
+    /* TODO: make queues and data structures
+     * is it tsch_schedule_init()? */
 
     /* Operate */
     printf("TSCH: starting cell operation\n");
 	  tsch_schedule_cell_operation(&cell_operation_timer, current_link_start, 0);
 
-    PROCESS_WAIT_UNTIL(!associated);
+    PROCESS_YIELD_UNTIL(!associated);
+
+    /* Resynchronize */
+    COOJA_DEBUG_STR("tsch_resynchronize\n");
+    off();
+    tsch_init_variables();
   }
 
   PROCESS_END();
@@ -1177,7 +1055,7 @@ tsch_init_variables(void)
 
   static int associated = 0;
   static struct pt cell_operation_pt;
-
+  tsch_join_priority = 0xff;
   current_asn = 0;
   current_link = NULL;
   current_packet = NULL;
@@ -1186,6 +1064,7 @@ tsch_init_variables(void)
   drift_correction = 0;
   tsch_state = TSCH_SEARCHING;
   /* start with a random sequence number */
+  /* TODO clean */
   ieee154e_vars.dsn = tsch_random_byte(127);
   ieee154e_vars.mac_ebsn = 0;
   ieee154e_vars.join_priority = 0xff; /* inherit from RPL - PAN coordinator: 0 -- lower is better */
@@ -1221,7 +1100,6 @@ tsch_init(void)
   hop_channel(0);
   /*	NETSTACK_RADIO.on(); */
   /* try to associate to a network or start one if setup as RPL root */
-  //  process_start(&tsch_associate, NULL);
   process_start(&tsch_tx_callback_process, NULL);
   process_start(&tsch_send_eb_process, NULL);
   process_start(&tsch_process, NULL);
