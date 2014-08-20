@@ -99,27 +99,51 @@ static struct seqno received_seqnos[MAX_SEQNOS];
 const rimeaddr_t tsch_broadcast_address = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
 const rimeaddr_t tsch_eb_address = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
 
-/* Other function prototypes */
-static void tsch_init(void);
-static void tsch_init_variables(void);
-static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
-static PT_THREAD(tsch_associate(struct pt *pt));
-
-/* Contiki processes */
-PROCESS(tsch_tx_callback_process, "tsch_tx");
-PROCESS(tsch_rx_callback_process, "tsch_rx");
-PROCESS(tsch_send_eb_process, "tsch_send_eb");
-PROCESS(tsch_process, "TSCH process");
-
 /* A global variable telling whether we are coordinator of the TSCH network
  * TODO: have a function to set this */
 int tsch_is_coordinator = 0;
+/* The current Absolute Slot Number (ASN) */
+asn_t current_asn;
+/* Last time we received Sync-IE (ACK or data packet from a time source) */
+static asn_t last_sync_asn;
+/* Are we associated to a TSCH network? */
+static int associated = 0;
+/* Device rank or join priority:
+ * For PAN coordinator: 0 -- lower is better
+ * To be inherited from RPL
+ * TODO: remove dependencies from RPL */
+uint8_t tsch_join_priority;
 
-enum tsch_state_e {
-  TSCH_OFF, TSCH_ASSOCIATED, TSCH_SEARCHING, TSCH_TIMEOUT,
-};
+/* Buffer to store received packet temporarily */
+static uint8_t tsch_rx_buffer[TSCH_MAX_PACKET_LEN] = {0};
 
-enum tsch_state_e tsch_state;
+/* last estimated drift */
+static int32_t drift_correction = 0;
+
+/* Used from tsch_cell_operation and sub-protothreads */
+static rtimer_clock_t current_link_start;
+static struct tsch_link *current_link;
+static struct tsch_packet *current_packet;
+static struct tsch_neighbor *current_neighbor;
+
+/* Protothread for cell operation, called from rtimer interrupt
+ * and scheduled from tsch_schedule_cell_operation */
+static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
+static struct pt cell_operation_pt;
+/* Sub-protothreads of tsch_cell_operation */
+static PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t));
+static PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t));
+
+/* Sub-protothread of tsch_process */
+static PT_THREAD(tsch_associate(struct pt *pt));
+/* TSCH Contiki processes */
+PROCESS(tsch_tx_callback_process, "TSCH: Tx process");
+PROCESS(tsch_rx_callback_process, "TSCH: Rx process");
+PROCESS(tsch_send_eb_process, "TSCH: send EB process");
+PROCESS(tsch_process, "TSCH: main process");
+
+/* Other function prototypes */
+static void tsch_init_variables(void);
 
 /* Debug timing */
 static rtimer_clock_t t0prepare = 0, t0tx = 0, t0txack = 0, t0post_tx = 0, t0rx = 0, t0rxack = 0;
@@ -370,9 +394,7 @@ tsch_schedule_cell_operation(struct rtimer *tm, rtimer_clock_t ref_time, rtimer_
 	return status;
 }
 
-/* Get EB, broadcast or unicast packet to be sent, and target neighbor.
- * TODO: Update EB fields.
- *  */
+/* Get EB, broadcast or unicast packet to be sent, and target neighbor. */
 static struct tsch_packet *
 get_packet_and_neighbor_for_cell(struct tsch_link *link, struct tsch_neighbor **target_neighbor)
 {
@@ -407,31 +429,6 @@ get_packet_and_neighbor_for_cell(struct tsch_link *link, struct tsch_neighbor **
   }
   return p;
 }
-
-static int associated = 0;
-static struct pt cell_operation_pt;
-
-asn_t current_asn;
-/* Last time we received Sync-IE (ACK or data packet from a time source) */
-static asn_t last_sync_asn;
-
-static rtimer_clock_t current_link_start;
-static struct tsch_link *current_link;
-static struct tsch_packet *current_packet;
-static struct tsch_neighbor *current_neighbor;
-/* Device rank or join priority:
- * For PAN coordinator: 0 -- lower is better
- * To be inherited from RPL
- * TODO: remove dependencies from RPL */
-uint8_t tsch_join_priority;
-
-/* Buffer to store received packet temporarily */
-static uint8_t tsch_rx_buffer[TSCH_MAX_PACKET_LEN] = {0};
-
-/* last estimated drift */
-static int32_t drift_correction = 0;
-
-static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
 
 /* Reads ACK and process sync IE header for drift correction */
 static uint8_t
@@ -952,10 +949,6 @@ PROCESS_THREAD(tsch_process, ev, data)
   PROCESS_END();
 }
 
-
-
-
-
 /* a polled-process to invoke the tsch_packet_input callback asynchronously */
 PROCESS_THREAD(tsch_tx_callback_process, ev, data)
 {
@@ -969,7 +962,7 @@ PROCESS_THREAD(tsch_tx_callback_process, ev, data)
     COOJA_DEBUG_STR("tsch_tx_callback_process: calling mac tx callback\n");
     if(data != NULL) {
       struct tsch_packet *p = (struct tsch_packet *)data;
-      /* XXX callback -- do we need to restore the packet to packetbuf? */
+      queuebuf_to_packetbuf(p->pkt);
       mac_call_sent_callback(p->sent, p->ptr, p->ret, p->transmissions);
     }
   }
@@ -1055,7 +1048,6 @@ tsch_init_variables(void)
   current_neighbor = NULL;
   /* last estimated drift */
   drift_correction = 0;
-  tsch_state = TSCH_SEARCHING;
 	/* save start sfd only */
 	NETSTACK_RADIO_sfd_sync(1, 0);
 
