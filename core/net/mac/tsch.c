@@ -1064,25 +1064,28 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 
 		current_cell = get_cell(current_timeslot);
 
-		if(current_cell->link_options & LINK_OPTION_TX) {
-			/* Get a packet ready to be sent */
-			current_packet = get_packet_and_neighbor_for_cell(current_cell, &current_neighbor);
-		}
+		if(!tsch_queue_is_locked()) { /* Skip the cell is the tsch queue module is locked
+		                              (in case of preempted neighbor addition or deletion) */
+      if(current_cell->link_options & LINK_OPTION_TX) {
+        /* Get a packet ready to be sent */
+        current_packet = get_packet_and_neighbor_for_cell(current_cell, &current_neighbor);
+      }
 
-	  /* Decide whether it is a TX/RX/IDLE or OFF link */
-		/* Actual slot operation */
-		if(current_packet != NULL) {
-			/* We have something to transmit, do the following:
-			 * 1. send
-			 * 2. update_backoff_state(current_neighbor)
-			 * 3. post tx callback
-			 **/
-			static struct pt cell_tx_pt;
-			PT_SPAWN(&cell_operation_pt, &cell_tx_pt, tsch_tx_cell(&cell_tx_pt, t));
-		} else if(current_cell->link_options & LINK_OPTION_RX) {
-			/* Listen */
-			static struct pt cell_rx_pt;
-			PT_SPAWN(&cell_operation_pt, &cell_rx_pt, tsch_rx_cell(&cell_rx_pt, t));
+      /* Decide whether it is a TX/RX/IDLE or OFF link */
+      /* Actual slot operation */
+      if(current_packet != NULL) {
+        /* We have something to transmit, do the following:
+         * 1. send
+         * 2. update_backoff_state(current_neighbor)
+         * 3. post tx callback
+         **/
+        static struct pt cell_tx_pt;
+        PT_SPAWN(&cell_operation_pt, &cell_tx_pt, tsch_tx_cell(&cell_tx_pt, t));
+      } else if(current_cell->link_options & LINK_OPTION_RX) {
+        /* Listen */
+        static struct pt cell_rx_pt;
+        PT_SPAWN(&cell_operation_pt, &cell_rx_pt, tsch_rx_cell(&cell_rx_pt, t));
+      }
 		}
 
 		/* End of slot operation, schedule next slot */

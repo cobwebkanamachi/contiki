@@ -62,12 +62,6 @@
  * a ringbuf with atomic insert, and does not require to take the lock. */
 static int locked = 0;
 
-/* Is the TSCH queue module locked? */
-int
-tsch_queue_is_locked()
-{
-  return locked;
-}
 /* Per-neighbor queue */
 NBR_TABLE(struct tsch_neighbor, neighbor_queues);
 
@@ -250,17 +244,23 @@ tsch_queue_get_packet_for_any(struct tsch_neighbor **n, int is_shared_link)
 void
 tsch_queue_decrement_backoff_counter_for_all_nbrs(void)
 {
-  /* TODO: check lock? */
-//  if(!locked) {
-	struct tsch_neighbor *curr_nbr = nbr_table_head(neighbor_queues);
+  if(!locked) {
+    struct tsch_neighbor *curr_nbr = nbr_table_head(neighbor_queues);
 
-	while(curr_nbr != NULL) {
-		if(curr_nbr->BW_value > 0) {
-			curr_nbr->BW_value--;
-		}
-		curr_nbr = nbr_table_next(neighbor_queues, curr_nbr);
-	}
-//  }
+    while(curr_nbr != NULL) {
+      if(curr_nbr->BW_value > 0) {
+        curr_nbr->BW_value--;
+      }
+      curr_nbr = nbr_table_next(neighbor_queues, curr_nbr);
+    }
+  }
+}
+
+/* Is the module locked? */
+int
+tsch_queue_is_locked(void)
+{
+  return locked;
 }
 
 /* Initialize TSCH queue module */

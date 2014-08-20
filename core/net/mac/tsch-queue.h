@@ -105,6 +105,8 @@ struct tsch_packet *tsch_queue_get_packet_for_any(struct tsch_neighbor **n, int 
 /* Decrements the CSMA backoff counter for all neighbors
  * To be used in shared slots */
 void tsch_queue_decrement_backoff_counter_for_all_nbrs(void);
+/* Is the module locked? */
+int tsch_queue_is_locked(void);
 /* Initialize TSCH queue module */
 void tsch_queue_init(void);
 
