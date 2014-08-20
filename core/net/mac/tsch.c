@@ -99,44 +99,6 @@ static struct seqno received_seqnos[MAX_SEQNOS];
 const rimeaddr_t tsch_broadcast_address = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
 const rimeaddr_t tsch_eb_address = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
 
-/* TODO: const? */
-/* Schedule: addresses */
-static rimeaddr_t cell_address1 = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } };
-static rimeaddr_t cell_address2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
-static rimeaddr_t cell_address3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
-
-/* Schedule: links */
-static const struct tsch_link generic_shared_cell = { 0xffff, 0,
-                                            LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
-                                            LINK_TYPE_NORMAL, &tsch_broadcast_address };
-static const struct tsch_link generic_eb_cell = { 0, 0,
-                                        LINK_OPTION_TX,
-                                        LINK_TYPE_ADVERTISING, &tsch_eb_address };
-static const struct tsch_link cell_to_1 = { 1, 0,
-                                  LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING,
-                                  LINK_TYPE_NORMAL, &cell_address1 };
-static const struct tsch_link cell_to_2 = { 2, 0,
-                                  LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
-                                  LINK_TYPE_NORMAL, &cell_address2 };
-static const struct tsch_link cell_to_3 = { 3, 0,
-                                  LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
-                                  LINK_TYPE_NORMAL, &cell_address3 };
-static const struct tsch_link cell_3_to_2 = { 4, 0,
-                                    LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
-                                    LINK_TYPE_NORMAL, &cell_address2 };
-
-/* Static schedule definition */
-static const struct tsch_link *minimum_links[6] = {
-  &generic_eb_cell, &generic_shared_cell, &generic_shared_cell,
-  &generic_shared_cell, &generic_shared_cell, &generic_shared_cell
-};
-static const struct tsch_link *links_list[] = { &generic_eb_cell, &generic_shared_cell,
-                                      &cell_to_1, &cell_to_2, &cell_to_3, &cell_3_to_2 };
-static struct slotframe minimum_slotframe = { 0, 101, 6, (struct tsch_link **)minimum_links };
-#define TOTAL_LINKS (sizeof(links_list) / sizeof(struct tsch_link *))
-
-
-
 /* Other function prototypes */
 static void tsch_init(void);
 static void tsch_resynchronize(struct rtimer *, void *);
@@ -278,29 +240,7 @@ hop_channel(uint8_t offset)
 {
   return NETSTACK_RADIO_set_channel(calculate_channel(offset));
 }
-/*
- * Schedule
- */
 
-/* Return the cell for a given timeslot */
-static struct tsch_link *
-get_cell(uint16_t timeslot)
-{
-  return (timeslot >= ieee154e_vars.current_slotframe->on_size) ?
-         NULL : ieee154e_vars.current_slotframe->links[timeslot];
-}
-/* Return the first active (not OFF) timeslot */
-static uint16_t
-get_first_active_timeslot()
-{
-  return 0;
-}
-/* Return the next active (not OFF) timeslot after a given timeslot */
-static uint16_t
-get_next_active_timeslot(uint16_t timeslot)
-{
-  return (timeslot >= ieee154e_vars.current_slotframe->on_size - 1) ? 0 : timeslot + 1;
-}
 /*---------------------------------------------------------------------------*/
 /* Function send for TSCH-MAC, puts the packet in packetbuf in the MAC queue */
 static int
@@ -469,7 +409,6 @@ schedule_strict(struct rtimer *tm, rtimer_clock_t ref_time,
 
   if(check_timer_miss(ref_time, duration, now)) {
     COOJA_DEBUG_STR("schedule_strict: missed deadline");
-    extern rtimer_clock_t start_of_powercycle;
     PRINTF("schedule_strict: missed deadline: %u, %u, %u (%u)\n", ref_time, duration, now, start_of_powercycle);
     PRINTF("tq: %u, t0prepare %u, t0tx %u, t0txack %u, t0post_tx %u, t0rx %u, t0rxack %u, tn %u\n", tq, t0prepare, t0tx, t0txack, t0post_tx, t0rx, t0rxack, tn);
     PUTCHAR('!');
@@ -636,7 +575,7 @@ get_packet_and_neighbor_for_cell(struct tsch_link *link, struct tsch_neighbor **
     /* NORMAL link or no EB to send, pick a data packet */
     if(p == NULL) {
       /* pick a packet from the neighbors queue who is associated with this cell */
-      n = tsch_queue_get_nbr(link->node_address);
+      n = tsch_queue_get_nbr(&link->addr);
       if(n != NULL) {
         p = tsch_queue_get_packet_for_nbr(n, 0);
       }
@@ -661,10 +600,8 @@ asn_t current_asn;
 /* Last time we received Sync-IE (ACK or data packet from a time source) */
 static asn_t last_sync_asn;
 
-static rtimer_clock_t current_cell_start;
-static uint16_t current_timeslot;
-struct slotframe *current_slotframe;
-static struct tsch_link *current_cell;
+static rtimer_clock_t current_link_start;
+static struct tsch_link *current_link;
 static struct tsch_packet *current_packet;
 static struct tsch_neighbor *current_neighbor;
 
@@ -828,12 +765,12 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
   cca_status = 1;
 #if CCA_ENABLED
   /* delay before CCA */
-  tsch_schedule_cell_operation(t, current_cell_start, TsCCAOffset);
+  tsch_schedule_cell_operation(t, current_link_start, TsCCAOffset);
   PT_YIELD(pt);
   on();
   /* CCA */
   BUSYWAIT_UNTIL_ABS(!(cca_status |= NETSTACK_RADIO.channel_clear()),
-  		current_cell_start, TsCCAOffset + TsCCA);
+  		current_link_start, TsCCAOffset + TsCCA);
   /* there is not enough time to turn radio off */
 //  off();
 #endif /* CCA_ENABLED */
@@ -841,7 +778,7 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
     mac_tx_status = (!mac_tx_status) ? MAC_TX_ERR : MAC_TX_COLLISION;
   } else {
     /* delay before TX */
-    tsch_schedule_cell_operation(t, current_cell_start, TsTxOffset - delayTx);
+    tsch_schedule_cell_operation(t, current_link_start, TsTxOffset - delayTx);
     PT_YIELD(pt);
     t0tx = RTIMER_NOW();
     tx_time = RTIMER_NOW();
@@ -859,7 +796,7 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
       if(!is_broadcast) {
         /* wait for ack after tx: sleep until ack time */
         COOJA_DEBUG_STR("wait for ACK\n");
-        tsch_schedule_cell_operation(t, current_cell_start,
+        tsch_schedule_cell_operation(t, current_link_start,
                        TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayRx);
         PT_YIELD(pt);
         cca_status = 0;
@@ -868,10 +805,10 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
         on();
         /* Wait for ACK to come */
         BUSYWAIT_UNTIL_ABS(NETSTACK_RADIO.receiving_packet(),
-                           current_cell_start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT - delayRx);
+                           current_link_start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT - delayRx);
         /* Wait for ACK to finish */
         BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
-                           current_cell_start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT + wdAckDuration);
+                           current_link_start, TsTxOffset + tx_time + TsTxAckDelay + TsShortGT + wdAckDuration);
         /* Enabling address decoding again so the radio filter data packets */
         NETSTACK_RADIO_address_decode(1);
 
@@ -889,7 +826,7 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
   t0txack = RTIMER_NOW() - t0txack;
 
   /* post TX: Update neighbor state */
-  update_neighbor_state(current_neighbor, current_packet, current_cell, mac_tx_status);
+  update_neighbor_state(current_neighbor, current_packet, current_link, mac_tx_status);
 
   /* Store TX status */
   current_packet->ret = mac_tx_status;
@@ -940,20 +877,20 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 	 * 5. Drift calculated in the ACK callback registered with the radio driver. Use it if receiving from a time source neighbor.
 	 **/
 
-	/* this cell is RX current_cell. Check if it is used for keep alive as well*/
-	if((current_cell->link_options & LINK_OPTION_TIME_KEEPING)) {
+	/* this cell is RX current_link. Check if it is used for keep alive as well*/
+	if((current_link->link_options & LINK_OPTION_TIME_KEEPING)) {
 		/* TODO LINK_OPTION_TIME_KEEPING ??? */
 	}
 
 	/* wait before RX */
-	tsch_schedule_cell_operation(t, current_cell_start, TsTxOffset - TsLongGT - delayRx);
+	tsch_schedule_cell_operation(t, current_link_start, TsTxOffset - TsLongGT - delayRx);
 	COOJA_DEBUG_STR("schedule RX on guard time - TsLongGT");
 	PT_YIELD(pt);
 	/* Start radio for at least guard time */
 	on();
 	/* Check if receiving within guard time */
 	BUSYWAIT_UNTIL_ABS(NETSTACK_RADIO.receiving_packet(),
-										 current_cell_start, TsTxOffset + TsLongGT);
+										 current_link_start, TsTxOffset + TsLongGT);
 	/* register packet timestamp*/
 	rx_start_time = NETSTACK_RADIO_read_sfd_timer() & 0xffffUL;
 	/* in case of 16bit SFD timer and 32bit RTimer*/
@@ -968,13 +905,13 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 		if(!irq_status) {
 			/* Check if receiving within guard time */
 			BUSYWAIT_UNTIL_ABS((irq_status = NETSTACK_RADIO_pending_irq()),
-												 current_cell_start, TsTxOffset + TsLongGT + wdDataDuration + delayRx);
+												 current_link_start, TsTxOffset + TsLongGT + wdDataDuration + delayRx);
 		}
 #endif
 
 		/* Wait until packet is received */
 		BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
-											 current_cell_start, TsTxOffset + TsLongGT + wdDataDuration);
+											 current_link_start, TsTxOffset + TsLongGT + wdDataDuration);
 		off();
 
 		/* Read packet */
@@ -992,7 +929,7 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 			if(ack_needed) {
 			  /* read seqno from payload */
 			  seqno = tsch_rx_buffer[2];
-			  estimated_drift = (int32_t)current_cell_start + TsTxOffset - rx_start_time;
+			  estimated_drift = (int32_t)current_link_start + TsTxOffset - rx_start_time;
 
 			  ack_len = tsch_packet_make_sync_ack(estimated_drift, ack_buf, seqno, nack);
 
@@ -1044,13 +981,13 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
   /* Loop over all active cells */
   while(associated) {
 
-		current_cell = get_cell(current_timeslot);
+		current_link = tsch_schedule_get_link_from_asn(current_asn);
 
 		if(!tsch_queue_is_locked()) { /* Skip the cell is the tsch queue module is locked
 		                              (in case of preempted neighbor addition or deletion) */
-      if(current_cell->link_options & LINK_OPTION_TX) {
+      if(current_link->link_options & LINK_OPTION_TX) {
         /* Get a packet ready to be sent */
-        current_packet = get_packet_and_neighbor_for_cell(current_cell, &current_neighbor);
+        current_packet = get_packet_and_neighbor_for_cell(current_link, &current_neighbor);
       }
 
       /* Decide whether it is a TX/RX/IDLE or OFF link */
@@ -1063,7 +1000,7 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
          **/
         static struct pt cell_tx_pt;
         PT_SPAWN(&cell_operation_pt, &cell_tx_pt, tsch_tx_cell(&cell_tx_pt, t));
-      } else if(current_cell->link_options & LINK_OPTION_RX) {
+      } else if(current_link->link_options & LINK_OPTION_RX) {
         /* Listen */
         static struct pt cell_rx_pt;
         PT_SPAWN(&cell_operation_pt, &cell_rx_pt, tsch_rx_cell(&cell_rx_pt, t));
@@ -1076,19 +1013,15 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 			associated = 0;
 			process_post(&tsch_process, PROCESS_EVENT_POLL, NULL);
 		} else {
-			/* Get next active timeslot */
-			uint16_t next_timeslot = get_next_active_timeslot(current_timeslot);
 			/* Calculate number of slots between current and next */
-			uint16_t timeslot_diff = next_timeslot > current_timeslot ? next_timeslot - current_timeslot:
-					current_slotframe->size - (current_timeslot - next_timeslot);
+			uint16_t timeslot_diff = tsch_schedule_time_to_next_active_link(current_asn);
 			/* Update ASN */
 			current_asn += (asn_t)timeslot_diff;
 
-			/* Update timeslot and cell start, schedule next wakeup */
-			current_timeslot = next_timeslot;
-			current_cell_start +=  timeslot_diff * TsSlotDuration + drift_correction;
+			/* Update current cell start, schedule next wakeup */
+			current_link_start +=  timeslot_diff * TsSlotDuration + drift_correction;
 
-		  tsch_schedule_cell_operation(t, current_cell_start, 0);
+		  tsch_schedule_cell_operation(t, current_link_start, 0);
 
 			printf("TSCH: end of cell %u\n", timeslot_diff);
 		}
@@ -1109,10 +1042,8 @@ PT_THREAD(tsch_associate_dummy(struct pt *pt))
   printf("TSCH: associate\n");
   if(tsch_is_coordinator) {
     associated = 1;
-    current_slotframe = &minimum_slotframe;
-    current_timeslot = get_first_active_timeslot();
-    current_asn = (asn_t)current_timeslot;
-    current_cell_start = RTIMER_NOW() + TRIVIAL_DELAY;
+    current_asn = (asn_t)0;
+    current_link_start = RTIMER_NOW() + TRIVIAL_DELAY;
     printf("TSCH: associate [done as coordinator]\n");
   } else {
     /* TODO */
@@ -1140,7 +1071,7 @@ PROCESS_THREAD(tsch_process, ev, data)
 
     /* Operate */
     printf("TSCH: starting cell operation\n");
-	  tsch_schedule_cell_operation(&cell_operation_timer, current_cell_start, 0);
+	  tsch_schedule_cell_operation(&cell_operation_timer, current_link_start, 0);
 
     PROCESS_WAIT_UNTIL(!associated);
   }
@@ -1248,9 +1179,7 @@ tsch_init_variables(void)
   static struct pt cell_operation_pt;
 
   current_asn = 0;
-  current_timeslot = 0;
-  current_slotframe = &minimum_slotframe;;
-  current_cell = NULL;
+  current_link = NULL;
   current_packet = NULL;
   current_neighbor = NULL;
   /* last estimated drift */

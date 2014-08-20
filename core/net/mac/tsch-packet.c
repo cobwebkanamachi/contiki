@@ -94,6 +94,9 @@ tsch_packet_make_eb(uint8_t *buf, uint8_t buf_size)
   /* XXX make sure this function does not overflow buf */
   uint16_t j = 0;
   uint8_t len, sub_id, type, i = 0, k = 0;
+  static uint8_t mac_eb_seqno;
+  asn_t next_eb_asn;
+  struct tsch_link *l;
 
   COOJA_DEBUG_STR("TSCH make EB");
   /* fcf: 2Bytes */
@@ -101,10 +104,10 @@ tsch_packet_make_eb(uint8_t *buf, uint8_t buf_size)
   buf[i++] = 0x00;
   /* b8: seqno suppression - b9:IE-list-present=1 - b10-11: destination address mode - b12-b13:frame version=2 - b14-15: src address mode=3 */
   buf[i++] = 2 | 32 | 128 | 64;
-  if(!ieee154e_vars.mac_ebsn) {
-    ieee154e_vars.mac_ebsn++;
+  if(mac_eb_seqno == 0) {
+    mac_eb_seqno++;
   }
-  buf[i++] = ieee154e_vars.mac_ebsn++;
+  buf[i++] = mac_eb_seqno++;
 
   /* copy src PAN ID and long src address */
   /* Source PAN ID */
@@ -126,11 +129,22 @@ tsch_packet_make_eb(uint8_t *buf, uint8_t buf_size)
   type = 0; /* short type */
   buf[i++] = len;
   buf[i++] = (sub_id << 1) | (type & 0x01);
-  buf[i++] = ieee154e_vars.asn;
-  buf[i++] = ieee154e_vars.asn >> 8;
-  buf[i++] = ieee154e_vars.asn >> 16;
-  buf[i++] = ieee154e_vars.asn >> 24;
-  buf[i++] = ieee154e_vars.asn >> 32;
+  /* Find ASN of the slot where we will transmit the EB */
+  next_eb_asn = current_asn;
+  do {
+    /* Jump to next active slot */
+    next_eb_asn += tsch_schedule_time_to_next_active_link(next_eb_asn);
+    /* Check if the link is usable for transmission of EB  */
+    l = tsch_schedule_get_link_from_asn(next_eb_asn);
+  } while(!(l && l->link_options & LINK_OPTION_TX /* is tx */
+      && l->link_type == LINK_TYPE_ADVERTISING /* is ADVERTISING */
+      && rimeaddr_cmp(&l->addr, &tsch_broadcast_address))); /* or is broadcast */
+
+  buf[i++] = next_eb_asn;
+  buf[i++] = next_eb_asn >> 8;
+  buf[i++] = next_eb_asn >> 16;
+  buf[i++] = next_eb_asn >> 24;
+  buf[i++] = next_eb_asn >> 32;
   /* update join_priority */
   rpl_instance_t *rpl = rpl_get_instance(RPL_DEFAULT_INSTANCE);
   static rpl_dag_t *my_rpl_dag = NULL;

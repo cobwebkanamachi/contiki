@@ -268,7 +268,7 @@ tsch_queue_backoff_inc(struct tsch_neighbor *n)
    * Iterate window+1 times, so that BW_next_asn points to the next usable share slot. */
   n->BW_next_asn = current_asn;
   while(window >= 0) {
-    struct tsch_link_ *l;
+    struct tsch_link *l;
     /* Jump to next active slot */
     n->BW_next_asn += tsch_schedule_time_to_next_active_link(n->BW_next_asn);
     /* Check if the link is a shared slot that can be used

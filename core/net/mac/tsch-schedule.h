@@ -54,8 +54,8 @@
 
 enum link_type { LINK_TYPE_NORMAL, LINK_TYPE_ADVERTISING };
 
-struct tsch_link_ {
-  struct tsch_link_ *next;
+struct tsch_link {
+  struct tsch_link *next;
   /* Unique identifier (local to specified slotframe) for the link
    * Unused. */
   /* uint16_t handle; */
@@ -77,8 +77,8 @@ struct tsch_link_ {
   uint16_t channel_offset;
 };
 
-struct tsch_slotframe_ {
-  struct tsch_slotframe_ *next;
+struct tsch_slotframe {
+  struct tsch_slotframe *next;
   /* Unique identifier */
   uint16_t handle;
   /* Number of timeslots in the slotframe */
@@ -90,17 +90,17 @@ struct tsch_slotframe_ {
 /* Initialization */
 void tsch_schedule_init();
 /* Adds and returns a slotframe (NULL if failure) */
-struct tsch_slotframe_ *tsch_schedule_add_slotframe(uint16_t handle, uint16_t size);
+struct tsch_slotframe *tsch_schedule_add_slotframe(uint16_t handle, uint16_t size);
 /* Looks for a slotframe from a handle */
-struct tsch_slotframe_ *tsch_schedule_get_slotframe_from_handle(uint16_t handle);
+struct tsch_slotframe *tsch_schedule_get_slotframe_from_handle(uint16_t handle);
 /* Adds a link to a slotframe, return a pointer to it (NULL if failure) */
-struct tsch_link_ *tsch_schedule_add_link(struct tsch_slotframe_ *slotframe,
+struct tsch_link *tsch_schedule_add_link(struct tsch_slotframe *slotframe,
     uint8_t link_options, enum link_type link_type, const rimeaddr_t *address,
     uint16_t timeslot, uint16_t channel_offset);
 /* Looks within a slotframe for a link with a given timeslot */
-struct tsch_link_ *tsch_schedule_get_link_from_timeslot(struct tsch_slotframe_ *slotframe, uint16_t timeslot);
-/* Returns the next active (not OFF) timeslot after a given timeslot */
-struct tsch_link_ *tsch_schedule_get_link_from_asn(asn_t asn);
+struct tsch_link *tsch_schedule_get_link_from_timeslot(struct tsch_slotframe *slotframe, uint16_t timeslot);
+/* Returns the link to be used at a given ASN */
+struct tsch_link *tsch_schedule_get_link_from_asn(asn_t asn);
 /* Returns the number of slots until the first active link after a given ASN */
 uint16_t tsch_schedule_time_to_next_active_link(asn_t asn);
 
