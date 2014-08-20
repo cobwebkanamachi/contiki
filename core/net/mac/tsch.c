@@ -751,12 +751,12 @@ update_neighbor_state(struct tsch_neighbor *n, struct tsch_packet * p,
 	/* If this is a shared link,
 	 * we need to decrease the backoff value for all neighbors reachable with this link */
 	if(is_shared_link) {
-	  if(!is_unicast) {
-	    tsch_queue_decrement_backoff_counter_for_all_nbrs();
-	  } else {
+	  if(is_unicast) {
 	    if(n->BW_value > 0) {
 	      n->BW_value--;
 	    }
+	  } else {
+	    tsch_queue_decrement_backoff_counter_for_all_nbrs();
 	  }
 	}
 
