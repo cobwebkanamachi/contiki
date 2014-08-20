@@ -18,12 +18,6 @@ CFLAGS+= -DCONFIG=$(CONFIG)
 PROJECTDIRS += tools
 PROJECT_SOURCEFILES += deployment.c simple-energest.c rpl-log.c
 
-ifeq ($(CONFIG),$(CONFIG_TSCH))
-PROJECT_SOURCEFILES += cc2420.c
-else
-PROJECT_SOURCEFILES += cc2420.c
-endif
-
 all: $(CONTIKI_PROJECT)
 
 CONTIKI=../..

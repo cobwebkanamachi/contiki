@@ -2,9 +2,6 @@ TARGET ?= sky
 #DEVICE_NAME ?= DR1198
 #APPS=servreg-hack
  
-ifeq ($(TARGET), sky) 
-CONTIKI_SOURCEFILES += cc2420.c
-endif
 CONTIKI_SOURCEFILES += tsch.c
 
 CONTIKI_PROJECT = udp-client udp-server rt-leds
