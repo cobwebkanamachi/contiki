@@ -54,4 +54,8 @@ int tsch_packet_make_eb(uint8_t *buf, uint8_t buf_size);
 rimeaddr_t * tsch_packet_extract_sender_address(uint8_t *buf, uint8_t len);
 
 uint8_t tsch_packet_is_ack_needed(uint8_t *data, uint8_t len);
+
+/* Parse EB and extract ASN and join priority */
+uint8_t tsch_parse_eb(uint8_t* buf, uint8_t buf_len, asn_t *asn, uint8_t *join_priority);
+
 #endif /* __tsch_packet_H__ */
