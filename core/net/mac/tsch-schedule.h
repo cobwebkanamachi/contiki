@@ -70,7 +70,7 @@ struct tsch_link_ {
    * Unused. */
   /* uint8_t handle; */
   /* MAC address of neighbor */
-  rimeaddr_t address;
+  rimeaddr_t addr;
   /* Timeslot for this link */
   uint16_t timeslot;
   /* Channel offset for this link */

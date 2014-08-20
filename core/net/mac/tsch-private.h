@@ -304,4 +304,15 @@ const rimeaddr_t tsch_broadcast_address;
 /* The address we use to identify EB queue */
 const rimeaddr_t tsch_eb_address;
 
+/* The current Absolute Slot Number (ASN) */
+asn_t current_asn;
+
+/* A pseudo-random generator with better properties than msp430-libc's default */
+void tsch_random_init(uint32_t x);
+uint8_t tsch_random_byte(uint8_t window);
+
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif /* MIN */
+
 #endif /* __TSCH_PRIVATE_H__ */

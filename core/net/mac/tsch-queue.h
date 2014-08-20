@@ -74,7 +74,8 @@ struct tsch_neighbor {
   uint8_t is_broadcast; /* is this neighbor a virtual neighbor used for broadcast (of data packets or EBs) */
   uint8_t is_time_source; /* is this neighbor a time source? */
   uint8_t BE_value; /* current value of backoff exponent */
-  uint8_t BW_value; /* current value of backoff counter */
+  uint8_t BW_next_asn; /* current value of backoff window:
+  ASN of the next possible transmission over a shared slot (0 if no backoff) */
   volatile uint8_t put_ptr,
                    get_ptr; /* pointers for circular buffer implementation */
 };
@@ -102,9 +103,13 @@ struct tsch_packet *tsch_queue_get_packet_for_dest_addr(const rimeaddr_t *addr, 
 /* Returns the head packet of any neighbor queue with zero backoff counter.
  * Writes pointer to the neighbor in *n */
 struct tsch_packet *tsch_queue_get_packet_for_any(struct tsch_neighbor **n, int is_shared_link);
-/* Decrements the CSMA backoff counter for all neighbors
- * To be used in shared slots */
-void tsch_queue_decrement_backoff_counter_for_all_nbrs(void);
+/* Is the module locked? */
+/* May the neighbor transmit over a share link? */
+int tsch_queue_backoff_expired(struct tsch_neighbor *n);
+/* Reset neighbor backoff */
+void tsch_queue_backoff_reset(struct tsch_neighbor *n);
+/* Increment backoff exponent, pick a new window */
+void tsch_queue_backoff_inc(struct tsch_neighbor *n);
 /* Is the module locked? */
 int tsch_queue_is_locked(void);
 /* Initialize TSCH queue module */

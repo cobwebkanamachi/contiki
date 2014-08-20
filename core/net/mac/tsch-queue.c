@@ -47,6 +47,7 @@
 #include "net/mac/rdc.h"
 #include "net/mac/tsch-private.h"
 #include "net/mac/tsch-queue.h"
+#include "net/mac/tsch-schedule.h"
 #include <string.h>
 
 #define DEBUG DEBUG_NONE
@@ -198,8 +199,8 @@ tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, int is_shared_link)
 {
   if(!locked) {
     if(n != NULL && !QUEUE_EMPTY(n) &&
-        !(is_shared_link && n->BW_value > 0)) { /* If this is a shared link,
-        make sure the backoff window is zero */
+        !(is_shared_link && !tsch_queue_backoff_expired(n))) { /* If this is a shared link,
+        make sure the backoff has expired */
       PRINTF("TSCH-queue: p%d @%p\n", n->get_ptr, n->buffer[n->get_ptr].pkt);
       return (struct tsch_packet *)&n->buffer[n->get_ptr];
     }
@@ -239,19 +240,46 @@ tsch_queue_get_packet_for_any(struct tsch_neighbor **n, int is_shared_link)
   return NULL;
 }
 
-/* Decrements the CSMA backoff counter for all neighbors
- * To be used in shared slots */
-void
-tsch_queue_decrement_backoff_counter_for_all_nbrs(void)
+/* May the neighbor transmit over a share link? */
+int
+tsch_queue_backoff_expired(struct tsch_neighbor *n)
 {
-  if(!locked) {
-    struct tsch_neighbor *curr_nbr = nbr_table_head(neighbor_queues);
+  return n->BW_next_asn <= current_asn;
+}
 
-    while(curr_nbr != NULL) {
-      if(curr_nbr->BW_value > 0) {
-        curr_nbr->BW_value--;
-      }
-      curr_nbr = nbr_table_next(neighbor_queues, curr_nbr);
+/* Reset neighbor backoff */
+void
+tsch_queue_backoff_reset(struct tsch_neighbor *n)
+{
+  n->BW_next_asn = 0;
+  n->BE_value = MAC_MIN_BE;
+}
+
+/* Increment backoff exponent, pick a new window */
+void
+tsch_queue_backoff_inc(struct tsch_neighbor *n)
+{
+  int16_t window;
+  asn_t asn = current_asn;
+  /* Increment exponent */
+  n->BE_value = MIN(n->BE_value + 1, MAC_MAX_BE);
+  /* Pick a window (number of shared slots to skip) */
+  window = tsch_random_byte((1 << n->BE_value) - 1);
+  /* Look for the next shared slot where we can transmit.
+   * Iterate window+1 times, so that BW_next_asn points to the next usable share slot. */
+  while(window >= 0) {
+    struct tsch_link_ *l;
+    /* Jump to next active slot */
+    n->BW_next_asn += tsch_schedule_time_to_next_active_link(asn);
+    /* Check if the link is a shared slot that can be used
+     * to transmit to n */
+    l = tsch_schedule_get_link_from_asn(n->BW_next_asn);
+    if(l->link_options & LINK_OPTION_SHARED /* is shared */
+        && l->link_options & LINK_OPTION_TX /* is tx */
+        && (rimeaddr_cmp(&l->addr, &n->addr) /* is targetted at n */
+            || rimeaddr_cmp(&l->addr, &tsch_broadcast_address)) /* or is broadcast */
+        ) {
+      --window;
     }
   }
 }

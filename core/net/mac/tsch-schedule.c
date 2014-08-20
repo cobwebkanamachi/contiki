@@ -130,7 +130,7 @@ tsch_schedule_add_link(struct tsch_slotframe_ *slotframe,
       l->link_options = link_options;
       l->link_type = link_type;
       l->slotframe_handle = slotframe->handle;
-      rimeaddr_copy(&l->address, address);
+      rimeaddr_copy(&l->addr, address);
       l->timeslot = timeslot;
       l->channel_offset = channel_offset;
       /* Add the link to the slotframe */
@@ -232,7 +232,7 @@ void tsch_schedule_print()
 
     while(l != NULL) {
       printf("[Link] Options %02x, type %u, timeslot %u, channel offset %u, address %u\n",
-          l->link_options, l->link_type, l->timeslot, l->channel_offset, l->address.u8[7]);
+          l->link_options, l->link_type, l->timeslot, l->channel_offset, l->addr.u8[7]);
       l = list_item_next(l);
     }
 

@@ -60,10 +60,6 @@
 #define DEBUG DEBUG_NONE
 #include "net/uip-debug.h"
 
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif /* MIN */
-
 #ifdef TSCH_CONF_WITHOUT_CHANNEL_HOPPING
 #define TSCH_WITHOUT_CHANNEL_HOPPING TSCH_CONF_WITHOUT_CHANNEL_HOPPING
 #else
@@ -177,13 +173,13 @@ PROCESS(tsch_process, "TSCH process");
 
 static uint32_t tsch_random_seed;
 
-static void
+void
 tsch_random_init(uint32_t x)
 {
   tsch_random_seed = x;
 }
 
-static uint8_t
+uint8_t
 tsch_random_byte(uint8_t window)
 {
   tsch_random_seed = tsch_random_seed * 1103515245 + 12345;
@@ -661,7 +657,7 @@ get_packet_and_neighbor_for_cell(struct tsch_link *link, struct tsch_neighbor **
 static int associated = 0;
 static struct pt cell_operation_pt;
 
-static asn_t current_asn;
+asn_t current_asn;
 /* Last time we received Sync-IE (ACK or data packet from a time source) */
 static asn_t last_sync_asn;
 
@@ -748,18 +744,6 @@ update_neighbor_state(struct tsch_neighbor *n, struct tsch_packet * p,
 
   t0post_tx = RTIMER_NOW();
 
-	/* If this is a shared link,
-	 * we need to decrease the backoff value for all neighbors reachable with this link */
-	if(is_shared_link) {
-	  if(is_unicast) {
-	    if(n->BW_value > 0) {
-	      n->BW_value--;
-	    }
-	  } else {
-	    tsch_queue_decrement_backoff_counter_for_all_nbrs();
-	  }
-	}
-
 	if(mac_tx_status == MAC_TX_OK) {
 	  /* Successful transmission */
 	  tsch_queue_remove_packet_from_queue(n);
@@ -769,8 +753,7 @@ update_neighbor_state(struct tsch_neighbor *n, struct tsch_packet * p,
 	    if(is_shared_link || tsch_queue_is_empty(n)) {
 	      /* If this is a shared link, reset backoff on success.
 	       * Otherwise, do so only is the queue is empty */
-	      n->BW_value = 0;
-	      n->BE_value = MAC_MIN_BE;
+	      tsch_queue_backoff_reset(n);
 	    }
 	  }
 	} else {
@@ -787,8 +770,7 @@ update_neighbor_state(struct tsch_neighbor *n, struct tsch_packet * p,
 	     * window nor exponent unchanged */
 	    if(is_shared_link) {
 	      /* Shared link: increment backoff exponent, pick a new window */
-	      n->BE_value = MIN(n->BE_value + 1, MAC_MAX_BE);
-        n->BW_value = tsch_random_byte((1 << n->BE_value) - 1);
+	      tsch_queue_backoff_inc(n);
 	    }
 	  }
 	}
