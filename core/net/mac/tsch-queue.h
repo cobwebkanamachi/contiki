@@ -104,7 +104,7 @@ struct tsch_packet *tsch_queue_get_packet_for_dest_addr(const rimeaddr_t *addr, 
 struct tsch_packet *tsch_queue_get_packet_for_any(struct tsch_neighbor **n, int is_shared_link);
 /* Decrements the CSMA backoff counter for all neighbors
  * To be used in shared slots */
-void tsch_decrement_backoff_counter_for_all_nbrs(void);
+void tsch_queue_decrement_backoff_counter_for_all_nbrs(void);
 /* Initialize TSCH queue module */
 void tsch_queue_init(void);
 

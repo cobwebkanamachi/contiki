@@ -748,11 +748,16 @@ update_neighbor_state(struct tsch_neighbor *n, struct tsch_packet * p,
 
   t0post_tx = RTIMER_NOW();
 
-	/* TODO fix this
-	 * If this is a shared link,
-	 * we need to decrease the backoff value for all neighbors waiting to send */
+	/* If this is a shared link,
+	 * we need to decrease the backoff value for all neighbors reachable with this link */
 	if(is_shared_link) {
-		tsch_decrement_backoff_counter_for_all_nbrs();
+	  if(is_unicast) {
+	    tsch_queue_decrement_backoff_counter_for_all_nbrs();
+	  } else {
+	    if(n->BW_value > 0) {
+	      n->BW_value--;
+	    }
+	  }
 	}
 
 	if(mac_tx_status == MAC_TX_OK) {

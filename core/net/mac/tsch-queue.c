@@ -195,7 +195,7 @@ tsch_queue_remove_packet_from_queue(struct tsch_neighbor *n)
 int
 tsch_queue_is_empty(const struct tsch_neighbor *n)
 {
-  return QUEUE_EMPTY(n);
+  return !locked && QUEUE_EMPTY(n);
 }
 
 /* Returns the first packet from a neighbor queue */
@@ -248,8 +248,9 @@ tsch_queue_get_packet_for_any(struct tsch_neighbor **n, int is_shared_link)
 /* Decrements the CSMA backoff counter for all neighbors
  * To be used in shared slots */
 void
-tsch_decrement_backoff_counter_for_all_nbrs(void)
+tsch_queue_decrement_backoff_counter_for_all_nbrs(void)
 {
+  /* TODO: check lock? */
 //  if(!locked) {
 	struct tsch_neighbor *curr_nbr = nbr_table_head(neighbor_queues);
 
