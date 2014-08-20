@@ -44,6 +44,7 @@
 
 #include "contiki.h"
 #include "rimeaddr.h"
+/* TODO: move platform-specific code away from core */
 #if CONTIKI_TARGET_JN5168
 #define CONVERT_DRIFT_US_TO_RTIMER(D, DC) ((uint32_t)(D) * 16UL) / ((uint32_t)(DC));
 #define RTIMER_TO_US(T)   ((T) >> 4UL)
@@ -63,15 +64,8 @@ void uart0_writeb(unsigned char c);
 /* Calculate packet tx/rc duration based on sent packet len assuming 802.15.4 250kbps data rate */
 #define PACKET_DURATION(payload_len) (RADIO_TO_RTIMER(((payload_len) + 1) * 2))
 
-/* struct received_frame_radio_s { */
-/*  uint8_t* buf; */
-/*  uint8_t len; */
-/*  rimeaddr_t source_address; */
-/*  rtimer_clock_t sfd_timestamp; */
-/* }; */
 
 #define NACK_FLAG (0x8000)
-
 /* number of slots to wait before initiating resynchronization */
 #define DESYNC_THRESHOLD 2048
 /* number of slots to wait before activating keep-alive mechanism */
@@ -82,6 +76,7 @@ void uart0_writeb(unsigned char c);
 #define EB_PERIOD (4*CLOCK_SECOND)
 
 
+/* TODO: move platform-specific code away from core */
 #if CONTIKI_TARGET_JN5168
 #pragma __TSCH_PARAMETERS_H__ CONTIKI_TARGET_JN5168
 #define TRIVIAL_DELAY (100 * 16UL) /* 50us */
@@ -220,20 +215,6 @@ typedef uint64_t asn_t;
 #define MAC_MIN_BE 0
 #define MAC_MAX_FRAME_RETRIES 4
 #define MAC_MAX_BE 4
-
-/* Link options */
-#define LINK_OPTION_TX              1
-#define LINK_OPTION_RX              2
-#define LINK_OPTION_SHARED          4
-#define LINK_OPTION_TIME_KEEPING    8
-
-enum cell_decision_enum {
-  CELL_OFF = 0,
-  CELL_TX = 1,
-  CELL_TX_IDLE = 2, /* No packet to transmit */
-  CELL_TX_BACKOFF = 3, /* csma backoff */
-  CELL_RX = 4,
-};
 
 /* 802.15.4 broadcast MAC address */
 const rimeaddr_t tsch_broadcast_address;
