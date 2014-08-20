@@ -116,8 +116,6 @@ PROCESS(tsch_process, "TSCH process");
  * TODO: have a function to set this */
 int tsch_is_coordinator = 0;
 
-volatile ieee154e_vars_t ieee154e_vars;
-
 enum tsch_state_e {
   TSCH_OFF, TSCH_ASSOCIATED, TSCH_SEARCHING, TSCH_TIMEOUT,
 };
@@ -225,11 +223,11 @@ check_timer_miss(rtimer_clock_t ref_time, rtimer_clock_t duration, rtimer_clock_
 static uint8_t
 calculate_channel(uint8_t offset)
 {
+  /* TODO: implement channel hopping according to standard */
 #if TSCH_WITHOUT_CHANNEL_HOPPING
   return RF_CHANNEL;
 #else
-  /* TODO: compute this with 5-byte ASN */
-  return 11 + (offset + ieee154e_vars.asn) % 16;
+  return 11 + (offset + current_asn) % 16;
 #endif /* TSCH_WITHOUT_CHANNEL_HOPPING */
 }
 /* Select the current channel from ASN and channel offset, hop to it */
@@ -248,6 +246,13 @@ send_packet(mac_callback_t sent, void *ptr)
   int ret = MAC_TX_DEFERRED;
   uint16_t seqno;
   struct tsch_neighbor *n;
+  static tsch_packet_seqno = 0;
+
+  /* PACKETBUF_ATTR_MAC_SEQNO cannot be zero, due to a pecuilarity
+         in framer-802154.c. */
+  if(tsch_packet_seqno == 0) {
+    tsch_packet_seqno++;
+  }
 
   const rimeaddr_t *addr = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
   /* Ask for ACK if we are sending anything other than broadcast */
@@ -256,8 +261,8 @@ send_packet(mac_callback_t sent, void *ptr)
     /* PACKETBUF_ATTR_MAC_SEQNO cannot be zero, due to a peculiarity
        in framer-802154.c. */
   }
-  seqno = (++ieee154e_vars.dsn) ? ieee154e_vars.dsn : ++ieee154e_vars.dsn;
-  packetbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, seqno);
+
+  packetbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, tsch_packet_seqno++);
   if(NETSTACK_FRAMER.create() < 0) {
     PRINTF("tsch: can't send packet due to framer error\n");
     ret = MAC_TX_ERR;
@@ -418,8 +423,9 @@ static struct tsch_packet *current_packet;
 static struct tsch_neighbor *current_neighbor;
 /* Device rank or join priority:
  * For PAN coordinator: 0 -- lower is better
- * To be inherited from RPL */
-static uint8_t tsch_join_priority;
+ * To be inherited from RPL
+ * TODO: remove dependencies from RPL */
+uint8_t tsch_join_priority;
 
 /* Buffer to store received packet temporarily */
 static uint8_t tsch_rx_buffer[TSCH_MAX_PACKET_LEN] = {0};
@@ -906,7 +912,6 @@ PT_THREAD(tsch_associate(struct pt *pt))
         }
         if(n != NULL) {
           n->is_time_source = 1;
-          PRINTF("Setting parent as time source : %x.%x\n", ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE - 2], ieee154e_vars.last_rf->source_address.u8[RIMEADDR_SIZE - 1]);
         }
         /* TODO: Verify if tsch_nbrs are created and timesources are set
          * this is an example code for setting a timesource
@@ -1063,14 +1068,6 @@ tsch_init_variables(void)
   /* last estimated drift */
   drift_correction = 0;
   tsch_state = TSCH_SEARCHING;
-  /* start with a random sequence number */
-  /* TODO clean */
-  ieee154e_vars.dsn = tsch_random_byte(127);
-  ieee154e_vars.mac_ebsn = 0;
-  ieee154e_vars.join_priority = 0xff; /* inherit from RPL - PAN coordinator: 0 -- lower is better */
-  ieee154e_vars.slot_template_id = 1;
-  ieee154e_vars.hop_sequence_id = 1;
-
 	/* save start sfd only */
 	NETSTACK_RADIO_sfd_sync(1, 0);
 
@@ -1090,9 +1087,6 @@ tsch_init(void)
 
   leds_blink();
   tsch_init_variables();
-  /* on resynchronization, the node has already joined a RPL network and it is mistaking it with root
-   * this flag is used to prevent this */
-  ieee154e_vars.first_associate = 0;
   tsch_queue_init();
   tsch_schedule_init();
 

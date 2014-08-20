@@ -291,7 +291,7 @@ void tsch_schedule_init()
 {
   /* Build 6TiSCH minimal schedule.
    * We pick a slotframe length of 101. */
-  struct tsch_slotframe *sf = tsch_schedule_add_slotframe(0, 101);
+  struct tsch_slotframe *sf = tsch_schedule_add_slotframe(MINSCHEDULE_SLOTFRAME_HANDLE, 101);
   /* Add a single Tx|Rx|Shared slot using broadcast address (i.e. usable for unicast and broadcast).
    * We set the link type to advertising, which is not compliant with 6TiSCH minimal schedule
    * but is required according to 802.15.4e if also used for EB transmission.

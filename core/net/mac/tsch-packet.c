@@ -42,6 +42,7 @@
 #include "net/mac/tsch.h"
 #include "net/mac/tsch-packet.h"
 #include "net/mac/tsch-private.h"
+#include "net/mac/tsch-schedule.h"
 #include "net/mac/frame802154.h"
 /* TODO: remove dependencies to RPL */
 #include "net/rpl/rpl.h"
@@ -97,6 +98,12 @@ tsch_packet_make_eb(uint8_t *buf, uint8_t buf_size)
   static uint8_t mac_eb_seqno;
   asn_t next_eb_asn;
   struct tsch_link *l;
+  /* TODO */
+  uint8_t tsch_slot_template_id = 1;
+  uint8_t tsch_hop_sequence_id = 1;
+  rpl_instance_t *rpl = rpl_get_instance(RPL_DEFAULT_INSTANCE);
+  static rpl_dag_t *my_rpl_dag = NULL;
+  struct tsch_slotframe *slotframe;
 
   COOJA_DEBUG_STR("TSCH make EB");
   /* fcf: 2Bytes */
@@ -145,21 +152,19 @@ tsch_packet_make_eb(uint8_t *buf, uint8_t buf_size)
   buf[i++] = next_eb_asn >> 16;
   buf[i++] = next_eb_asn >> 24;
   buf[i++] = next_eb_asn >> 32;
-  /* update join_priority */
-  rpl_instance_t *rpl = rpl_get_instance(RPL_DEFAULT_INSTANCE);
-  static rpl_dag_t *my_rpl_dag = NULL;
+
   if(rpl != NULL) {
     my_rpl_dag = rpl->current_dag;
     if(my_rpl_dag != NULL) {
-      ieee154e_vars.join_priority = (my_rpl_dag->rank) >> 8;
+      tsch_join_priority = (my_rpl_dag->rank) >> 8;
     }
   }
 
   if(tsch_is_coordinator) {
-    ieee154e_vars.join_priority = 0;
+    tsch_join_priority = 0;
   }
 
-  buf[i++] = ieee154e_vars.join_priority;
+  buf[i++] = tsch_join_priority;
 
   /* Append timeslot template IE */
   len = 1;
@@ -167,9 +172,9 @@ tsch_packet_make_eb(uint8_t *buf, uint8_t buf_size)
   type = 0; /* short type */
   buf[i++] = len;
   buf[i++] = (sub_id << 1) | (type & 0x01);
-  buf[i++] = ieee154e_vars.slot_template_id;
+  buf[i++] = tsch_slot_template_id;
   /* Optional: include the full timeslot template */
-  /* not today ... */
+  /* TODO not today ... */
 
   /* Append channel hopping IE */
   len = 1;
@@ -177,39 +182,44 @@ tsch_packet_make_eb(uint8_t *buf, uint8_t buf_size)
   type = 0; /* short type */
   buf[i++] = len;
   buf[i++] = (sub_id << 1) | (type & 0x01);
-  buf[i++] = ieee154e_vars.hop_sequence_id;
+  buf[i++] = tsch_hop_sequence_id;
   /* Optional: include the full hop sequence */
-  /* not today ... */
+  /* TODO not today ... */
 
   /* Append TSCH slotframe & link IE */
-  if(ieee154e_vars.current_slotframe != NULL) {
+  slotframe = tsch_schedule_get_slotframe_from_handle(MINSCHEDULE_SLOTFRAME_HANDLE);
+  if(slotframe != NULL) {
     sub_id = 0x1b;
     type = 0; /* short type */
     len = i++; /* saving len index instead to calculate len at the end */
     /* buf[i++] = 4; */
     buf[i++] = (sub_id << 1) | (type & 0x01);
+
     buf[i++] = 1; /* number of slotframes described in EB */
     /* TSCH slotframe descriptor*/
-    buf[i++] = ieee154e_vars.current_slotframe->slotframe_handle;
-    buf[i++] = ieee154e_vars.current_slotframe->size;
-    buf[i++] = ieee154e_vars.current_slotframe->size >> 8;
-    /* buf[i++] = ieee154e_vars.current_slotframe->on_size & 0xff; / * number of included links * / */
+    buf[i++] = slotframe->handle;
+    buf[i++] = slotframe->size;
+    buf[i++] = slotframe->size >> 8;
+
     k = i++; /* index of the element containing the number of included links */
-    for(j = 0; j < (ieee154e_vars.current_slotframe->on_size & 0xff); j++) {
+    struct tsch_link *l = list_head(slotframe->links_list);
+    while(l != NULL) {
       /* Include cells I am listening on only */
-      if(ieee154e_vars.current_slotframe->links[j]->link_options & LINK_OPTION_RX) {
+      if(l->link_options & LINK_OPTION_RX) {
         /* increase the number of included cells */
         buf[k]++;
-        /* XXX slotnumber may not be its index in the general case */
-        buf[i++] = j;
-        buf[i++] = j >> 8;
-        /* XXX slotnumber end of comment */
-        buf[i++] = ieee154e_vars.current_slotframe->links[j]->channel_offset;
-        buf[i++] = ieee154e_vars.current_slotframe->links[j]->channel_offset >> 8;
-        buf[i++] = ieee154e_vars.current_slotframe->links[j]->link_options;
+        buf[i++] = l->timeslot;
+        buf[i++] = l->timeslot >> 8;
+        buf[i++] = l->channel_offset;
+        buf[i++] = l->channel_offset >> 8;
+        buf[i++] = l->link_options;
       }
+      /* Size of slotframe IE */
       buf[len] = 4 + 5 * buf[k];
+
+      l = list_item_next(l);
     }
+
   }
   buf[buf_size - 1] = i;
   /* Append time correction IE */

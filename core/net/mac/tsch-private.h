@@ -221,46 +221,6 @@ typedef uint64_t asn_t;
 #define MAC_MAX_FRAME_RETRIES 4
 #define MAC_MAX_BE 4
 
-/* IEEE 802.154e TSCH state */
-typedef struct {
-  volatile asn_t asn;                /* current absolute slot number */
-  volatile uint8_t state;              /* state of the FSM */
-  uint8_t dsn;                /* data sequence number */
-  uint16_t sync_timeout;        /* how many slots left before loosing sync */
-  uint8_t mac_ebsn;           /* EB sequence number */
-  uint8_t join_priority;      /* inherit from RPL - for PAN coordinator: 0 -- lower is better */
-  struct slotframe *current_slotframe;
-  volatile rtimer_clock_t start; /* cell start time */
-  uint8_t slot_template_id;
-  uint8_t hop_sequence_id;
-  volatile uint16_t timeslot;
-  volatile int16_t registered_drift;
-  volatile struct received_frame_radio_s *last_rf;
-  volatile struct rtimer t;
-  volatile struct pt mpt;
-  volatile uint8_t need_ack;
-  /* variable to protect queue structure */
-  volatile uint8_t working_on_queue;
-  uint8_t eb_buf[TSCH_MAX_PACKET_LEN + 1]; /* a buffer for EB packets, last byte for length */
-
-  /* on resynchronization, the node has already joined a RPL network and it is mistaking it with root
-   * this flag is used to prevent this */
-  volatile uint8_t first_associate;
-  volatile int32_t drift_correction;
-  volatile int32_t drift; /* estimated drift to all time source neighbors */
-  volatile uint16_t drift_counter; /* number of received drift corrections source neighbors */
-  uint8_t cell_decison;
-  struct tsch_link *cell;
-  struct tsch_packet *p;
-  struct tsch_neighbor *n;
-  void *payload;
-  unsigned short payload_len;
-  /* 1 byte for length if needed as dictated by the radio driver */
-  uint8_t ackbuf[STD_ACK_LEN + SYNC_IE_LEN + 1];
-} ieee154e_vars_t;
-
-extern volatile ieee154e_vars_t ieee154e_vars;
-
 /* Link options */
 #define LINK_OPTION_TX              1
 #define LINK_OPTION_RX              2
@@ -282,6 +242,7 @@ const rimeaddr_t tsch_eb_address;
 
 /* The current Absolute Slot Number (ASN) */
 asn_t current_asn;
+uint8_t tsch_join_priority;
 
 /* A pseudo-random generator with better properties than msp430-libc's default */
 void tsch_random_init(uint32_t x);

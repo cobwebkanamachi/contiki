@@ -46,6 +46,9 @@
 #include "net/mac/tsch-private.h"
 #include "net/rime/rimeaddr.h"
 
+/* 6TiSCH Minimal schedule-related defines */
+#define MINSCHEDULE_SLOTFRAME_HANDLE 0
+
 /* Link options */
 #define LINK_OPTION_TX              1
 #define LINK_OPTION_RX              2
