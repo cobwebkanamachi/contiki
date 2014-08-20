@@ -678,7 +678,8 @@ static uint8_t eb_buf[TSCH_MAX_PACKET_LEN] = { 0 };
 static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
 
 /* Reads ACK and process sync IE header for drift correction */
-static uint8_t tsch_read_and_process_ack(struct tsch_neighbor *n, uint8_t seqno) {
+static uint8_t
+tsch_read_and_process_ack(struct tsch_neighbor *n, uint8_t seqno) {
 	uint8_t ackbuf[STD_ACK_LEN + SYNC_IE_LEN];
 	uint8_t ack_len, /* ack_len*/
 					success,
@@ -1218,19 +1219,17 @@ PROCESS_THREAD(tsch_rx_callback_process, ev, data)
   PRINTF("tsch_tx_callback_process: started\n");
   COOJA_DEBUG_STR("tsch_tx_callback_process: started\n");
 
-  uint8_t payload_len;
-
   while(1) {
+    uint8_t payload_len;
     PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
     /*		PRINTF("tsch_tx_callback_process: calling mac tx callback\n"); */
     COOJA_DEBUG_STR("tsch_rx_callback_process: calling input\n");
-    if(data != 0) {
-    	payload_len = (uint8_t)data;
-			packetbuf_clear();
-			memcpy(packetbuf_dataptr(), (void *)tsch_rx_buffer, payload_len);
-			packetbuf_set_datalen(payload_len);
-
-			NETSTACK_RDC.input();
+    payload_len = (uint8_t)data;
+    if(payload_len > 0 && payload_len <= PACKETBUF_SIZE) {
+      packetbuf_clear();
+      memcpy(packetbuf_dataptr(), (void *)tsch_rx_buffer, payload_len);
+      packetbuf_set_datalen(payload_len);
+      NETSTACK_RDC.input();
     }
   }
   PROCESS_END();
@@ -1266,8 +1265,9 @@ PROCESS_THREAD(tsch_send_eb_process, ev, data)
 			if(data == &eb_timer) {
 				etimer_reset(&eb_timer);
 				/* Prepare the EB packet and schedule it to be sent */
-				eb_len = tsch_packet_make_eb(eb_buf, TSCH_MAX_PACKET_LEN);
-				packetbuf_reference((void *)eb_buf, eb_len);
+				packetbuf_clear();
+				eb_len = tsch_packet_make_eb(packetbuf_dataptr(), TSCH_MAX_PACKET_LEN);
+				packetbuf_set_datalen(eb_len);
 		    /* enqueue eb packet */
 		    if(n != NULL && !tsch_queue_add_packet(&eb_cell_address, NULL, NULL)) {
 		      PRINTF("tsch: can't send EB packet\n");

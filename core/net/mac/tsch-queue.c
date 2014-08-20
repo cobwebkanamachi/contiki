@@ -236,8 +236,8 @@ tsch_decrement_backoff_counter_for_all_nbrs(void)
 //  if(!locked) {
 	struct tsch_neighbor *curr_nbr = nbr_table_head(neighbor_queues);
 
-	while (curr_nbr != NULL) {
-		if (curr_nbr->BW_value > 0) {
+	while(curr_nbr != NULL) {
+		if(curr_nbr->BW_value > 0) {
 			curr_nbr->BW_value--;
 		}
 		curr_nbr = nbr_table_next(neighbor_queues, curr_nbr);
