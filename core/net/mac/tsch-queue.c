@@ -110,11 +110,14 @@ tsch_queue_add_nbr(const rimeaddr_t *addr)
     if(n != NULL) {
       /* Initialize neighbor entry */
       n->BE_value = MAC_MIN_BE;
+      n->is_broadcast = rimeaddr_cmp(addr, &tsch_eb_address)
+          || rimeaddr_cmp(addr, &tsch_broadcast_address);
     }
     locked = 0;
   }
   return n;
 }
+
 /* Get a TSCH neighbor */
 struct tsch_neighbor *
 tsch_queue_get_nbr(const rimeaddr_t *addr)
@@ -124,6 +127,7 @@ tsch_queue_get_nbr(const rimeaddr_t *addr)
   }
   return NULL;
 }
+
 /* Remove TSCH neighbor queue */
 void
 tsch_queue_remove_nbr(struct tsch_neighbor *n)
@@ -141,6 +145,7 @@ tsch_queue_remove_nbr(struct tsch_neighbor *n)
     locked = 0;
   }
 }
+
 /* Add packet to neighbor queue. Use same lockfree implementation as ringbuf.c (put is atomic) */
 int
 tsch_queue_add_packet(const rimeaddr_t *addr, mac_callback_t sent, void *ptr)
@@ -167,12 +172,12 @@ tsch_queue_add_packet(const rimeaddr_t *addr, mac_callback_t sent, void *ptr)
   PRINTF("TSCH-queue: failed to enqueue packet\n");
   return 0;
 }
+
 /* Remove first packet from a neighbor queue */
 int
-tsch_queue_remove_packet_from_dest_addr(const rimeaddr_t *addr)
+tsch_queue_remove_packet_from_queue(struct tsch_neighbor *n)
 {
   if(!locked) {
-    struct tsch_neighbor *n = tsch_queue_get_nbr(addr);
     if(n != NULL && !QUEUE_EMPTY(n)) {
       uint8_t prev_get_ptr = n->get_ptr;
       /* Actually remove form the ringbuf. Must be atomic. */
@@ -185,31 +190,43 @@ tsch_queue_remove_packet_from_dest_addr(const rimeaddr_t *addr)
   }
   return 0;
 }
+
+/* Is the neighbor queue empty? */
+int
+tsch_queue_is_empty(const struct tsch_neighbor *n)
+{
+  return QUEUE_EMPTY(n);
+}
+
 /* Returns the first packet from a neighbor queue */
 struct tsch_packet *
-tsch_queue_get_packet_from_neighbor(const struct tsch_neighbor *n)
+tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, int is_shared_link)
 {
   if(!locked) {
-    if(n != NULL && !QUEUE_EMPTY(n)) {
+    if(n != NULL && !QUEUE_EMPTY(n) &&
+        !(is_shared_link && n->BW_value > 0)) { /* If this is a shared link,
+        make sure the backoff window is zero */
       PRINTF("TSCH-queue: p%d @%p\n", n->get_ptr, n->buffer[n->get_ptr].pkt);
       return (struct tsch_packet *)&n->buffer[n->get_ptr];
     }
   }
   return NULL;
 }
+
 /* Returns the head packet from a neighbor queue (from neighbor address) */
 struct tsch_packet *
-tsch_queue_get_packet_from_dest_addr(const rimeaddr_t *addr)
+tsch_queue_get_packet_for_dest_addr(const rimeaddr_t *addr, int is_shared_link)
 {
   if(!locked) {
-    return tsch_queue_get_packet_from_neighbor(tsch_queue_get_nbr(addr));
+    return tsch_queue_get_packet_for_nbr(tsch_queue_get_nbr(addr), is_shared_link);
   }
   return NULL;
 }
+
 /* Returns the head packet of any neighbor queue with zero backoff counter.
  * Writes pointer to the neighbor in *n */
 struct tsch_packet *
-tsch_queue_get_any_packet(struct tsch_neighbor **n)
+tsch_queue_get_packet_for_any(struct tsch_neighbor **n, int is_shared_link)
 {
   if(!locked) {
     /* TODO: round-robin among neighbors */
@@ -217,8 +234,8 @@ tsch_queue_get_any_packet(struct tsch_neighbor **n)
     struct tsch_packet *p = NULL;
 
     while(curr_nbr != NULL) {
-      p = tsch_queue_get_packet_from_neighbor(curr_nbr);
-      if(p != NULL && curr_nbr->BW_value == 0) {
+      p = tsch_queue_get_packet_for_nbr(curr_nbr, is_shared_link);
+      if(p != NULL) {
         *n = curr_nbr;
         return p;
       }
@@ -243,7 +260,6 @@ tsch_decrement_backoff_counter_for_all_nbrs(void)
 		curr_nbr = nbr_table_next(neighbor_queues, curr_nbr);
 	}
 //  }
-	return NULL;
 }
 
 /* Initialize TSCH queue module */

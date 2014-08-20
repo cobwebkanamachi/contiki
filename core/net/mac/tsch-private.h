@@ -217,9 +217,9 @@ typedef uint64_t asn_t;
 #define SYNC_IE_LEN 4
 
 /* TSCH MAC parameters */
-#define MAC_MIN_BE 1
-#define MAC_MAC_FRAME_RETRIES 4
-#define MAC_MAC_BE 4
+#define MAC_MIN_BE 0
+#define MAC_MAX_FRAME_RETRIES 4
+#define MAC_MAX_BE 4
 
 /* IEEE 802.154e TSCH state */
 typedef struct {
@@ -301,5 +301,7 @@ enum cell_decision_enum {
 
 /* 802.15.4 broadcast MAC address */
 const rimeaddr_t tsch_broadcast_address;
+/* The address we use to identify EB queue */
+const rimeaddr_t tsch_eb_address;
 
 #endif /* __TSCH_PRIVATE_H__ */

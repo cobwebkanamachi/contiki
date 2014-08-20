@@ -71,6 +71,7 @@ struct tsch_neighbor {
   struct tsch_packet buffer[NBR_BUFFER_SIZE]; /* circular buffer of packets.
                                                  Its size must be a power of two  to allow for atomic put */
   rimeaddr_t addr; /* link-layer address of the neighbor */
+  uint8_t is_broadcast; /* is this neighbor a virtual neighbor used for broadcast (of data packets or EBs) */
   uint8_t is_time_source; /* is this neighbor a time source? */
   uint8_t BE_value; /* current value of backoff exponent */
   uint8_t BW_value; /* current value of backoff counter */
@@ -91,14 +92,16 @@ rimeaddr_t * tsch_queue_get_nbr_address(struct tsch_neighbor *n);
 /* Add packet to neighbor queue. Use same lockfree implementation as ringbuf.c (put is atomic) */
 int tsch_queue_add_packet(const rimeaddr_t *addr, mac_callback_t sent, void *ptr);
 /* Remove first packet from a neighbor queue */
-int tsch_queue_remove_packet_from_dest_addr(const rimeaddr_t *addr);
+int tsch_queue_remove_packet_from_queue(struct tsch_neighbor *n);
+/* Is the neighbor queue empty? */
+int tsch_queue_is_empty(const struct tsch_neighbor *n);
 /* Returns the first packet from a neighbor queue */
-struct tsch_packet *tsch_queue_get_packet_from_neighbor(const struct tsch_neighbor *n);
+struct tsch_packet *tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, int is_shared_link);
 /* Returns the head packet from a neighbor queue (from neighbor address) */
-struct tsch_packet *tsch_queue_get_packet_from_dest_addr(const rimeaddr_t *addr);
+struct tsch_packet *tsch_queue_get_packet_for_dest_addr(const rimeaddr_t *addr, int is_shared_link);
 /* Returns the head packet of any neighbor queue with zero backoff counter.
  * Writes pointer to the neighbor in *n */
-struct tsch_packet *tsch_queue_get_any_packet(struct tsch_neighbor **n);
+struct tsch_packet *tsch_queue_get_packet_for_any(struct tsch_neighbor **n, int is_shared_link);
 /* Decrements the CSMA backoff counter for all neighbors
  * To be used in shared slots */
 void tsch_decrement_backoff_counter_for_all_nbrs(void);

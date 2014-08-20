@@ -101,11 +101,10 @@ static struct seqno received_seqnos[MAX_SEQNOS];
 
 /* 802.15.4 broadcast MAC address */
 const rimeaddr_t tsch_broadcast_address = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
+const rimeaddr_t tsch_eb_address = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
 
 /* TODO: const? */
 /* Schedule: addresses */
-static rimeaddr_t broadcast_cell_address = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
-static rimeaddr_t eb_cell_address = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
 static rimeaddr_t cell_address1 = { { 0x00, 0x12, 0x74, 01, 00, 01, 01, 01 } };
 static rimeaddr_t cell_address2 = { { 0x00, 0x12, 0x74, 02, 00, 02, 02, 02 } };
 static rimeaddr_t cell_address3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
@@ -113,10 +112,10 @@ static rimeaddr_t cell_address3 = { { 0x00, 0x12, 0x74, 03, 00, 03, 03, 03 } };
 /* Schedule: links */
 static const struct tsch_link generic_shared_cell = { 0xffff, 0,
                                             LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED,
-                                            LINK_TYPE_NORMAL, &broadcast_cell_address };
+                                            LINK_TYPE_NORMAL, &tsch_broadcast_address };
 static const struct tsch_link generic_eb_cell = { 0, 0,
                                         LINK_OPTION_TX,
-                                        LINK_TYPE_ADVERTISING, &eb_cell_address };
+                                        LINK_TYPE_ADVERTISING, &tsch_eb_address };
 static const struct tsch_link cell_to_1 = { 1, 0,
                                   LINK_OPTION_TX | LINK_OPTION_RX | LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING,
                                   LINK_TYPE_NORMAL, &cell_address1 };
@@ -623,33 +622,32 @@ PROCESS_THREAD(tsch_associate, ev, data)
 static struct tsch_packet *
 get_packet_and_neighbor_for_cell(struct tsch_link *link, struct tsch_neighbor **target_neighbor)
 {
-	struct tsch_packet * p = NULL;
-	struct tsch_neighbor * n = NULL;
+	struct tsch_packet *p = NULL;
+	struct tsch_neighbor *n = NULL;
 
   /* is there a packet to send? if not check if this slot is RX too */
   if(link->link_options & LINK_OPTION_TX) {
     /* is it for ADV/EB? */
     if(link->link_type == LINK_TYPE_ADVERTISING) {
       /* fetch adv/EB packets */
-      n = tsch_queue_get_nbr(&eb_cell_address);
-      p = tsch_queue_get_packet_from_dest_addr(&eb_cell_address);
+      n = tsch_queue_get_nbr(&tsch_eb_address);
+      p = tsch_queue_get_packet_for_dest_addr(&tsch_eb_address, 0);
     }
     /* NORMAL link or no EB to send, pick a data packet */
     if(p == NULL) {
       /* pick a packet from the neighbors queue who is associated with this cell */
       n = tsch_queue_get_nbr(link->node_address);
       if(n != NULL) {
-        p = tsch_queue_get_packet_from_dest_addr(link->node_address);
+        p = tsch_queue_get_packet_for_nbr(n, 0);
       }
-      /* if there it is a shared broadcast slot and there were no broadcast packets, pick any unicast packet */
+      /* if there it is a broadcast slot and there were no broadcast packets, pick any unicast packet */
       if(p == NULL
-         && rimeaddr_cmp(link->node_address, &broadcast_cell_address)
-         && (link->link_options & LINK_OPTION_SHARED)) {
-        p = tsch_queue_get_any_packet(&n);
+         && n->is_broadcast) {
+        p = tsch_queue_get_packet_for_any(&n, link->link_options & LINK_OPTION_SHARED);
       }
     }
   }
-  /* return nbr */
+  /* return nbr (by reference) */
   if(target_neighbor != NULL) {
   	*target_neighbor = n;
   }
@@ -733,84 +731,54 @@ tsch_read_and_process_ack(struct tsch_neighbor *n, uint8_t seqno) {
   return success;
 }
 
-/* post TX: Update CSMA control variables */
+/* post TX: Update neighbor state after a transmission */
 static void
-update_csma(struct tsch_packet * p, struct tsch_neighbor * n, struct tsch_link * cell, uint8_t mac_tx_status, uint8_t is_broadcast) {
-	uint8_t window = 0;
-	t0post_tx = RTIMER_NOW();
+update_neighbor_state(struct tsch_neighbor *n, struct tsch_packet * p,
+    struct tsch_link *link, uint8_t mac_tx_status) {
 
-	/* If this is a shared link,
+  int is_shared_link = link->link_options & LINK_OPTION_SHARED;
+  int is_unicast = !n->is_broadcast;
+
+  t0post_tx = RTIMER_NOW();
+
+	/* TODO fix this
+	 * If this is a shared link,
 	 * we need to decrease the backoff value for all neighbors waiting to send */
-	if(cell->link_options & LINK_OPTION_SHARED) {
+	if(is_shared_link) {
 		tsch_decrement_backoff_counter_for_all_nbrs();
 	}
 
-	/* if it was EB or broadcast there is no need to update anything */
-	if(!is_broadcast) {
-		if(mac_tx_status == MAC_TX_NOACK) {
-			p->transmissions++;
-			if(p->transmissions >= MAC_MAC_FRAME_RETRIES) {
-				tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
-				n->BE_value = MAC_MIN_BE;
-				n->BW_value = 0;
-			} else if((cell->link_options & LINK_OPTION_SHARED)) {
-				window = 1 << n->BE_value;
-				n->BW_value = tsch_random_byte(window - 1);
-				n->BE_value++;
-				if(n->BE_value > MAC_MAC_BE) {
-					n->BE_value = MAC_MAC_BE;
-				}
-			}
-		} else if(mac_tx_status == MAC_TX_OK) {
-			tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
-			if(!tsch_queue_get_packet_from_dest_addr(cell->node_address)) {
-				/* if no more packets in the queue */
-				n->BW_value = 0;
-				n->BE_value = MAC_MIN_BE;
-			} else {
-				/* if queue is not empty */
-				n->BW_value = 0;
-			}
-		} else if(mac_tx_status == MAC_TX_COLLISION) {
-			p->transmissions++;
-			if(p->transmissions >= MAC_MAC_FRAME_RETRIES) {
-				tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
-				n->BE_value = MAC_MIN_BE;
-				n->BW_value = 0;
-			} else if((cell->link_options & LINK_OPTION_SHARED)) {
-				window = 1 << n->BE_value;
-				n->BW_value = tsch_random_byte(window - 1);
-				n->BE_value++;
-				if(n->BE_value > MAC_MAC_BE) {
-					n->BE_value = MAC_MAC_BE;
-				}
-			}
-		} else if(mac_tx_status == MAC_TX_ERR) {
-			p->transmissions++;
-			if(p->transmissions >= MAC_MAC_FRAME_RETRIES) {
-				tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
-				n->BE_value = MAC_MIN_BE;
-				n->BW_value = 0;
-			} else if((cell->link_options & LINK_OPTION_SHARED)) {
-				window = 1 << n->BE_value;
-				n->BW_value = tsch_random_byte(window - 1);
-				n->BE_value++;
-				if(n->BE_value > MAC_MAC_BE) {
-					n->BE_value = MAC_MAC_BE;
-				}
-			}
-		} else {
-			/* successful transmission */
-			tsch_queue_remove_packet_from_dest_addr(queuebuf_addr(p->pkt, PACKETBUF_ADDR_RECEIVER));
-			if(!tsch_queue_get_packet_from_dest_addr(cell->node_address)) {
-				/* if no more packets in the queue */
-				n->BW_value = 0;
-				n->BE_value = MAC_MIN_BE;
-			} else {
-				/* if queue is not empty */
-				n->BW_value = 0;
-			}
-		}
+	if(mac_tx_status == MAC_TX_OK) {
+	  /* Successful transmission */
+	  tsch_queue_remove_packet_from_queue(n);
+
+	  /* Update CSMA state in the unicast case */
+	  if(is_unicast) {
+	    if(is_shared_link || tsch_queue_is_empty(n)) {
+	      /* If this is a shared link, reset backoff on success.
+	       * Otherwise, do so only is the queue is empty */
+	      n->BW_value = 0;
+	      n->BE_value = MAC_MIN_BE;
+	    }
+	  }
+	} else {
+	  /* Failed transmission */
+	  p->transmissions++;
+	  if(p->transmissions >= MAC_MAX_FRAME_RETRIES) {
+	    /* Drop packet */
+	    tsch_queue_remove_packet_from_queue(n);
+	  }
+
+	  /* Update CSMA state in the unicast case */
+	  if(is_unicast) {
+	    /* Failures on dedicated (== non-shared) leave the backoff
+	     * window nor exponent unchanged */
+	    if(is_shared_link) {
+	      /* Shared link: increment backoff exponent, pick a new window */
+	      n->BE_value = MIN(n->BE_value + 1, MAC_MAX_BE);
+        n->BW_value = tsch_random_byte((1 << n->BE_value) - 1);
+	    }
+	  }
 	}
 
 	t0post_tx = RTIMER_NOW() - t0post_tx;
@@ -840,8 +808,7 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
   /* tx status */
   static uint8_t mac_tx_status = 0;
   /* is this a broadcast packet? (wait for ack?) */
-  static uint8_t is_broadcast = 0,
-  		is_eb = 0;
+  static uint8_t is_broadcast = 0;
   /* is channel clear? */
   static uint8_t cca_status = 0;
   /* tx duration */
@@ -857,10 +824,7 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
 	}
 
   /* is this a broadcast packet? (wait for ack?) */
-  is_eb = rimeaddr_cmp(tsch_queue_get_nbr_address(current_neighbor), &eb_cell_address);
-  // TODO: get broadcast status from nbr or from packet? I think it is the same
-  //  is_broadcast = is_eb || rimeaddr_cmp(tsch_queue_get_nbr_address(current_neighbor), &broadcast_cell_address);
-  is_broadcast = is_eb || rimeaddr_cmp(queuebuf_addr(current_packet->pkt, PACKETBUF_ADDR_RECEIVER), &rimeaddr_null);
+  is_broadcast = current_neighbor->is_broadcast;
   /* read seqno from payload! */
   seqno = ((uint8_t *)(payload))[2];
   /* prepare packet to send: copy to radio buffer */
@@ -930,8 +894,8 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
   }
   t0txack = RTIMER_NOW() - t0txack;
 
-  /* post TX: Update CSMA control variables */
-  update_csma(current_packet, current_neighbor, current_cell, mac_tx_status, is_broadcast);
+  /* post TX: Update neighbor state */
+  update_neighbor_state(current_neighbor, current_packet, current_cell, mac_tx_status);
 
   /* Store TX status */
   current_packet->ret = mac_tx_status;
@@ -1246,7 +1210,7 @@ PROCESS_THREAD(tsch_send_eb_process, ev, data)
 	/* yield the process until a neighbor for EBs is added */
   etimer_set(&eb_timer, CLOCK_SECOND/10);
   do {
-		n = tsch_queue_add_nbr(&eb_cell_address);
+		n = tsch_queue_add_nbr(&tsch_eb_address);
 		if(n == NULL) {
 			PROCESS_WAIT_EVENT();
 		}
@@ -1269,7 +1233,7 @@ PROCESS_THREAD(tsch_send_eb_process, ev, data)
 				eb_len = tsch_packet_make_eb(packetbuf_dataptr(), TSCH_MAX_PACKET_LEN);
 				packetbuf_set_datalen(eb_len);
 		    /* enqueue eb packet */
-		    if(n != NULL && !tsch_queue_add_packet(&eb_cell_address, NULL, NULL)) {
+		    if(n != NULL && !tsch_queue_add_packet(&tsch_eb_address, NULL, NULL)) {
 		      PRINTF("tsch: can't send EB packet\n");
 		    }
 			}
