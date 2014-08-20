@@ -140,11 +140,13 @@ static const struct tsch_link *links_list[] = { &generic_eb_cell, &generic_share
 static struct slotframe minimum_slotframe = { 0, 101, 6, (struct tsch_link **)minimum_links };
 #define TOTAL_LINKS (sizeof(links_list) / sizeof(struct tsch_link *))
 
+
+
 /* Other function prototypes */
-static int powercycle(struct rtimer *t, void *ptr);
 static void tsch_init(void);
 static void tsch_resynchronize(struct rtimer *, void *);
 static void tsch_init_variables(void);
+static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
 
 /* A global variable telling whether we are coordinator of the TSCH network
  * TODO: have a function to set this */
@@ -168,6 +170,8 @@ PROCESS(tsch_send_eb_process, "tsch_send_eb");
 PROCESS(tsch_associate, "tsch_associate");
 PROCESS(tsch_process, "TSCH process");
 
+
+
 /**
  *  A pseudo-random generator with better properties than msp430-libc's default
  **/
@@ -179,6 +183,7 @@ tsch_random_init(uint32_t x)
 {
   tsch_random_seed = x;
 }
+
 static uint8_t
 tsch_random_byte(uint8_t window)
 {
@@ -407,8 +412,7 @@ packet_input(void)
  * Provides basic protection against missed deadlines and timer overflows
  * A non-zero return value signals to powercycle a missed deadline */
 static uint8_t
-schedule_operation(struct rtimer *tm, rtimer_callback_t operation, rtimer_clock_t ref_time,
-							 rtimer_clock_t duration)
+tsch_schedule_cell_operation(struct rtimer *tm, rtimer_clock_t ref_time, rtimer_clock_t duration)
 {
 	int r, status = 0;
 	rtimer_clock_t now = RTIMER_NOW();
@@ -422,7 +426,7 @@ schedule_operation(struct rtimer *tm, rtimer_callback_t operation, rtimer_clock_
 	} else {
 		ref_time += duration;
 	}
-  r = rtimer_set(tm, ref_time, 1, (void(*)(struct rtimer *, void *))operation, NULL /*(void*)&status*/);
+  r = rtimer_set(tm, ref_time, 1, (void(*)(struct rtimer *, void *))tsch_cell_operation, NULL /*(void*)&status*/);
 	if(r != RTIMER_OK) {
 		COOJA_DEBUG_STR("schedule_fixed: could not set rtimer\n");
 		status = 2;
@@ -870,7 +874,7 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
   cca_status = 1;
 #if CCA_ENABLED
   /* delay before CCA */
-  schedule_operation(t, (rtimer_callback_t)tsch_tx_cell, current_cell_start, TsCCAOffset);
+  tsch_schedule_cell_operation(t, current_cell_start, TsCCAOffset);
   PT_YIELD(pt);
   on();
   /* CCA */
@@ -883,7 +887,7 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
     mac_tx_status = (!mac_tx_status) ? MAC_TX_ERR : MAC_TX_COLLISION;
   } else {
     /* delay before TX */
-    schedule_operation(t, (rtimer_callback_t)tsch_tx_cell, current_cell_start, TsTxOffset - delayTx);
+    tsch_schedule_cell_operation(t, current_cell_start, TsTxOffset - delayTx);
     PT_YIELD(pt);
     t0tx = RTIMER_NOW();
     tx_time = RTIMER_NOW();
@@ -901,7 +905,7 @@ PT_THREAD(tsch_tx_cell(struct pt *pt, struct rtimer *t))
       if(!is_broadcast) {
         /* wait for ack after tx: sleep until ack time */
         COOJA_DEBUG_STR("wait for ACK\n");
-        schedule_operation(t, (rtimer_callback_t)tsch_tx_cell, current_cell_start,
+        tsch_schedule_cell_operation(t, current_cell_start,
                        TsTxOffset + tx_time + TsTxAckDelay - TsShortGT - delayRx);
         PT_YIELD(pt);
         cca_status = 0;
@@ -988,7 +992,7 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 	}
 
 	/* wait before RX */
-	schedule_operation(t, (rtimer_callback_t)tsch_rx_cell, current_cell_start, TsTxOffset - TsLongGT - delayRx);
+	tsch_schedule_cell_operation(t, current_cell_start, TsTxOffset - TsLongGT - delayRx);
 	COOJA_DEBUG_STR("schedule RX on guard time - TsLongGT");
 	PT_YIELD(pt);
 	/* Start radio for at least guard time */
@@ -1041,7 +1045,7 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 			  /* Copy to radio buffer */
 			  NETSTACK_RADIO.prepare((const void *)ack_buf, ack_len);
 
-			  schedule_operation(t, (rtimer_callback_t)tsch_rx_cell, rx_end_time, TsTxAckDelay - delayTx);
+			  tsch_schedule_cell_operation(t, rx_end_time, TsTxAckDelay - delayTx);
 				PT_YIELD(pt);
 				NETSTACK_RADIO.transmit(ack_len);
 			}
@@ -1127,8 +1131,9 @@ PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr))
 			/* Update timeslot and cell start, schedule next wakeup */
 			current_timeslot = next_timeslot;
 			current_cell_start +=  timeslot_diff * TsSlotDuration + drift_correction;
-			rtimer_set(t, current_cell_start,
-					0, (rtimer_callback_t)tsch_cell_operation, NULL);
+
+		  tsch_schedule_cell_operation(t, current_cell_start, 0);
+
 			printf("TSCH: end of cell %u\n", timeslot_diff);
 		}
 
@@ -1179,8 +1184,7 @@ PROCESS_THREAD(tsch_process, ev, data)
 
     /* Operate */
     printf("TSCH: starting cell operation\n");
-    rtimer_set(&cell_operation_timer, current_cell_start,
-        0, (rtimer_callback_t)tsch_cell_operation, NULL);
+	  tsch_schedule_cell_operation(&cell_operation_timer, current_cell_start, 0);
 
     PROCESS_WAIT_UNTIL(!associated);
   }
@@ -1283,22 +1287,25 @@ tsch_init_variables(void)
 {
   /* setting seed for the random generator */
   tsch_random_init(clock_time() * RTIMER_NOW());
-  /* look for a root to sync with */
-  ieee154e_vars.current_slotframe = &minimum_slotframe;
-  ieee154e_vars.slot_template_id = 1;
-  ieee154e_vars.hop_sequence_id = 1;
-  ieee154e_vars.asn = 0;
+
+  static int associated = 0;
+  static struct pt cell_operation_pt;
+
+  current_asn = 0;
+  current_timeslot = 0;
+  current_slotframe = &minimum_slotframe;;
+  current_cell = NULL;
+  current_packet = NULL;
+  current_neighbor = NULL;
+  /* last estimated drift */
+  drift = 0;
+  tsch_state = TSCH_SEARCHING;
   /* start with a random sequence number */
   ieee154e_vars.dsn = tsch_random_byte(127);
-  tsch_state = TSCH_SEARCHING;
-  /* we need to sync */
-  ieee154e_vars.sync_timeout = 0; /* 30sec/slotDuration - (asn-asn0)*slotDuration */
   ieee154e_vars.mac_ebsn = 0;
   ieee154e_vars.join_priority = 0xff; /* inherit from RPL - PAN coordinator: 0 -- lower is better */
-  ieee154e_vars.need_ack = 0;
-  ieee154e_vars.last_rf = NULL;
-  ieee154e_vars.registered_drift = 0;
-  ieee154e_vars.timeslot = 0;
+  ieee154e_vars.slot_template_id = 1;
+  ieee154e_vars.hop_sequence_id = 1;
 
 	/* save start sfd only */
 	NETSTACK_RADIO_sfd_sync(1, 0);
@@ -1324,12 +1331,12 @@ tsch_init(void)
   ieee154e_vars.first_associate = 0;
   tsch_queue_init();
   tsch_schedule_init();
-  /* try to associate to a network or start one if setup as RPL root */
-//  process_start(&tsch_associate, NULL);
+
   /* XXX for debugging */
   hop_channel(0);
   /*	NETSTACK_RADIO.on(); */
-//  powercycle(&ieee154e_vars.t, NULL);
+  /* try to associate to a network or start one if setup as RPL root */
+  //  process_start(&tsch_associate, NULL);
   process_start(&tsch_tx_callback_process, NULL);
   process_start(&tsch_send_eb_process, NULL);
   process_start(&tsch_process, NULL);
