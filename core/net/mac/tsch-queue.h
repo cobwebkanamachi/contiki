@@ -89,7 +89,7 @@ void tsch_queue_remove_nbr(struct tsch_neighbor *n);
 /* Lock a TSCH neighbor, to prevent removal by table replacement policy */
 int tsch_queue_lock_nbr(struct tsch_neighbor *n);
 /* Get the address of a neighbor */
-rimeaddr_t * tsch_queue_get_nbr_address(struct tsch_neighbor *n);
+rimeaddr_t *tsch_queue_get_nbr_address(const struct tsch_neighbor *n);
 /* Add packet to neighbor queue. Use same lockfree implementation as ringbuf.c (put is atomic) */
 int tsch_queue_add_packet(const rimeaddr_t *addr, mac_callback_t sent, void *ptr);
 /* Remove first packet from a neighbor queue */
@@ -105,7 +105,7 @@ struct tsch_packet *tsch_queue_get_packet_for_dest_addr(const rimeaddr_t *addr, 
 struct tsch_packet *tsch_queue_get_packet_for_any(struct tsch_neighbor **n, int is_shared_link);
 /* Is the module locked? */
 /* May the neighbor transmit over a share link? */
-int tsch_queue_backoff_expired(struct tsch_neighbor *n);
+int tsch_queue_backoff_expired(const struct tsch_neighbor *n);
 /* Reset neighbor backoff */
 void tsch_queue_backoff_reset(struct tsch_neighbor *n);
 /* Increment backoff exponent, pick a new window */

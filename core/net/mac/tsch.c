@@ -101,7 +101,6 @@ const rimeaddr_t tsch_eb_address = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
 /* Other function prototypes */
 static void tsch_init(void);
-static void tsch_resynchronize(struct rtimer *, void *);
 static void tsch_init_variables(void);
 static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
 static PT_THREAD(tsch_associate(struct pt *pt));
@@ -123,7 +122,7 @@ enum tsch_state_e {
 enum tsch_state_e tsch_state;
 
 /* Debug timing */
-static rtimer_clock_t t0prepare = 0, t0tx = 0, t0txack = 0, t0post_tx = 0, t0rx = 0, t0rxack = 0, tq = 0, tn = 0;
+static rtimer_clock_t t0prepare = 0, t0tx = 0, t0txack = 0, t0post_tx = 0, t0rx = 0, t0rxack = 0;
 
 /**
  *  A pseudo-random generator with better properties than msp430-libc's default
@@ -156,16 +155,18 @@ off(void)
   NETSTACK_RADIO.off();
 }
 /*---------------------------------------------------------------------------*/
-static void
+static int
 turn_on(void)
 {
   PRINTF("TSCH: turn_on not supported\n");
+  return 1;
 }
 /*---------------------------------------------------------------------------*/
-static void
+static int
 turn_off(int keep_radio_on)
 {
   PRINTF("TSCH: turn_off not supported\n");
+  return 1;
 }
 /*---------------------------------------------------------------------------*/
 static unsigned short
@@ -239,14 +240,13 @@ hop_channel(uint8_t offset)
 
 /*---------------------------------------------------------------------------*/
 /* Function send for TSCH-MAC, puts the packet in packetbuf in the MAC queue */
-static int
+static void
 send_packet(mac_callback_t sent, void *ptr)
 {
   PRINTF("TSCH send_packet\n");
   int ret = MAC_TX_DEFERRED;
-  uint16_t seqno;
   struct tsch_neighbor *n;
-  static tsch_packet_seqno = 0;
+  static uint8_t tsch_packet_seqno = 0;
 
   /* PACKETBUF_ATTR_MAC_SEQNO cannot be zero, due to a pecuilarity
          in framer-802154.c. */
@@ -278,9 +278,8 @@ send_packet(mac_callback_t sent, void *ptr)
         PRINTF("tsch: can't send packet !tsch_queue_add_packet 1\n");
         ret = MAC_TX_ERR;
       }
-    } else
-    /* add new packet to neighbor list */
-    if(!tsch_queue_add_packet(addr, sent, ptr)) {
+    } else if(!tsch_queue_add_packet(addr, sent, ptr)) {
+      /* add new packet to neighbor list */
       PRINTF("tsch: can't send packet !tsch_queue_add_packet 2\n");
       ret = MAC_TX_ERR;
     }
@@ -288,7 +287,6 @@ send_packet(mac_callback_t sent, void *ptr)
   if(ret != MAC_TX_DEFERRED) {
     mac_call_sent_callback(sent, ptr, ret, 1);
   }
-  return ret;
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -432,8 +430,6 @@ static uint8_t tsch_rx_buffer[TSCH_MAX_PACKET_LEN] = {0};
 
 /* last estimated drift */
 static int32_t drift_correction = 0;
-
-static uint8_t eb_buf[TSCH_MAX_PACKET_LEN] = { 0 };
 
 static PT_THREAD(tsch_cell_operation(struct rtimer *t, void *ptr));
 
@@ -688,12 +684,10 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 	/* Estimated drift based on RX time */
 	static int32_t estimated_drift = 0;
 
-	uint8_t ack_needed = 0,
-			ret = 0;
+	uint8_t ack_needed = 0;
 	/* RX-packet sequence number */
 	uint8_t seqno;
 
-	uint32_t irq_status = 0;
 	rtimer_clock_t rx_start_time, rx_end_time;
 	struct tsch_neighbor *n;
 	rimeaddr_t *source_address;
@@ -722,7 +716,6 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 		off();
 		t0rx = RTIMER_NOW() - t0rx;
 		/* no packets on air */
-		ret = 0;
 	} else {
 #if CONTIKI_TARGET_JN5168
 		if(!irq_status) {
@@ -772,7 +765,7 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 			if(estimated_drift) {
 				COOJA_DEBUG_PRINTF("estimated_drift seen %d\n", estimated_drift);
 				/* check the source address for potential time-source match */
-				n = tsch_queue_get_nbr(&source_address);
+				n = tsch_queue_get_nbr(source_address);
 				if(n != NULL && n->is_time_source) {
         	/* Keep track of sync time */
 					last_sync_asn = current_asn;
@@ -783,12 +776,9 @@ PT_THREAD(tsch_rx_cell(struct pt *pt, struct rtimer *t))
 			}
 
 			/* poll RDC RX callback */
-			while(PROCESS_ERR_OK != process_post(&tsch_rx_callback_process, PROCESS_EVENT_POLL, (void *)payload_len)) {
+			while(PROCESS_ERR_OK != process_post(&tsch_rx_callback_process, PROCESS_EVENT_POLL, (void *)(unsigned)payload_len)) {
 				PRINTF("PROCESS_ERR_OK != process_post(&tsch_rx_callback_process\n");
 			}
-
-			/* TODO return length instead? or status? or something? */
-			ret = 1;
 		}
 	}
 	t0rxack = RTIMER_NOW() - t0rxack;
@@ -998,7 +988,7 @@ PROCESS_THREAD(tsch_rx_callback_process, ev, data)
     PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
     /*		PRINTF("tsch_tx_callback_process: calling mac tx callback\n"); */
     COOJA_DEBUG_STR("tsch_rx_callback_process: calling input\n");
-    payload_len = (uint8_t)data;
+    payload_len = (uint8_t)(unsigned)data;
     if(payload_len > 0 && payload_len <= PACKETBUF_SIZE) {
       packetbuf_clear();
       memcpy(packetbuf_dataptr(), (void *)tsch_rx_buffer, payload_len);
@@ -1058,8 +1048,6 @@ tsch_init_variables(void)
   /* setting seed for the random generator */
   tsch_random_init(clock_time() * RTIMER_NOW());
 
-  static int associated = 0;
-  static struct pt cell_operation_pt;
   tsch_join_priority = 0xff;
   current_asn = 0;
   current_link = NULL;

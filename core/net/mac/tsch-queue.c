@@ -79,9 +79,9 @@ tsch_queue_lock_nbr(struct tsch_neighbor *n)
 
 /* Get the address of a neighbor */
 rimeaddr_t *
-tsch_queue_get_nbr_address(struct tsch_neighbor *n)
+tsch_queue_get_nbr_address(const struct tsch_neighbor *n)
 {
-	return nbr_table_get_lladdr(neighbor_queues, n);
+	return nbr_table_get_lladdr(neighbor_queues, (struct tsch_neighbor *)n);
 }
 
 /* Add a TSCH neighbor */
@@ -242,7 +242,7 @@ tsch_queue_get_packet_for_any(struct tsch_neighbor **n, int is_shared_link)
 
 /* May the neighbor transmit over a share link? */
 int
-tsch_queue_backoff_expired(struct tsch_neighbor *n)
+tsch_queue_backoff_expired(const struct tsch_neighbor *n)
 {
   return n->BW_next_asn <= current_asn;
 }

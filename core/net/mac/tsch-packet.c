@@ -93,7 +93,6 @@ int
 tsch_packet_make_eb(uint8_t *buf, uint8_t buf_size)
 {
   /* XXX make sure this function does not overflow buf */
-  uint16_t j = 0;
   uint8_t len, sub_id, type, i = 0, k = 0;
   static uint8_t mac_eb_seqno;
   asn_t next_eb_asn;
