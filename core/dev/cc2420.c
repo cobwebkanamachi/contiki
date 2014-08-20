@@ -684,7 +684,7 @@ PROCESS_THREAD(cc2420_process, ev, data)
   PRINTF("cc2420_process: started\n");
 
   while(1) {
-    PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_POLL);
+    PROCESS_YIELD_UNTIL(interrupt_enabled && ev == PROCESS_EVENT_POLL);
 #if CC2420_TIMETABLE_PROFILING
     TIMETABLE_TIMESTAMP(cc2420_timetable, "poll");
 #endif /* CC2420_TIMETABLE_PROFILING */
