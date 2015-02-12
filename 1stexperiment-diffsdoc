@@ -1,0 +1,155 @@
+contiki jn5168 making with Tocos SDK for JN5164(TWE-Lite DIP) tech memo. Author : @cobwebkanamachi 2014/08/20
+Files ./contiki-rich-2.7.chg/Makefile.include and ./contiki-rich-2.7.org/Makefile.include are identical
+*** contiki-rich-2.7.chg/examples/tsch/Makefile --- contiki-rich-2.7.org/examples/tsch/Makefile ***************
+*** 1,6 ****
+! TARGET ?= jn5168
+! #TARGET ?= sky
+! DEVICE_NAME ?= DR1198
+#APPS=servreg-hack CONTIKIDIRS += dev ifeq ($(TARGET), sky)
+--- 1,5 ----
+! TARGET ?= sky
+! #DEVICE_NAME ?= DR1198
+#APPS=servreg-hack CONTIKIDIRS += dev ifeq ($(TARGET), sky)
+*************** *** 24,27 ****
+2014-07-25 07:56:34.000000000 +0900 2014-07-18 00:31:29.000000000 +0900
+sim: $(CONTIKI_PROJECT)
+java -jar $(CONTIKI)/tools/cooja/dist/cooja.jar -quickstart=$(CONTIKI_PROJECT).csc
+!
+--- 23,26 ----
+sim: $(CONTIKI_PROJECT)
+java -jar $(CONTIKI)/tools/cooja/dist/cooja.jar -quickstart=$(CONTIKI_PROJECT).csc
+!
+\ No newline at end of file
+*** contiki-rich-2.7.chg/examples/example-shell/Makefile 2014-07-24 17:04:47.000000000 +0900
+--- contiki-rich-2.7.org/examples/example-shell/Makefile ***************
+*** 1,9 ****
+CONTIKI_PROJECT = example-shell TARGET ?= jn5168
+all: $(CONTIKI_PROJECT)
+! LINKCMD = 1.ld y2.ld
+#CFLAGS += -DMACRO_NAME=1
+- #CFLAGS += --disable-newlib-supplied-syscalls
+APPS = serial-shell
+CONTIKI = ../.. --- 1,8 ----
+CONTIKI_PROJECT = example-shell TARGET ?= jn5168
+all: $(CONTIKI_PROJECT)
+!
+#CFLAGS += -DMACRO_NAME=1
+APPS = serial-shell
+2014-07-18 00:31:29.000000000 +0900
+CONTIKI = ../..
+*** 1.ld 2014-08-18 18:24:53.000000000 +0900
+--- ./contiki-rich-2.7.org/platform/jn5168/Jennic/Chip/JN5164/Build/AppBuildStart_JN5164.ld 07-18 00:31:29.000000000 +0900
+***************
+2014-07-18 00:31:29.000000000 +0900
+***************
+*** 34,51 ****
+/* Set minimum heap size unless it is already set from App_Stack_Size.ld */ _minimum_heap_size = DEFINED(_minimum_heap_size) ? _minimum_heap_size : 3350;
+MEMORY {
+flash : ORIGIN = 0x00080000, LENGTH = 0x40000 ram : ORIGIN = 0x0400004c, LENGTH = 0x07fb4
+}
+SECTIONS {
+.bir ABSOLUTE(ORIGIN(flash)): {
+_flash_start = ABSOLUTE(.);
+_flash_beg = ABSOLUTE(.); } > flash
+}
+--- 34,116 ----
+/* Set minimum heap size unless it is already set from App_Stack_Size.ld */ _minimum_heap_size = DEFINED(_minimum_heap_size) ? _minimum_heap_size : 3350;
++ _SwConfig = (DEFINED(g_bSWConf_Debug)) | (DEFINED(g_bSWConf_AltDebugPort)<<1); +
+MEMORY {
+flash : ORIGIN = 0x00080000, LENGTH = 0x28000
+ram : ORIGIN = 0x0400004c, LENGTH = 0x07fb4 }
+￼!
+!
++ /* Now building all code at once, so include vectors. MAC address is embedded + in build for now */
+SECTIONS
+{
++ .version ABSOLUTE(ORIGIN(flash)-4): +{
++ /*
++ 0008 - Chip Type 6x
++ 03 - 32K Ram
++ 04 - 160K Flash
++ */
++ LONG(0x04030008)
++ } > flash +
+.bir ABSOLUTE(ORIGIN(flash)): {
+_flash_start = ABSOLUTE(.);
+_flash_beg = ABSOLUTE(.);
++ /* Magic number */
++ LONG(0x12345678)
++ LONG(0x11223344)
++ LONG(0x55667788)
++
++ /* Configuration A (32K, DRE, 16MHz) */
++ BYTE(0x08) +
++ /* Configuration B (version 1) */
++ BYTE(0x01) +
++ /* Application ID */
++ SHORT(0x0000)
+} > flash
++ .flashheader : +{
++ /* Encryption IV */
++ LONG(0x00000000)
++ LONG(0x00000000)
++ LONG(0x00000000)
++ SHORT(0x0000) +
++ /*SW Config*/
++ /*
++ Bit
++ 0
++ 1 +
++ 2-15 Unused
++ */
++ SHORT(ABSOLUTE(_SwConfig)) +
++ _enc_start = ABSOLUTE(.);
++ /*Flash Image Length*/
++ LONG(ABSOLUTE(_image_len))
++ _enc_offset = (_enc_start & 0x0000000F);
++ _enc_start = _enc_start - _flash_beg; +
++ /* Data start & length */
++ LONG(ABSOLUTE(_flash_data_start))
++ SHORT((ABSOLUTE(_ram_data_start) / 4) & 0xffff)
++ SHORT((ABSOLUTE(_ram_data_len) / 4) & 0xffff) +
++ /* BSS start & length */
++ SHORT((ABSOLUTE(_bss_start) / 4) & 0xffff)
++ SHORT((ABSOLUTE(_bss_len) / 4) & 0xffff) +
++ /* Entry points */
++ LONG(ABSOLUTE(_AppWarmStart))
++ LONG(ABSOLUTE(_AppColdStart))
++ } > flash +
+}
+*** y2.ld2014-08-18 18:24:53.000000000 +0900
+--- ./contiki-rich-2.7.org/platform/jn5168/Jennic/Chip/JN5168/Build/AppBuildEnd_JN5168.ld 07-18 00:31:29.000000000 +0900
+***************
+*** 61,67 ****
+*(COMMON)
+. = ALIGN (4);
+_bss_end = ABSOLUTE(.); - PROVIDE(_end = .); /*ADDER*/
+} > ram
+/* reserve minimum heap size */ --- 61,66 ----
+*************** *** 78,95 ****
+_stack_low_water_mark = ABSOLUTE(.);
+. += _stack_size; } > ram
+! _stack = .; /*ADDER*/
+/* Test to check if the .data initialisation values in flash has gone
+past the end of the available space; the linker doesn't throw an error if that has happened. The following forces a byte to be stored after the .data initialisation values, but it is marked as NOLOAD so it never gets into the binary */
+- /*
+.test (((LOADADDR(.text) + SIZEOF(.text) + 3) & ~ 3) + SIZEOF(.data)) (NOLOAD): {
+BYTE(0xff) } > flash
+- */ }
+_flash_data_start = LOADADDR(.data); --- 77,92 ----
+_stack_low_water_mark = ABSOLUTE(.);
+. += _stack_size; } > ram
+!
+/* Test to check if the .data initialisation values in flash has gone
+past the end of the available space; the linker doesn't throw an error if that has happened. The following forces a byte to be stored after the .data initialisation values, but it is marked as NOLOAD so it never gets into the binary */
+.test (((LOADADDR(.text) + SIZEOF(.text) + 3) & ~ 3) + SIZEOF(.data)) (NOLOAD): {
+BYTE(0xff) } > flash
+}
+_flash_data_start = LOADADDR(.data); ***************
+*** 102,107 ****
+__app_ram_start = 0x01001580; /* Page 5, word 8 (16-byte words, 16 words per page) */
+PROVIDE(_heap_location = _u32HeapStart); -
+- _minimum_heap_size = 16384;
+- _stack_size = 8192;
+--- 99,101 ----
++ /* Configuration A (32K, DRE, 16MHz) */
