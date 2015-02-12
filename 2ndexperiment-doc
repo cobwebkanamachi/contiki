@@ -1,0 +1,379 @@
+contiki jn5168 making with Tocos SDK for JN5164(TWE-Lite DIP) tech memo. Author : @cobwebkanamachi 2014/09/16
+summary: 
+1)	Recently I report for .ld files are not needed this time for build.
+Because I replace each printf with PRINTF.
+2)	So, next issue is how to get work serial-shell with key input via serial-line.
+3)	Slip and uart are conflict each other I think.
+4)	So, Slip make to go to uart1.
+5)	But, uart0 input is too heavy to get realtime key hits.
+6)	Kludge: I change code as ‘?’ hit make command invoking I wrote.
+7)	So, code shown bellow are invoke ps command if your type ?(repeatedly pressdown for a while ? key).
+
+./serial-shell/serial-shell.c ../contiki-rich-2.7.dif/tmp/contiki-rich-2.7.org/apps/serial-shell/serial-shell.c
+53,61d52
+< #define VERBOSE 1
+< #if VERBOSE
+< int dbg_printf(const char *fmt, ...);
+< #define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
+< #else
+< #define PRINTF(...) do {} while (0)
+< #endif
+< 
+< extern shell_process;
+79c70
+<   /* Precision (PRINTF("%.Ns", text1)) not supported on all platforms.
+---
+>   /* Precision (printf("%.Ns", text1)) not supported on all platforms.
+82c73
+<     PRINTF("%c", text1[i]);
+---
+>     printf("%c", text1[i]);
+85c76
+<     PRINTF("%c", text2[i]);
+---
+>     printf("%c", text2[i]);
+87c78
+<   PRINTF("\r\n");
+---
+>   printf("\r\n");
+93c84
+<   PRINTF("%d.%d: %s\r\n", rimeaddr_node_addr.u8[0], rimeaddr_node_addr.u8[1],
+---
+>   printf("%d.%d: %s\r\n", rimeaddr_node_addr.u8[0], rimeaddr_node_addr.u8[1],
+104a96
+> 
+
+contiki jn5168 making with Tocos SDK for JN5164(TWE-Lite DIP) tech memo. Author : @cobwebkanamachi 2014/09/16
+106,113c98,101
+<   shell_ps_init();
+<   shell_start();
+<   while(1){
+<      PROCESS_WAIT_EVENT();
+<      PRINTF("Got event number %d\n", ev); /*130 comes*/
+<      PRINTF("Got data %s\n", data);
+<      shell_input(data, strlen(data));
+<      //NGprocess_post_synch(&shell_process,shell_event_input,data);
+---
+> 
+>   while(1) {
+>     PROCESS_WAIT_EVENT_UNTIL(ev == serial_line_event_message && data != NULL);
+>     shell_input(data, strlen(data));
+114a103
+> 
+121,123d109
+<   char c=0;
+<   char msg[10];
+<   char *p;
+125,150d110
+<   memset(msg,0,sizeof(msg));
+<   p=msg; 
+<   while(1){
+<     memset(msg,0,sizeof(msg));
+<     c=vMenu_coord();
+<     if(c=='?'){
+< #if 0
+<       msg[0] =  't';
+<       msg[1] =  'i';
+<       msg[2] =  'm';
+<       msg[3] =  'e';
+<       msg[4] =  '\n';
+< #else
+< #if 1
+<       msg[0] =  'p';
+<       msg[1] =  's';
+<       msg[2] =  0x00;
+< #else
+<       msg[0] =  '?';  //? + 0x00 is ok!!!
+<       msg[1] =  0x00;
+< #endif
+< #endif
+<       //process_post_synch(&serial_shell_process,PROCESS_EVENT_MSG,msg);
+<       process_post_synch(&serial_shell_process,PROCESS_EVENT_POLL,msg);
+<     }
+<   }
+
+
+contiki jn5168 making with Tocos SDK for JN5164(TWE-Lite DIP) tech memo. Author : @cobwebkanamachi 2014/09/16
+
+./shell/shell.c ../contiki-rich-2.7.dif/tmp/contiki-rich-2.7.org/apps/shell/shell.c
+68,76d67
+< #define VERBOSE 1
+< #if VERBOSE
+< int dbg_printf(const char *fmt, ...);
+< #define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
+< #else
+< #define PRINTF(...) do {} while (0)
+< #endif
+< 
+< 
+296,298c287
+<       c = c->next){
+<       PRINTF("shell:start_command:list of command:%s\n",c->command);
+<   }
+---
+>       c = c->next);
+365,367d353
+<     PRINTF("shell input_to_child(process.name):%s\n",c->process->name);
+<     PRINTF("shell input_to_child(data1):%s\n",input.data1);
+<     PRINTF("shell input_to_child(data2):%s\n",input.data2);
+377c363
+<   PRINTF("shell_input front_process '%s'\n", front_process->name);
+---
+>   /*  printf("shell_input front_process '%s'\n", front_process->name);*/
+391,392d376
+<       PRINTF("shell_input cmd:%s",input.data1);
+<       process_post_synch(front_process, shell_event_input, &input);
+405,408d388
+< #if 1
+<     PRINTF("%s\n",text1);
+<     PRINTF("%s\n",text2);
+< #else
+411d390
+< #endif
+462c441
+<   //PROCESS_PAUSE();
+---
+>   PROCESS_PAUSE();
+470d448
+<       PRINTF("shell_process:%s\n",data);
+473d450
+<       PRINTF("shell_process-after:(ret)%d\n",ret);
+
+
+contiki jn5168 making with Tocos SDK for JN5164(TWE-Lite DIP) tech memo. Author : @cobwebkanamachi 2014/09/16
+
+./tsch/hello-world.c ../contiki-rich-2.7.dif/tmp/contiki-rich-2.7.org/examples/tsch/hello-world.c
+41,83d40
+< 
+< #include "contiki.h"
+< 
+< #include <stdio.h> /* For printf() */
+< #include <string.h>
+< #include "dev/leds.h"
+< #include "cooja-debug.h"
+< #include "tsch.h"
+< #include "net/rime.h"
+< 
+< #include "sys/clock.h"
+< //#include "shell.h"
+< //#include "serial-shell.h"
+< #include "dev/serial-line.h"
+< //#include "dev/uart0.h"
+< #include "dev/uart0.h"
+< #include "dev/uart1.h"
+< #include "lib/ringbuf.h"
+< 
+< #include <stdbool.h>
+< #include <stdint.h>
+< #include <string.h>
+< #include "contiki-net.h"
+< 
+< #include <jendefs.h>
+< #include <AppHardwareApi.h>
+< //#include <AppQueueApi.h>
+< 
+< //#include "ToCoNet.h"
+< //#include "ToCoNet_mod_prototype.h"
+< //#include "serial.h"
+< 
+< 
+< #define VERBOSE 1
+< #if VERBOSE
+< int dbg_printf(const char *fmt, ...);
+< #define PRINTF(...) do {dbg_printf(__VA_ARGS__);} while(0)
+< #else
+< #define PRINTF(...) do {} while (0)
+< #endif
+< 
+< #define  USE_SLIP_UART1 1
+< 
+
+
+contiki jn5168 making with Tocos SDK for JN5164(TWE-Lite DIP) tech memo. Author : @cobwebkanamachi 2014/09/16
+
+
+93,95d49
+< 
+< #include "dev/serial-line.h"
+< 
+164,169c118
+< //#define PRINTF COOJA_DEBUG_STR
+< 
+< uint8 vprintf_uart = E_AHI_UART_0;
+< #define FIFO_LEN 256
+< uint8 S2TxFifo[FIFO_LEN];
+< uint8 S2RxFifo[FIFO_LEN];
+---
+> #define PRINTF COOJA_DEBUG_STR
+198,208d146
+< process_event_t s_line_event_message;
+< 
+< static int uart_rx_callback(unsigned char c) {
+<      uint8_t u;
+<      PRINTF("\nReceived %c",c);
+<      serial_line_input_byte(c);
+<      u = (uint8_t)c;
+<      slip_arch_writeb(c);
+<      //printf("\nReceived %u",u);
+< }
+< 
+212,226c150,152
+<   seriz_uart_init();
+<   //uart0_set_input(uart_rx_callback);
+<   //uart0_set_input(serial_line_input_byte);
+<   serial_line_init();
+<   //uart0_init(115200UL);
+<   //seri_init(1);
+<   //uart0_set_input(uart_rx_callback); //tochu stacks!!!
+<   //uart0_set_input(serial_line_input_byte);
+<   serial_shell_init();
+<   shell_ps_init();
+<   shell_time_init();
+<   //shell_init();
+<   //shell_start();
+<   //vMenu_coord();
+<   PROCESS_PAUSE();
+---
+>   COOJA_DEBUG_STR("COOJA_DEBUG_STR hello_world_process\n");
+>   //sprintf(msg, "Hello, world\n");
+> 
+
+
+contiki jn5168 making with Tocos SDK for JN5164(TWE-Lite DIP) tech memo. Author : @cobwebkanamachi 2014/09/16
+
+231,239d156
+<   s_line_event_message = process_alloc_event();
+<   for(;;) {
+<      PROCESS_YIELD();
+<      if(ev == PROCESS_EVENT_POLL) {
+<        PRINTF("received line: %s\n", (char *)data);
+<      }
+<   }
+<   COOJA_DEBUG_STR("COOJA_DEBUG_STR hello_world_process\n");
+<   //sprintf(msg, "Hello, world\n");
+246,325d162
+< 
+< void seriz_uart_init(void)
+< {
+<         bool_t Bflag = false;
+<        // if (vprintf_uart == E_AHI_UART_1)return;
+< 
+<         // disable RTS CTS
+<         vAHI_UartSetRTSCTS(E_AHI_UART_1, FALSE);
+< 
+<         // set fifo buffers
+<         Bflag = bAHI_UartEnable(E_AHI_UART_1, S2TxFifo, (sizeof(S2TxFifo)), S2RxFifo, (sizeof(S2RxFifo)));
+< 
+<         //set uart baud rate
+<         vAHI_UartSetBaudRate(E_AHI_UART_1, E_AHI_UART_RATE_115200);
+< 
+<         // set uart: no parity, 8 bit data, 1 stop bit
+<         vAHI_UartSetControl(E_AHI_UART_1, E_AHI_UART_EVEN_PARITY,
+<                 E_AHI_UART_PARITY_DISABLE, E_AHI_UART_WORD_LEN_8,
+<                 E_AHI_UART_1_STOP_BIT, E_AHI_UART_RTS_HIGH);
+<         PRINTF("init seriz...\n");
+< }
+< 
+< void vPutChar(char c)
+<    {
+<    //      do something with c here, maybe write it to a uart
+<                 while ((u8AHI_UartReadLineStatus(vprintf_uart) & E_AHI_UART_LS_TEMT)==0){};
+<                         vAHI_UartWriteData(vprintf_uart, c);
+<    }
+< 
+< 
+< /*-----------------------------------------------------------
+<  * \brief Get char on vPrintf serial interface
+
+
+contiki jn5168 making with Tocos SDK for JN5164(TWE-Lite DIP) tech memo. Author : @cobwebkanamachi 2014/09/16
+
+< */
+< 
+< uint8 vmyGetChar(void)
+< {
+<         uint8 c;
+<     // test for somthing in rx fifo
+<     if ((u8AHI_UartReadLineStatus(vprintf_uart) & E_AHI_UART_LS_DR  ) != 0){
+<     c = u8AHI_UartReadData(vprintf_uart);
+< 
+< #if 1 
+<     if (c == '\n')PRINTF("1[NL]\n\r");
+<     if (c == '\r')PRINTF("1[CR]\r");
+<     PRINTF("1hex %x\n\r",c);
+< #endif
+<     return c;
+<     }
+<     return 0;
+< }
+< 
+< uint8 s2_GetChar(void)
+< {
+<         uint8 c;
+<         if (vprintf_uart == E_AHI_UART_1)return 0;
+<     if ((u8AHI_UartReadLineStatus(E_AHI_UART_1) & E_AHI_UART_LS_DR  ) != 0){
+<     c = u8AHI_UartReadData(E_AHI_UART_1);
+< #if 1
+<     if (c == '\n')PRINTF("2[NL]\n\r");
+<     if (c == '\r')PRINTF("2[CR]\r");
+<     PRINTF("2hex %x\n\r",c);
+< #endif
+<     return c;
+<     }
+<     return 0;
+< }
+< 
+< char vMenu_coord(char *p){
+<         uint8 RxChar=0;
+<         if ((RxChar = vmyGetChar())&&RxChar == 0){
+<                         if ((RxChar = s2_GetChar())&&RxChar == 0)return 0;
+<         }
+<         if(RxChar != 0 ){
+<           PRINTF("in:%x\n",RxChar);
+<           return RxChar;
+<         }else{
+<           return 0;
+
+contiki jn5168 making with Tocos SDK for JN5164(TWE-Lite DIP) tech memo. Author : @cobwebkanamachi 2014/09/16
+
+<         }
+< }
+< 
+
+
+./tsch/Makefile ../contiki-rich-2.7.dif/tmp/contiki-rich-2.7.org/examples/tsch/Makefile
+1,4c1,3
+< TARGET ?= jn5168
+< APPS+=serial-shell
+< USE_SLIP_UART1=1
+< DEVICE_NAME ?= DR1198
+---
+> TARGET ?= sky
+> #DEVICE_NAME ?= DR1198
+> #APPS=servreg-hack
+5a5,7
+> ifeq ($(TARGET), sky) 
+> CONTIKI_SOURCEFILES += cc2420-tsch.c tsch.c
+> else
+6a9
+> endif
+8,10c11,13
+< CONTIKI_PROJECT = udp-client udp-server rt-leds 
+< UIP_CONF_IPV6  ?=1
+< USE_SLIP_UART1 ?=1
+---
+> 
+> CONTIKI_PROJECT = udp-client udp-server rt-leds
+> UIP_CONF_IPV6=1
+13c16
+< SMALL ?= 1 #ORG 1
+---
+> SMALL = 1
+23,24c26
+< 	
+< 
+---
+> 	
+\ No newline at end of file
+
+
