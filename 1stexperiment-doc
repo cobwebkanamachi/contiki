@@ -1,0 +1,102 @@
+contiki jn5168 making with Tocos SDK for JN5164(TWE-Lite DIP) tech memo. Author : @cobwebkanamachi 2014/08/20
+
+Readme.txt
+
+I found contiki-jn5168 beta git-hub. https://github.com/EIT-ICT-RICH/contiki/tree/rich-2.7 So make it.
+You make it, then see error message shown bellow 1st.
+
+I notice how to resolve this error bellow. /cygdrive/c/TWESDK/Wks_ToCoNet/contiki-rich-2.7/platform/jn5168/Jennic/Tools/ba-elf-ba2/bin/../lib/gcc/ba-elf/4.1.2/../../../../ba-elf/lib/ba2/libc.a(glue.o):
+In function `_sbrk': /ba-tools/b-gcc/ba-elf/ba2/newlib/libc/sys/basim/../../../../../../../gcc-4.1.2- ba-r8352/newlib/libc/sys/basim/glue.c:129: undefined reference to `_end' /ba-tools/b-gcc/ba-elf/ba2/newlib/libc/sys/basim/../../../../../../../gcc-4.1.2- ba-r8352/newlib/libc/sys/basim/glue.c:129: undefined reference to `_stack'
+collect2: ld returned 1 exit status
+make: *** [example-shell.jn5168] Error 1
+rm example-shell.co
+
+Then, I research why _sbrk, _stack, _end are problematic.
+So, I get description bellow. http://www.atollic.com/index.php/kb/1-kb_building/111-library-functions_hardfault But, I experiment another _sbrk implement, but insane.
+I prefer resolve this error to define _stack, _end.
+So, I make 1.ld, y2.ld from SDK's *.ld and LINKCMD introduce to Makefile. like this.
+CONTIKI_PROJECT = example-shell
+TARGET ?= jn5168
+all: $(CONTIKI_PROJECT)
+LINKCMD = 1.ld y2.ld
+#CFLAGS += -DMACRO_NAME=1
+#CFLAGS += --disable-newlib-supplied-syscalls
+APPS = serial-shell
+CONTIKI = ../..
+include $(CONTIKI)/Makefile.include
+$diff Makefile ../../../*.org/examples/example-shell 4c4
+< LINKCMD = 1.ld y2.ld
+---
+>
+6d5
+< #CFLAGS += --disable-newlib-supplied-syscalls
+
+https://github.com/Seeed-Studio/Mesh_Bee/blob/master/build/AppBuildRam_JN5168.ld
+# I referred to make y2.ld bellow two lines from above url.
+__app_ram_start = 0x01001580; /* Page 5, word 8 (16-byte words, 16 words per page) */ PROVIDE(_heap_location = _u32HeapStart);
+
+http://www.jennic.com/support/forums/thread.php?postID=0000000341 # I referred to make *.ld bellow lines from above url.
+stack ALIGN(256) :
+{
+. += STACK_SIZE; PROVIDE (_stack = .);
+} > RAM
+_end = . ; PROVIDE (end = .);
+
+http://microcworld.blogspot.jp/2014/07/bare-metal-programming-using-lpc1768.html Bare metal programming using LPC1768-Xplorer and CodeSourcery toolchain
+# supplementally above url is suggestive( mcu is not jennic related).
+another fundamental literatures: http://www.nxp.com/documents/data_sheet/JN516X.pdf Data Sheet: JN516x
+JN-DS-JN516x v1.3Production
+1 Introduction
+memory size description of JN5164-001, JN5168-001
+4 Memory Organisation
+Figure 5: JN5168Memory Map
+
+http://www.nxp.com/documents/application_note/JN-AN-1003.pdf Application Note: JN-AN-1003
+JN51xx Boot Loader Operation
+JN516x Memory Maps
+RAM_END:
+0x04008000 for JN5168 0x04008000 for JN5164 0x04002000 for JN5161
+INT_FLASH_END: 0x00040000 for JN5168 0x00028000 for JN5164 0x00010000 for JN5161
+
+- write two ld files.
+- modify Makefile (LINKCMD,TARGET, etc) - make
+./examples/tsch/hello-world.c so cd ./examples/tsch
+make
+- fix all errors
+- you will get this
+./examples/tsch/hello-world.jn5168.bin
+- compare runnable jn5164 binary (you have) to contiki jn5168 binary (first 3bytes) by winhex. - write jennic binary by jenprog. (not a contiki format binary)
+- connect serial terminal
+
+And Finally you get messages via serial terminal. Rime started with address 00.1b.c5.01.21.00.2c.02
+HW MAC tsExtAddr: 001bc501.21002c02 tsch_tx_callback_process: started
+Resync
+Contiki 2.7 started with IPV6, RPL
+MAC nullmac RDC tschrdc NETWORK sicslowpan
+Tentative link-local IPv6 address fe80:0000:0000:0000:021b:c501:2100:2c02
+
+Make environment:
+1. USB serial converter module
+http://akizukidenshi.com/catalog/g/gK-01977/
+FT232RL
+2. JN5164 (TWE-Lite DIP)
+http://tocos-wireless.com/jp/products/TWE-Lite-DIP/ 3. Breadboard
+4. Jenprog_1_3
+http://tocos-wireless.com/jp/tech/misc/jenprog/jenprog_1_3.zip 5. FT_Prog
+http://www.ftdichip.com/Support/Utilities.htm 6. Windows7
+7. Tocos SDK
+8. WinHex
+Binary JN5164 and JN5168 compare and edit Jennic binary(header)
+make JN5168 binary to fit JN5164 SOC.
+9. http://www.nxp.com/techzones/wireless-connectivity/jennet-ip.html
+Note: _sbrk error message(all):
+# this is my experiment of _sbrk redefinition cause.
+CC example-shell.c
+example-shell.c: In function '_sbrk':
+example-shell.c:111: warning: implicit declaration of function 'sbrk' example-shell.c:111: warning: initialization makes pointer from integer without a cast Generating binary ...
+￼JENNIC_CHIP OND_CHIPSET DEVICE_NAME JENNIC_PCB JENNIC_STACK JIP_DEVICE_TYPE = JIP_DEVICE_ID = OND_DEVICE_TYPE = VERSION = 41552
+LD example-shell.jn5168 /cygdrive/c/twesdk/wks_toconet/contiki-rich-2.7/platform/jn5168/Jennic/Tools/ba-elf-ba2/bin/ba-elf-gcc - Wl,--gc-sections -Wl,-u_AppColdStart -Wl,-u_AppWarmStart -TAppBuildMac_JN5168.ld - TApp_Stack_Size.ld -nostartfiles -mba2_elf -march=ba2 -L/cygdrive/c/twesdk/wks_toconet/contiki-rich- 2.7/platform/jn5168/Jennic/Platform/DK4/Library -L/cygdrive/c/twesdk/wks_toconet/contiki-rich- 2.7/platform/jn5168/Jennic/Components/Library -L/cygdrive/c/twesdk/wks_toconet/contiki-rich- 2.7/platform/jn5168/Jennic/Stack/NONE/Build -L/cygdrive/c/twesdk/wks_toconet/contiki-rich- 2.7/platform/jn5168/Jennic/Chip/JN5168/Build -L/cygdrive/c/twesdk/wks_toconet/contiki-rich- 2.7/platform/jn5168/Jennic/Chip/JN5168/Library -o example-shell.jn5168 -Wl,--start-group example- shell.co contiki-jn5168.a -lMMAC_JN516x -lDBG_JN516x -lRecal_JN516x -lPDM_EEPROM_JN516x - lJIP_JN516x -lJenNet_JN516x -l6LP_JN516x -lAppApi_JN516x -lMac_JN516x -lTof_JN516x - lXcv_JN516x -lAES_CCM_SW_PATCH_JN516x -lAes_JN516x -lTimerServer_JN516x - lHardwareApi_JN516x -lMicroSpecific_JN516x -lBoot_JN516x -lMaths_JN516x -lBoardLib_JN516x - lJPT_JN5168 -Wl,--end-group -Wl,-Map,contiki-jn5168.map /cygdrive/c/twesdk/wks_toconet/contiki-rich-2.7/platform/jn5168/Jennic/Tools/ba-elf-ba2/bin/../lib/gcc/ba- elf/4.1.2/../../../../ba-elf/lib/ba2/libc.a(glue.o): In function `_sbrk':
+
+/ba-tools/b-gcc/ba-elf/ba2/newlib/libc/sys/basim/../../../../../../../gcc-4.1.2-ba- r8352/newlib/libc/sys/basim/glue.c:129: multiple definition of `__sbrk' example-shell.co:example-shell.c:(.text._sbrk+0x0): first defined here /cygdrive/c/twesdk/wks_toconet/contiki-rich-2.7/platform/jn5168/Jennic/Tools/ba-elf-ba2/bin/../lib/gcc/ba- elf/4.1.2/../../../../ba-elf/bin/ld: Warning: size of symbol `__sbrk' changed from 42 in example-shell.co to 105 in /cygdrive/c/twesdk/wks_toconet/contiki-rich-2.7/platform/jn5168/Jennic/Tools/ba-elf- ba2/bin/../lib/gcc/ba-elf/4.1.2/../../../../ba-elf/lib/ba2/libc.a(glue.o) /cygdrive/c/twesdk/wks_toconet/contiki-rich-2.7/platform/jn5168/Jennic/Tools/ba-elf-ba2/bin/../lib/gcc/ba- elf/4.1.2/../../../../ba-elf/lib/ba2/libc.a(glue.o): In function `_sbrk': /ba-tools/b-gcc/ba-elf/ba2/newlib/libc/sys/basim/../../../../../../../gcc-4.1.2-ba- r8352/newlib/libc/sys/basim/glue.c:129: undefined reference to `_end' /ba-tools/b-gcc/ba-elf/ba2/newlib/libc/sys/basim/../../../../../../../gcc-4.1.2-ba- r8352/newlib/libc/sys/basim/glue.c:129: undefined reference to `_stack'
+collect2: ld returned 1 exit status
+make: *** [example-shell.jn5168] Error 1 rm example-shell.co
