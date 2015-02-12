@@ -218,7 +218,7 @@ contiki jn5168 making with Tocos SDK for JN5164(TWE-Lite DIP) tech memo. Author 
 < }
 < 
 212,226c150,152
-<   seriz_uart_init();
+<   test_uart_init();
 <   //uart0_set_input(uart_rx_callback);
 <   //uart0_set_input(serial_line_input_byte);
 <   serial_line_init();
@@ -253,25 +253,8 @@ contiki jn5168 making with Tocos SDK for JN5164(TWE-Lite DIP) tech memo. Author 
 <   //sprintf(msg, "Hello, world\n");
 246,325d162
 < 
-< void seriz_uart_init(void)
-< {
-<         bool_t Bflag = false;
-<        // if (vprintf_uart == E_AHI_UART_1)return;
-< 
-<         // disable RTS CTS
-<         vAHI_UartSetRTSCTS(E_AHI_UART_1, FALSE);
-< 
-<         // set fifo buffers
-<         Bflag = bAHI_UartEnable(E_AHI_UART_1, S2TxFifo, (sizeof(S2TxFifo)), S2RxFifo, (sizeof(S2RxFifo)));
-< 
-<         //set uart baud rate
-<         vAHI_UartSetBaudRate(E_AHI_UART_1, E_AHI_UART_RATE_115200);
-< 
-<         // set uart: no parity, 8 bit data, 1 stop bit
-<         vAHI_UartSetControl(E_AHI_UART_1, E_AHI_UART_EVEN_PARITY,
-<                 E_AHI_UART_PARITY_DISABLE, E_AHI_UART_WORD_LEN_8,
-<                 E_AHI_UART_1_STOP_BIT, E_AHI_UART_RTS_HIGH);
-<         PRINTF("init seriz...\n");
+< void test_uart_init(void)
+/*: between these lines are omitted */
 < }
 < 
 < void vPutChar(char c)
