@@ -17,3 +17,10 @@ and so on.
 For more information, see the Contiki website:
 
 [http://contiki-os.org](http://contiki-os.org)
+
+addendum to referers of this (@cobwebkanamachi):
+
+experiment to build and execute contiki on jn5168 i did twice.
+1st is with .ld files.
+2nd is with no .ld files.
+I make brief diff pdf for a person will similar experiment.
